@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa do Terna</title>
+<style>
+  :root {
+    --bg: #eef1f6;
+    --surface: #ffffff;
+    --surface-2: #e4e9f1;
+    --border: #d3dae5;
+    --border-strong: #aab4c4;
+    --text: #1a2230;
+    --text-muted: #5b6577;
+    --text-faint: #8792a3;
+    --accent: #0e6f78;
+    --accent-strong: #0a555c;
+
+    /* status palette — fixo, mesmo significado em toda a página */
+    --good: #0ca30c;         /* concluída / resolvido */
+    --good-wash: rgba(12,163,12,0.13);
+    --good-bg: rgba(12,163,12,0.10);
+    --good-border: rgba(12,163,12,0.38);
+
+    --warning: #e0940a;      /* pronta / pendente */
+    --warning-bg: rgba(224,148,10,0.12);
+    --warning-border: rgba(224,148,10,0.42);
+
+    --serious: #d9633a;      /* ainda não criada */
+    --serious-bg: rgba(217,99,58,0.10);
+    --serious-border: rgba(217,99,58,0.38);
+
+    --critical: #c62828;     /* bloqueada por decisão */
+    --critical-bg: rgba(198,40,40,0.10);
+    --critical-border: rgba(198,40,40,0.42);
+
+    /* escala de intensidade do heatmap de ritmo — nunca reaproveita good/warning/serious (significado fixo de status) */
+    --heat-0: var(--surface-2);
+    --heat-1: rgba(14,111,120,0.22);
+    --heat-2: rgba(14,111,120,0.42);
+    --heat-3: rgba(14,111,120,0.68);
+    --heat-4: #0e6f78;
+
+    --shadow-1: 0 1px 2px rgba(20, 30, 50, 0.06);
+    --shadow-2: 0 8px 24px rgba(20, 30, 50, 0.10);
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12161d; --surface: #1a2029; --surface-2: #212836;
+      --border: #313b4c; --border-strong: #47536a;
+      --text: #e8ecf4; --text-muted: #a3adc2; --text-faint: #767f93;
+      --accent: #4fc3c9; --accent-strong: #7fdadf;
+      --good-wash: rgba(58,214,102,0.16); --good-bg: rgba(58,214,102,0.13); --good-border: rgba(58,214,102,0.4);
+      --good: #3ad666;
+      --warning: #f2a934; --warning-bg: rgba(242,169,52,0.15); --warning-border: rgba(242,169,52,0.42);
+      --serious: #ef7e57; --serious-bg: rgba(239,126,87,0.14); --serious-border: rgba(239,126,87,0.4);
+      --critical: #ef5350; --critical-bg: rgba(239,83,80,0.14); --critical-border: rgba(239,83,80,0.42);
+      --heat-0: var(--surface-2); --heat-1: rgba(79,195,201,0.20); --heat-2: rgba(79,195,201,0.38);
+      --heat-3: rgba(79,195,201,0.62); --heat-4: #4fc3c9;
+      --shadow-1: 0 1px 2px rgba(0,0,0,0.3); --shadow-2: 0 10px 26px rgba(0,0,0,0.45);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12161d; --surface: #1a2029; --surface-2: #212836;
+    --border: #313b4c; --border-strong: #47536a;
+    --text: #e8ecf4; --text-muted: #a3adc2; --text-faint: #767f93;
+    --accent: #4fc3c9; --accent-strong: #7fdadf;
+    --good-wash: rgba(58,214,102,0.16); --good-bg: rgba(58,214,102,0.13); --good-border: rgba(58,214,102,0.4);
+    --good: #3ad666;
+    --warning: #f2a934; --warning-bg: rgba(242,169,52,0.15); --warning-border: rgba(242,169,52,0.42);
+    --serious: #ef7e57; --serious-bg: rgba(239,126,87,0.14); --serious-border: rgba(239,126,87,0.4);
+    --critical: #ef5350; --critical-bg: rgba(239,83,80,0.14); --critical-border: rgba(239,83,80,0.42);
+    --heat-0: var(--surface-2); --heat-1: rgba(79,195,201,0.20); --heat-2: rgba(79,195,201,0.38);
+    --heat-3: rgba(79,195,201,0.62); --heat-4: #4fc3c9;
+    --shadow-1: 0 1px 2px rgba(0,0,0,0.3); --shadow-2: 0 10px 26px rgba(0,0,0,0.45);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: "Archivo","Segoe UI",system-ui,sans-serif; }
+  img { max-width: 100%; }
+
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden;
+    clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+  .wrap { max-width: 1220px; margin: 0 auto; padding: 26px 20px 60px; }
+
+  .mono { font-family:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace; }
+
+  h1,h2,h3 { text-wrap: balance; margin: 0; }
+
+  /* ---------- top bar ---------- */
+  .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:22px; flex-wrap:wrap; }
+  .brand { display:flex; align-items:center; gap:10px; }
+  .brand .dot { width:10px; height:10px; border-radius:50%; background:var(--accent); }
+  .brand h1 { font-size:1.05rem; font-weight:800; letter-spacing:-0.01em; }
+  .datestamp { font-size:0.72rem; color:var(--text-faint); font-family:"JetBrains Mono",monospace; }
+
+  /* ---------- hero ---------- */
+  .hero { display:grid; grid-template-columns: 1.3fr 0.85fr 1fr; gap:14px; margin-bottom:38px; }
+  @media (max-width: 860px) { .hero { grid-template-columns: 1fr; } }
+
+  .hero-card { background:var(--surface); border:1px solid var(--border); border-radius:18px;
+    padding:20px 22px; box-shadow: var(--shadow-1); display:flex; flex-direction:column; justify-content:center; }
+
+  .hero-eyebrow { font-family:"JetBrains Mono",monospace; font-size:0.66rem; letter-spacing:0.16em;
+    text-transform:uppercase; color:var(--text-faint); margin-bottom:10px; }
+
+  .meter-row { display:flex; align-items:baseline; gap:14px; }
+  .meter-value { font-size:3.2rem; font-weight:800; line-height:1; color:var(--good); letter-spacing:-0.02em; }
+  .meter-track { flex:1; height:14px; border-radius:99px; background:var(--good-wash); overflow:hidden; position:relative; margin-top:14px; }
+  .meter-fill { height:100%; border-radius:99px; background:var(--good); }
+  .meter-icons { display:flex; gap:16px; margin-top:14px; }
+  .micon { display:flex; align-items:center; gap:6px; font-family:"JetBrains Mono",monospace; font-size:0.92rem; font-weight:700; }
+  .micon svg { width:15px; height:15px; flex:none; }
+
+  .eta-value { font-size:1.35rem; font-weight:800; font-family:"JetBrains Mono",monospace; letter-spacing:-0.01em; }
+  .eta-range { display:flex; align-items:center; gap:10px; }
+  .eta-cal { width:34px; height:34px; flex:none; color:var(--accent); }
+  .eta-bar { margin-top:14px; height:8px; border-radius:99px; background:var(--surface-2); position:relative; overflow:visible; }
+  .eta-bar .pin { position:absolute; top:-4px; width:16px; height:16px; border-radius:50%; background:var(--accent); border:3px solid var(--surface); box-shadow:var(--shadow-1); }
+  .eta-bar .pin.today { background:var(--text-faint); }
+  .eta-basis { display:flex; flex-wrap:wrap; gap:6px; margin-top:18px; }
+  .eta-chip { font-family:"JetBrains Mono",monospace; font-size:0.68rem; font-weight:700; padding:3px 9px;
+    border-radius:99px; background:var(--surface-2); color:var(--text-muted); white-space:nowrap; }
+
+  .kpi-list { display:flex; flex-direction:column; gap:10px; }
+  .kpi { display:flex; align-items:center; gap:10px; }
+  .kpi svg { width:22px; height:22px; flex:none; }
+  .kpi .n { font-size:1.3rem; font-weight:800; font-family:"JetBrains Mono",monospace; min-width:26px; }
+  .kpi .k { font-size:0.72rem; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.06em; }
+
+  /* ---------- section chrome (minimal) ---------- */
+  section.block { margin-top:44px; }
+  .block-title { display:flex; align-items:center; gap:8px; font-family:"JetBrains Mono",monospace;
+    font-size:0.7rem; letter-spacing:0.16em; text-transform:uppercase; color:var(--text-faint); margin-bottom:14px; }
+  .block-title::after { content:""; flex:1; height:1px; background:var(--border); }
+
+  /* ---------- icon legend ---------- */
+  .ikey { display:flex; flex-wrap:wrap; gap:16px; margin-bottom:16px; }
+  .ikey .it { display:flex; align-items:center; gap:6px; font-size:0.74rem; color:var(--text-muted); }
+  .ikey svg { width:14px; height:14px; }
+
+  /* ---------- flow ---------- */
+  .flow-scroll { overflow-x:auto; border:1px solid var(--border); border-radius:16px; background:var(--surface); padding:10px; box-shadow:var(--shadow-1); }
+  #flow-canvas { position:relative; }
+  .lane-tag { position:absolute; font-family:"JetBrains Mono",monospace; font-size:0.62rem; letter-spacing:0.09em;
+    text-transform:uppercase; color:var(--text-faint); left:4px; opacity:0.75; }
+
+  .node { position:absolute; width:150px; height:52px; border-radius:11px; border:1.5px solid; box-shadow:var(--shadow-1);
+    display:flex; align-items:center; justify-content:center; gap:7px; cursor:default; }
+  .node .pid { font-family:"JetBrains Mono",monospace; font-size:0.78rem; font-weight:700; text-align:center; }
+  .node .sicon { width:16px; height:16px; flex:none; }
+  .node.good { background:var(--good-bg); border-color:var(--good-border); color:var(--good); }
+  .node.warning { background:var(--warning-bg); border-color:var(--warning-border); color:var(--warning); }
+  .node.serious { background:var(--serious-bg); border-color:var(--serious-border); color:var(--serious); }
+  .node .qmark { position:absolute; top:-8px; left:-8px; width:19px; height:19px; border-radius:50%;
+    background:var(--critical); color:#fff; display:grid; place-items:center; font-weight:800; font-size:0.68rem;
+    box-shadow:var(--shadow-1); border:2px solid var(--surface); }
+
+  #flow-svg path.edge { fill:none; stroke:var(--border-strong); stroke-width:2; }
+  #flow-svg path.edge.into-serious { stroke-dasharray:5 5; stroke:var(--text-faint); }
+  #flow-svg path.edge.note { stroke:var(--accent); stroke-dasharray:2 5; stroke-width:2; }
+
+  /* ---------- DT waffle ---------- */
+  .dt-head { display:flex; align-items:center; gap:22px; margin-bottom:18px; flex-wrap:wrap; }
+  .dt-meter { display:flex; align-items:center; gap:12px; }
+  .dt-meter .v { font-size:2.1rem; font-weight:800; font-family:"JetBrains Mono",monospace; color:var(--good); }
+  .dt-meter .track { width:150px; height:10px; border-radius:99px; background:var(--warning-bg); overflow:hidden; }
+  .dt-meter .fill { height:100%; background:var(--good); border-radius:99px; }
+
+  .waffle { display:grid; grid-template-columns: repeat(11, 1fr); gap:5px; max-width:560px; }
+  @media (max-width:520px){ .waffle{ grid-template-columns: repeat(8,1fr);} }
+  .cell { aspect-ratio:1; border-radius:6px; cursor:default; }
+  .cell.good { background:var(--good); }
+  .cell.warning { background:var(--warning); }
+
+  /* ---------- ritmo (heatmap de produtividade por data) ---------- */
+  .ritmo-stats { display:flex; gap:14px; margin-bottom:16px; flex-wrap:wrap; }
+  .ritmo-stat { background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:12px 16px; box-shadow:var(--shadow-1); min-width:150px; }
+  .ritmo-stat .v { font-size:1.35rem; font-weight:800; font-family:"JetBrains Mono",monospace; color:var(--accent); }
+  .ritmo-stat .k { font-size:0.68rem; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.06em; margin-top:2px; }
+
+  .heat-wrap { display:flex; gap:8px; align-items:flex-start; overflow-x:auto; padding-bottom:4px; }
+  .heat-days { display:flex; flex-direction:column; gap:3px; padding-top:16px; flex:none; }
+  .heat-days span { display:block; height:11px; width:20px; font-size:0.62rem; line-height:11px;
+    color:var(--text-faint); font-family:"JetBrains Mono",monospace; }
+  .heat-cols { display:flex; flex-direction:column; gap:3px; }
+  .heat-months { display:flex; gap:3px; }
+  .heat-months span { display:block; width:11px; font-size:0.6rem; color:var(--text-faint); font-family:"JetBrains Mono",monospace; }
+  .heat-grid { display:flex; gap:3px; }
+  .heat-week { display:flex; flex-direction:column; gap:3px; }
+  .heat-cell { width:11px; height:11px; border-radius:3px; cursor:default; }
+  .heat-cell.l0 { background:var(--heat-0); border:1px solid var(--border); }
+  .heat-cell.l1 { background:var(--heat-1); }
+  .heat-cell.l2 { background:var(--heat-2); }
+  .heat-cell.l3 { background:var(--heat-3); }
+  .heat-cell.l4 { background:var(--heat-4); }
+  .heat-cell.future { background:transparent; }
+  .heat-legend { display:flex; align-items:center; gap:5px; margin-top:10px; font-size:0.68rem;
+    color:var(--text-faint); font-family:"JetBrains Mono",monospace; }
+
+  /* ---------- decisions ---------- */
+  footer { margin-top:48px; padding-top:16px; border-top:1px solid var(--border); font-size:0.7rem; color:var(--text-faint); text-align:center; }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="ic-check" viewBox="0 0 24 24"><path d="M4 13l5 5L20 6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="ic-half" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></symbol>
+    <symbol id="ic-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-dasharray="3 3.4"/></symbol>
+    <symbol id="ic-q" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><text x="12" y="17" text-anchor="middle" font-size="13" font-weight="800" fill="#fff" font-family="Archivo,sans-serif">?</text></symbol>
+    <symbol id="ic-cal" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span><h1>Mapa do Terna</h1></div>
+    <div class="datestamp">retrato · 22/09/2026</div>
+  </div>
+
+  <!-- ================= HERO ================= -->
+  <div class="hero">
+    <div class="hero-card">
+      <div class="hero-eyebrow">Progresso</div>
+      <div class="meter-row">
+        <div class="meter-value" id="progress-num">17%</div>
+      </div>
+      <div class="meter-track"><div class="meter-fill" id="progress-fill" style="width:17%"></div></div>
+      <div class="meter-icons" id="progress-icons"></div>
+      <span class="sr-only" id="progress-sr"></span>
+    </div>
+
+    <div class="hero-card" title="Ainda não existe nenhuma PRD formal para o jogo — só um item entregue e cinco etapas de roadmap citadas em conversa, sem tasks nem estimativa de esforço registradas. Sem dado medido não é seguro projetar uma data.">
+      <div class="hero-eyebrow">Entrega estimada</div>
+      <div class="eta-range">
+        <svg class="eta-cal"><use href="#ic-cal"/></svg>
+        <div class="eta-value">sem base para estimar</div>
+      </div>
+    </div>
+
+    <div class="hero-card">
+      <div class="hero-eyebrow">Etapas do roadmap</div>
+      <div class="kpi-list" id="kpi-list"></div>
+    </div>
+  </div>
+
+  <!-- ================= FLOWCHART ================= -->
+  <section class="block">
+    <div class="block-title">Roadmap</div>
+    <div class="ikey">
+      <span class="it"><svg style="color:var(--good)"><use href="#ic-check"/></svg>concluída</span>
+      <span class="it"><svg style="color:var(--warning)"><use href="#ic-half"/></svg>pronta</span>
+      <span class="it"><svg style="color:var(--serious)"><use href="#ic-circle"/></svg>a criar</span>
+    </div>
+    <div class="flow-scroll"><div id="flow-canvas"></div></div>
+  </section>
+
+  <!-- ================= DECISOES ================= -->
+  <footer>index.html · src/chao.js · src/main.js (working tree) · relatório visual da Hwei · prds/ e docs/relatorios/ do harness base ignorados (não pertencem ao jogo) — retrato datado</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var W = 150, H = 52;
+  var COLX = [16, 198, 380, 562, 744];
+
+  // Sem PRDs formais ainda: cada "etapa" é uma peça de escopo do jogo, não um documento.
+  // A única concluída é a entrega real já validada visualmente (chão + canvas).
+  var nodes = [
+    { id:"ETAPA-01", status:"good",    col:0, y:110 },
+    { id:"ETAPA-02", status:"serious", col:1, y:30  },
+    { id:"ETAPA-03", status:"serious", col:2, y:30  },
+    { id:"ETAPA-04", status:"serious", col:2, y:190 },
+    { id:"ETAPA-05", status:"serious", col:3, y:110 },
+    { id:"ETAPA-06", status:"serious", col:4, y:110 }
+  ];
+
+  var titles = {
+    "ETAPA-01":"Cenário base",
+    "ETAPA-02":"Personagem, pulo e colisão",
+    "ETAPA-03":"Plataformas",
+    "ETAPA-04":"Itens coletáveis e placar",
+    "ETAPA-05":"Inimigos",
+    "ETAPA-06":"Telas de início e fim"
+  };
+
+  var descs = {
+    "ETAPA-01":"O canvas do jogo já mostra um céu em degradê e um chão de grama, tufos e terra com pedrinhas, em pixel art ampliada 16:9. Validado visualmente sem nenhum problema grave.",
+    "ETAPA-02":"Vai dar ao personagem movimento para os lados, pulo com gravidade e colisão com o chão — ainda não existe nenhum código disso.",
+    "ETAPA-03":"Vai criar plataformas soltas no ar para o personagem pular entre elas, além do chão já existente.",
+    "ETAPA-04":"Vai adicionar itens para o personagem coletar pelo cenário, com um placar mostrando quantos já foram pegos.",
+    "ETAPA-05":"Vai colocar inimigos que o personagem precisa desviar ou derrotar.",
+    "ETAPA-06":"Vai criar a tela de abertura do jogo e a tela de fim (vitória ou derrota)."
+  };
+
+  var edges = [
+    ["ETAPA-01","ETAPA-02"],
+    ["ETAPA-02","ETAPA-03"],
+    ["ETAPA-02","ETAPA-04"],
+    ["ETAPA-03","ETAPA-05"],
+    ["ETAPA-04","ETAPA-05"],
+    ["ETAPA-05","ETAPA-06"]
+  ];
+  var noteEdges = [];
+
+  var byId = {}; nodes.forEach(function(n){ byId[n.id]=n; });
+
+  var canvas = document.getElementById("flow-canvas");
+  var scroller = canvas.parentElement;
+  var svgNS = "http://www.w3.org/2000/svg";
+  var iconOf = { good:"ic-check", warning:"ic-half", serious:"ic-circle" };
+  var larguraHorizontal = Math.max.apply(null, COLX)+W+16;
+  var lanes = ["Cenário","Movimento","Conteúdo","Desafio","Fechamento"];
+
+  // Sem espaço para o fluxo horizontal, as colunas viram linhas — nada de rolagem lateral escondida.
+  function layout(){
+    var estilo = getComputedStyle(scroller);
+    var util = scroller.clientWidth - parseFloat(estilo.paddingLeft) - parseFloat(estilo.paddingRight);
+    var pos = {};
+    if (util >= larguraHorizontal) {
+      nodes.forEach(function(n){ pos[n.id] = { x:COLX[n.col], y:n.y }; });
+      return { vertical:false, w:W, largura:larguraHorizontal,
+        altura:Math.max.apply(null, nodes.map(function(n){return n.y;}))+H+20, pos:pos };
+    }
+    var w = Math.min(W, Math.floor((util-12)/2));
+    var passo = H+40;
+    var porColuna = {};
+    nodes.forEach(function(n){ (porColuna[n.col] = porColuna[n.col] || []).push(n); });
+    Object.keys(porColuna).forEach(function(c){
+      var grupo = porColuna[c].sort(function(a,b){ return a.y-b.y; });
+      grupo.forEach(function(n,i){
+        var x = grupo.length===1 ? Math.round((util-w)/2) : (i===0 ? 0 : util-w);
+        pos[n.id] = { x:x, y:10+Number(c)*passo };
+      });
+    });
+    var ultimaCol = Math.max.apply(null, nodes.map(function(n){ return n.col; }));
+    return { vertical:true, w:w, largura:util, altura:10+ultimaCol*passo+H+10, pos:pos };
+  }
+
+  function caminho(L,a,b){
+    var pa=L.pos[a], pb=L.pos[b];
+    if (L.vertical) {
+      var sx=pa.x+L.w/2, sy=pa.y+H, tx=pb.x+L.w/2, ty=pb.y, my=sy+(ty-sy)/2;
+      return "M "+sx+" "+sy+" V "+my+" H "+tx+" V "+ty;
+    }
+    var hx=pa.x+L.w, hy=pa.y+H/2, htx=pb.x, hty=pb.y+H/2, mx=hx+(htx-hx)/2;
+    return "M "+hx+" "+hy+" H "+mx+" V "+hty+" H "+htx;
+  }
+
+  function desenharFluxo(){
+  var L = layout();
+  canvas.innerHTML = "";
+  canvas.style.width = L.largura+"px"; canvas.style.height = L.altura+"px";
+
+  var svg = document.createElementNS(svgNS,"svg");
+  svg.setAttribute("id","flow-svg"); svg.setAttribute("width",L.largura); svg.setAttribute("height",L.altura);
+  svg.style.position="absolute"; svg.style.left="0"; svg.style.top="0";
+  svg.setAttribute("role","img");
+  svg.setAttribute("aria-label","Dependências entre as etapas de escopo do jogo, coloridas por status: concluída, pronta ou a criar.");
+
+  var defs = document.createElementNS(svgNS,"defs");
+  var marker = document.createElementNS(svgNS,"marker");
+  marker.setAttribute("id","arrow"); marker.setAttribute("markerWidth","8"); marker.setAttribute("markerHeight","8");
+  marker.setAttribute("refX","6.5"); marker.setAttribute("refY","3"); marker.setAttribute("orient","auto");
+  var tri = document.createElementNS(svgNS,"polygon"); tri.setAttribute("points","0 0,7 3,0 6"); tri.setAttribute("fill","currentColor");
+  marker.appendChild(tri); defs.appendChild(marker); svg.appendChild(defs);
+
+  edges.forEach(function(e){
+    var p=document.createElementNS(svgNS,"path");
+    p.setAttribute("d",caminho(L,e[0],e[1]));
+    p.setAttribute("class","edge"+(byId[e[1]].status==="serious"?" into-serious":""));
+    p.setAttribute("marker-end","url(#arrow)"); p.style.color="var(--text-faint)";
+    var t=document.createElementNS(svgNS,"title"); t.textContent=e[0]+" → "+e[1]; p.appendChild(t);
+    svg.appendChild(p);
+  });
+  canvas.appendChild(svg);
+
+  if (!L.vertical) {
+    lanes.forEach(function(t,i){ var d=document.createElement("div"); d.className="lane-tag"; d.style.left=(COLX[i]-6)+"px"; d.style.top="-14px"; d.textContent=t; canvas.appendChild(d); });
+  }
+
+  nodes.forEach(function(n){
+    var d=document.createElement("div");
+    d.className="node "+n.status;
+    d.style.left=L.pos[n.id].x+"px"; d.style.top=L.pos[n.id].y+"px";
+    d.style.width=L.w+"px"; d.style.padding="0 6px";
+    d.title = titles[n.id]+(descs[n.id] ? "\n"+descs[n.id] : "")+"\n("+n.id+")";
+    d.innerHTML =
+      '<svg class="sicon"><use href="#'+iconOf[n.status]+'"/></svg>' +
+      '<span class="pid">'+titles[n.id]+'</span>';
+    canvas.appendChild(d);
+  });
+  }
+
+  desenharFluxo();
+  window.addEventListener("resize", desenharFluxo);
+
+  // ---- hero numbers ----
+  var wDone=nodes.filter(function(n){return n.status==="good";}).length;
+  var wPend=nodes.filter(function(n){return n.status==="warning";}).length;
+  var wTodo=nodes.filter(function(n){return n.status==="serious";}).length;
+  var total=nodes.length;
+  var pct = Math.round(((wDone*1 + wPend*0.5) / total) * 100);
+  document.getElementById("progress-num").textContent = pct+"%";
+  document.getElementById("progress-fill").style.width = pct+"%";
+  document.getElementById("progress-sr").textContent = pct+"% do roadmap concluído: "+wDone+" etapas prontas, "+wPend+" em execução, "+wTodo+" ainda não criadas.";
+
+  var micons = document.getElementById("progress-icons");
+  [["ic-check","good",wDone],["ic-half","warning",wPend],["ic-circle","serious",wTodo]].forEach(function(a){
+    var s=document.createElement("span"); s.className="micon"; s.style.color="var(--"+a[1]+")";
+    s.innerHTML='<svg><use href="#'+a[0]+'"/></svg>'+a[2];
+    micons.appendChild(s);
+  });
+
+  var kpiList = document.getElementById("kpi-list");
+  [["ic-check","good","concluídas",wDone],["ic-half","warning","prontas",wPend],["ic-circle","serious","a criar",wTodo]].forEach(function(a){
+    var d=document.createElement("div"); d.className="kpi";
+    d.innerHTML='<svg style="color:var(--'+a[1]+')"><use href="#'+a[0]+'"/></svg><span class="n">'+a[3]+'</span><span class="k">'+a[2]+'</span>';
+    kpiList.appendChild(d);
+  });
+
+})();
+</script>
+</body>
+</html>
