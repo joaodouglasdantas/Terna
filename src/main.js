@@ -38,6 +38,8 @@ const ceu = ctx.createLinearGradient(0, 0, 0, Y_CHAO);
 ceu.addColorStop(0, '#5fb4f0');
 ceu.addColorStop(1, '#bfe6ff');
 
+const fundo = criarFundo(LARGURA, Y_CHAO);
+const vegetacao = criarVegetacao(LARGURA, ALTURA, Y_CHAO);
 const sol = criarSol(36);
 const SOL_X = LARGURA - 70;
 const SOL_Y = 46;
@@ -99,7 +101,9 @@ function desenhar() {
   ctx.fillStyle = ceu;
   ctx.fillRect(0, 0, LARGURA, ALTURA);
   ctx.drawImage(sol, SOL_X - sol.width / 2, SOL_Y - sol.height / 2);
+  ctx.drawImage(fundo, 0, 0);
   ctx.drawImage(chao, 0, Y_CHAO - FOLGA_TUFOS);
+  ctx.drawImage(vegetacao, 0, 0);
 
   ctx.save();
   if (personagem.direcao === -1) {
