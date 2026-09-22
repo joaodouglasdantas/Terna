@@ -38,6 +38,30 @@ const ceu = ctx.createLinearGradient(0, 0, 0, Y_CHAO);
 ceu.addColorStop(0, '#5fb4f0');
 ceu.addColorStop(1, '#bfe6ff');
 
+const sol = criarSol(36);
+const SOL_X = LARGURA - 70;
+const SOL_Y = 46;
+
+function criarSol(diametro) {
+  const canvasSol = document.createElement('canvas');
+  canvasSol.width = diametro;
+  canvasSol.height = diametro;
+  const ctxSol = canvasSol.getContext('2d');
+  const raio = diametro / 2;
+
+  ctxSol.fillStyle = '#ffe066';
+  ctxSol.beginPath();
+  ctxSol.arc(raio, raio, raio - 4, 0, Math.PI * 2);
+  ctxSol.fill();
+
+  ctxSol.fillStyle = '#fff3b0';
+  ctxSol.beginPath();
+  ctxSol.arc(raio, raio, raio - 8, 0, Math.PI * 2);
+  ctxSol.fill();
+
+  return canvasSol;
+}
+
 function atualizar(dt) {
   const esquerda = teclas['ArrowLeft'] || teclas['KeyA'];
   const direita = teclas['ArrowRight'] || teclas['KeyD'];
@@ -74,6 +98,7 @@ function atualizar(dt) {
 function desenhar() {
   ctx.fillStyle = ceu;
   ctx.fillRect(0, 0, LARGURA, ALTURA);
+  ctx.drawImage(sol, SOL_X - sol.width / 2, SOL_Y - sol.height / 2);
   ctx.drawImage(chao, 0, Y_CHAO - FOLGA_TUFOS);
 
   ctx.save();
