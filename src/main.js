@@ -10,6 +10,9 @@ const Y_CHAO = ALTURA - ALTURA_CHAO;
 const FOLGA_TUFOS = 4;
 const chao = criarChao(LARGURA, ALTURA_CHAO, FOLGA_TUFOS);
 
+const spritePersonagem = criarSprite(SPRITE_PERSONAGEM, PALETA_PERSONAGEM);
+const personagem = { x: 60, y: Y_CHAO - spritePersonagem.height };
+
 const ceu = ctx.createLinearGradient(0, 0, 0, Y_CHAO);
 ceu.addColorStop(0, '#5fb4f0');
 ceu.addColorStop(1, '#bfe6ff');
@@ -18,6 +21,7 @@ function desenhar() {
   ctx.fillStyle = ceu;
   ctx.fillRect(0, 0, LARGURA, ALTURA);
   ctx.drawImage(chao, 0, Y_CHAO - FOLGA_TUFOS);
+  ctx.drawImage(spritePersonagem, personagem.x, personagem.y);
 }
 
 function loop() {
