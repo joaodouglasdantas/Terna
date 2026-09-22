@@ -10,21 +10,63 @@ const Y_CHAO = ALTURA - ALTURA_CHAO;
 const FOLGA_TUFOS = 4;
 const chao = criarChao(LARGURA, ALTURA_CHAO, FOLGA_TUFOS);
 
-const spritePersonagem = criarSprite(SPRITE_PERSONAGEM, PALETA_PERSONAGEM);
+const ANIMACOES = {};
+Object.entries(QUADROS_PERSONAGEM).forEach(([nome, quadros]) => {
+  ANIMACOES[nome] = quadros.map((linhas) => criarSprite(linhas, PALETA_PERSONAGEM));
+});
+
+const DURACAO_QUADRO = {
+  parado: 0.6,
+  andando: 0.11,
+  subindo: 0.2,
+  caindo: 0.2,
+  deitado: 1.1,
+};
 
 const VELOCIDADE = 90; // pixels por segundo
 const FORCA_PULO = 220; // pixels por segundo
 const GRAVIDADE = 640; // pixels por segundo²
-const Y_INICIAL = Y_CHAO - spritePersonagem.height;
 
+// `y` é a linha dos pés: os quadros têm alturas diferentes, o apoio no chão não.
 const personagem = {
   x: 60,
-  y: Y_INICIAL,
+  y: Y_CHAO,
   vx: 0,
   vy: 0,
   direcao: 1, // 1 = direita, -1 = esquerda
   noChao: true,
+  deitado: false,
+  animacao: 'parado',
+  quadro: 0,
+  tempoQuadro: 0,
 };
+
+function animacaoDoEstado() {
+  if (personagem.deitado) return 'deitado';
+  if (!personagem.noChao) return personagem.vy < 0 ? 'subindo' : 'caindo';
+  return personagem.vx !== 0 ? 'andando' : 'parado';
+}
+
+function avancarAnimacao(dt) {
+  const animacao = animacaoDoEstado();
+  if (animacao !== personagem.animacao) {
+    personagem.animacao = animacao;
+    personagem.quadro = 0;
+    personagem.tempoQuadro = 0;
+    return;
+  }
+
+  personagem.tempoQuadro += dt;
+  const passo = DURACAO_QUADRO[animacao];
+  if (personagem.tempoQuadro >= passo) {
+    personagem.tempoQuadro -= passo;
+    personagem.quadro = (personagem.quadro + 1) % ANIMACOES[animacao].length;
+  }
+}
+
+function spriteAtual() {
+  return ANIMACOES[personagem.animacao][personagem.quadro];
+}
 
 const teclas = {};
 window.addEventListener('keydown', (evento) => {
@@ -68,33 +110,39 @@ function atualizar(dt) {
   const esquerda = teclas['ArrowLeft'] || teclas['KeyA'];
   const direita = teclas['ArrowRight'] || teclas['KeyD'];
   const pular = teclas['Space'] || teclas['ArrowUp'] || teclas['KeyW'];
+  const baixo = teclas['ArrowDown'] || teclas['KeyS'];
+
+  // Só deita com os pés no chão; deitado não anda nem pula.
+  personagem.deitado = Boolean(baixo) && personagem.noChao;
 
   personagem.vx = 0;
-  if (esquerda) {
-    personagem.vx = -VELOCIDADE;
-    personagem.direcao = -1;
-  }
-  if (direita) {
-    personagem.vx = VELOCIDADE;
-    personagem.direcao = 1;
-  }
-
-  if (pular && personagem.noChao) {
-    personagem.vy = -FORCA_PULO;
-    personagem.noChao = false;
+  if (!personagem.deitado) {
+    if (esquerda) {
+      personagem.vx = -VELOCIDADE;
+      personagem.direcao = -1;
+    }
+    if (direita) {
+      personagem.vx = VELOCIDADE;
+      personagem.direcao = 1;
+    }
+    if (pular && personagem.noChao) {
+      personagem.vy = -FORCA_PULO;
+      personagem.noChao = false;
+    }
   }
 
   personagem.vy += GRAVIDADE * dt;
   personagem.x += personagem.vx * dt;
   personagem.y += personagem.vy * dt;
 
-  personagem.x = Math.max(0, Math.min(LARGURA - spritePersonagem.width, personagem.x));
-
-  if (personagem.y >= Y_INICIAL) {
-    personagem.y = Y_INICIAL;
+  if (personagem.y >= Y_CHAO) {
+    personagem.y = Y_CHAO;
     personagem.vy = 0;
     personagem.noChao = true;
   }
+
+  avancarAnimacao(dt);
+  personagem.x = Math.max(0, Math.min(LARGURA - spriteAtual().width, personagem.x));
 }
 
 function desenhar() {
@@ -105,13 +153,16 @@ function desenhar() {
   ctx.drawImage(chao, 0, Y_CHAO - FOLGA_TUFOS);
   ctx.drawImage(vegetacao, 0, 0);
 
+  const sprite = spriteAtual();
+  const topo = personagem.y - sprite.height;
+
   ctx.save();
   if (personagem.direcao === -1) {
-    ctx.translate(personagem.x + spritePersonagem.width, personagem.y);
+    ctx.translate(personagem.x + sprite.width, topo);
     ctx.scale(-1, 1);
-    ctx.drawImage(spritePersonagem, 0, 0);
+    ctx.drawImage(sprite, 0, 0);
   } else {
-    ctx.drawImage(spritePersonagem, personagem.x, personagem.y);
+    ctx.drawImage(sprite, personagem.x, topo);
   }
   ctx.restore();
 }
