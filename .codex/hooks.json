@@ -1,0 +1,120 @@
+{
+  "description": "harness:managed v2.16.0 — wiring dos hooks do harness para o CODEX (espelho funcional do .claude/settings.json, restrito aos 10 eventos que o Codex suporta; sem SessionEnd/Notification/PermissionDenied/PostToolUseFailure e SEM async — hooks rodam sincronos no Codex). Scripts compartilhados em .claude/hooks/. Este arquivo so carrega com o projeto TRUSTED e cada hook exige aprovacao via /hooks (trust por hash) — atualizacao de hook re-pende o trust, e o doctor avisa. Matchers usam regex sobre os nomes de tool do Codex (shell/apply_patch e variantes) — degradacao silenciosa se um nome nao casar. Ver .claude/PLATAFORMAS.md §4.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HARNESS_HOST=codex bash .claude/hooks/sync-memory.sh",
+            "timeout": 30,
+            "statusMessage": "harness: memoria"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HARNESS_HOST=codex bash .claude/hooks/rag-ensure-index.sh",
+            "timeout": 600,
+            "statusMessage": "harness: indice RAG"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HARNESS_HOST=codex bash .claude/hooks/presence.sh --start",
+            "timeout": 10,
+            "statusMessage": "harness: presenca"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HARNESS_HOST=codex bash .claude/hooks/rag-inject.sh",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HARNESS_HOST=codex bash .claude/hooks/presence.sh --prompt",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|shell|local_shell|unified_exec|exec_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HARNESS_HOST=codex bash .claude/hooks/guard-bash.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|apply_patch|str_replace|create_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HARNESS_HOST=codex bash .claude/hooks/lint.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HARNESS_HOST=codex bash .claude/hooks/presence.sh --prompt",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HARNESS_HOST=codex bash .claude/hooks/rag-capture-agent.sh",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HARNESS_HOST=codex bash .claude/hooks/rag-capture-session.sh",
+            "timeout": 120,
+            "statusMessage": "harness: captura RAG (throttled)"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "HARNESS_HOST=codex bash .claude/hooks/presence.sh --prompt",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

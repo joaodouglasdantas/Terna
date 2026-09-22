@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="page-title">Roadmap de Teste Manual</title>
+<style>
+  /* Paleta do roadmap — dark sepia + accent. Ajuste as variaveis abaixo
+     se quiser uma identidade visual por projeto (opcional). */
+  :root {
+    --bg-canvas: #1a1411;
+    --bg-elevated: #241c18;
+    --bg-card: #2e2520;
+    --bg-card-hover: #382d27;
+    --bg-input: #1f1815;
+    --border-subtle: #3d322c;
+    --border-strong: #4f4138;
+    --text-primary: #f4ece4;
+    --text-secondary: #c2b3a5;
+    --text-muted: #8a7969;
+    --accent-primary: #C77B8C;
+    --accent-primary-soft: rgba(199, 123, 140, 0.18);
+    --accent-secondary: #A47148;
+    --accent-secondary-soft: rgba(164, 113, 72, 0.18);
+    --color-aprovado: #5fa978;
+    --color-aprovado-soft: rgba(95, 169, 120, 0.18);
+    --color-rejeitado: #d97b7b;
+    --color-rejeitado-soft: rgba(217, 123, 123, 0.18);
+    --color-ajuste: #d9a85c;
+    --color-ajuste-soft: rgba(217, 168, 92, 0.18);
+    --color-pendente: #8a7969;
+    --color-pendente-soft: rgba(138, 121, 105, 0.15);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.2);
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --fs-sm: 13px;
+    --fs-base: 14px;
+    --fs-md: 15px;
+    --fs-lg: 17px;
+    --fs-xl: 22px;
+    --fs-2xl: 28px;
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 24px;
+    --sp-6: 32px;
+    --sp-7: 48px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-canvas);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
+    font-size: var(--fs-base);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .container {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: var(--sp-6) var(--sp-5) var(--sp-7);
+  }
+
+  /* ========== HEADER ========== */
+  header.page-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-6);
+    padding-bottom: var(--sp-5);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .badge-prd {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--accent-primary-soft);
+    color: var(--accent-primary);
+    border: 1px solid var(--accent-primary-soft);
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    width: fit-content;
+  }
+
+  h1.page-title {
+    margin: 0;
+    font-size: var(--fs-2xl);
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    color: var(--text-primary);
+  }
+
+  p.page-subtitle {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: var(--fs-md);
+  }
+
+  .meta-row {
+    display: flex;
+    gap: var(--sp-5);
+    flex-wrap: wrap;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    margin-top: var(--sp-2);
+  }
+
+  .meta-row .meta-item strong { color: var(--text-secondary); font-weight: 500; }
+
+  /* ========== STATS BAR ========== */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-6);
+  }
+
+  .stat-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--sp-3) var(--sp-4);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-card .stat-value {
+    font-size: var(--fs-xl);
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .stat-card .stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .stat-card.stat-total .stat-value { color: var(--text-primary); }
+  .stat-card.stat-aprovado .stat-value { color: var(--color-aprovado); }
+  .stat-card.stat-rejeitado .stat-value { color: var(--color-rejeitado); }
+  .stat-card.stat-ajuste .stat-value { color: var(--color-ajuste); }
+  .stat-card.stat-pendente .stat-value { color: var(--color-pendente); }
+
+  .progress-track {
+    height: 6px;
+    background: var(--bg-elevated);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: var(--sp-6);
+    display: flex;
+  }
+  .progress-segment { height: 100%; transition: width 0.3s ease; }
+  .progress-segment.aprovado { background: var(--color-aprovado); }
+  .progress-segment.rejeitado { background: var(--color-rejeitado); }
+  .progress-segment.ajuste { background: var(--color-ajuste); }
+
+  /* ========== SECTIONS ========== */
+  section.roadmap-section {
+    margin-bottom: var(--sp-6);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-4);
+    padding-bottom: var(--sp-2);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .section-icon {
+    width: 28px;
+    height: 28px;
+    background: var(--accent-primary-soft);
+    color: var(--accent-primary);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+
+  .section-title {
+    margin: 0;
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+  }
+
+  .section-count {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+  }
+
+  /* ========== ITEM CARD ========== */
+  .item-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-left: 3px solid var(--color-pendente);
+    border-radius: var(--radius-md);
+    padding: var(--sp-4) var(--sp-5);
+    margin-bottom: var(--sp-3);
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+  .item-card:hover { background: var(--bg-card-hover); }
+  .item-card[data-status="aprovado"] { border-left-color: var(--color-aprovado); }
+  .item-card[data-status="rejeitado"] { border-left-color: var(--color-rejeitado); }
+  .item-card[data-status="ajuste"] { border-left-color: var(--color-ajuste); }
+
+  .item-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-3);
+  }
+
+  .item-title {
+    margin: 0;
+    font-size: var(--fs-md);
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+  }
+
+  .item-id {
+    font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--bg-input);
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .item-meta {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+    font-size: var(--fs-sm);
+  }
+
+  .meta-block {
+    display: flex;
+    gap: var(--sp-2);
+    align-items: flex-start;
+  }
+  .meta-block .meta-label {
+    color: var(--text-muted);
+    font-weight: 500;
+    min-width: 110px;
+    flex-shrink: 0;
+  }
+  .meta-block .meta-value {
+    color: var(--text-secondary);
+    flex: 1;
+  }
+
+  .item-meta ol, .item-meta ul {
+    margin: 0;
+    padding-left: 18px;
+    color: var(--text-secondary);
+  }
+  .item-meta li { margin-bottom: 2px; }
+
+  .meta-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .tag {
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    font-size: 11px;
+  }
+  .tag.url { color: var(--accent-primary); cursor: pointer; text-decoration: none; }
+  .tag.url:hover { background: var(--accent-primary-soft); }
+
+  /* ========== STATUS BUTTONS ========== */
+  .status-buttons {
+    display: flex;
+    gap: var(--sp-2);
+    margin-bottom: var(--sp-3);
+  }
+
+  .btn-status {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    padding: 10px var(--sp-3);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+    font-family: inherit;
+  }
+  .btn-status:hover { background: var(--bg-input); border-color: var(--text-muted); color: var(--text-primary); }
+  .btn-status .icon { font-size: 16px; }
+
+  .btn-status.active.aprovado {
+    background: var(--color-aprovado-soft);
+    border-color: var(--color-aprovado);
+    color: var(--color-aprovado);
+  }
+  .btn-status.active.rejeitado {
+    background: var(--color-rejeitado-soft);
+    border-color: var(--color-rejeitado);
+    color: var(--color-rejeitado);
+  }
+  .btn-status.active.ajuste {
+    background: var(--color-ajuste-soft);
+    border-color: var(--color-ajuste);
+    color: var(--color-ajuste);
+  }
+
+  /* ========== TEXTAREA ========== */
+  .item-notes label {
+    display: block;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+
+  textarea.notes-input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    resize: vertical;
+    min-height: 70px;
+    transition: border-color 0.15s ease;
+  }
+  textarea.notes-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+  }
+  textarea.notes-input::placeholder { color: var(--text-muted); }
+
+  /* ========== FOOTER ========== */
+  footer.page-footer {
+    position: sticky;
+    bottom: 0;
+    background: linear-gradient(to top, var(--bg-canvas) 60%, transparent);
+    padding: var(--sp-5) 0 var(--sp-3);
+    margin-top: var(--sp-6);
+    display: flex;
+    gap: var(--sp-3);
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary, .btn-secondary {
+    border-radius: var(--radius-sm);
+    padding: 12px 20px;
+    font-size: var(--fs-md);
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.15s ease;
+  }
+
+  .btn-primary {
+    background: var(--accent-primary);
+    color: white;
+  }
+  .btn-primary:hover { background: #d89aa9; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: transparent;
+    border-color: var(--border-strong);
+    color: var(--text-secondary);
+  }
+  .btn-secondary:hover { background: var(--bg-elevated); color: var(--text-primary); }
+
+  /* ========== MODAL ========== */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: var(--sp-5);
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal-box {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    max-width: 760px;
+    width: 100%;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-card);
+  }
+
+  .modal-head {
+    padding: var(--sp-4) var(--sp-5);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .modal-head h2 {
+    margin: 0;
+    font-size: var(--fs-lg);
+    font-weight: 600;
+  }
+
+  .modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+  .modal-close:hover { color: var(--text-primary); }
+
+  .modal-body {
+    padding: var(--sp-5);
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .modal-foot {
+    padding: var(--sp-4) var(--sp-5);
+    border-top: 1px solid var(--border-subtle);
+    display: flex;
+    gap: var(--sp-3);
+    justify-content: flex-end;
+  }
+
+  .modal-body label {
+    display: block;
+    font-size: var(--fs-sm);
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  .modal-body input[type="password"], .modal-body input[type="text"] {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-family: 'JetBrains Mono', 'SF Mono', monospace;
+    font-size: var(--fs-sm);
+    margin-bottom: var(--sp-3);
+  }
+
+  .saved-info {
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    font-size: var(--fs-sm);
+    margin-bottom: var(--sp-3);
+    border-left: 3px solid var(--text-muted);
+    background: var(--bg-input);
+    color: var(--text-secondary);
+  }
+  .saved-info code {
+    background: var(--bg-canvas);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    font-size: 12px;
+    color: var(--text-primary);
+    word-break: break-all;
+  }
+  .saved-info.ok      { border-left-color: var(--color-aprovado); background: var(--color-aprovado-soft); }
+  .saved-info.warning { border-left-color: var(--color-ajuste);   background: var(--color-ajuste-soft); }
+
+  textarea.report-output {
+    width: 100%;
+    min-height: 360px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-3);
+    font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+    font-size: var(--fs-sm);
+    resize: vertical;
+    line-height: 1.6;
+  }
+
+  .loading-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--text-muted);
+    border-top-color: var(--text-primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .helper-text {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: -8px;
+    margin-bottom: var(--sp-3);
+    line-height: 1.5;
+  }
+  .helper-text a { color: var(--accent-primary); text-decoration: none; }
+  .helper-text a:hover { text-decoration: underline; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-card);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: 10px 18px;
+    font-size: var(--fs-sm);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-card);
+    z-index: 200;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  .toast.success { border-left: 3px solid var(--color-aprovado); }
+  .toast.error { border-left: 3px solid var(--color-rejeitado); }
+
+  /* ========== RESPONSIVE ========== */
+  @media (max-width: 720px) {
+    .container { padding: var(--sp-4); }
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    .status-buttons { flex-direction: column; }
+    .meta-block { flex-direction: column; gap: 2px; }
+    .meta-block .meta-label { min-width: auto; }
+  }
+
+  /* Print-friendly */
+  @media print {
+    footer.page-footer, .modal-overlay { display: none !important; }
+    .item-card { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="page-header">
+    <span class="badge-prd" id="badge-prd">PRD-XXX</span>
+    <h1 class="page-title" id="prd-titulo">Roadmap de Teste Manual</h1>
+    <p class="page-subtitle" id="prd-resumo">Carregando&hellip;</p>
+    <div class="meta-row">
+      <span class="meta-item"><strong>Gerado em:</strong> <span id="prd-data-geracao">&ndash;</span></span>
+      <span class="meta-item"><strong>Total de itens:</strong> <span id="prd-total-itens">0</span></span>
+      <span class="meta-item"><strong>Tempo estimado:</strong> <span id="prd-tempo-estimado">&ndash;</span></span>
+    </div>
+  </header>
+
+  <div class="stats-bar">
+    <div class="stat-card stat-total">
+      <span class="stat-value" id="stat-total">0</span>
+      <span class="stat-label">Total</span>
+    </div>
+    <div class="stat-card stat-aprovado">
+      <span class="stat-value" id="stat-aprovado">0</span>
+      <span class="stat-label">Aprovados</span>
+    </div>
+    <div class="stat-card stat-rejeitado">
+      <span class="stat-value" id="stat-rejeitado">0</span>
+      <span class="stat-label">Rejeitados</span>
+    </div>
+    <div class="stat-card stat-ajuste">
+      <span class="stat-value" id="stat-ajuste">0</span>
+      <span class="stat-label">Ajuste</span>
+    </div>
+    <div class="stat-card stat-pendente">
+      <span class="stat-value" id="stat-pendente">0</span>
+      <span class="stat-label">Pendentes</span>
+    </div>
+  </div>
+
+  <div class="progress-track" aria-label="Progresso do roadmap">
+    <div class="progress-segment aprovado" id="progress-aprovado" style="width:0%"></div>
+    <div class="progress-segment rejeitado" id="progress-rejeitado" style="width:0%"></div>
+    <div class="progress-segment ajuste" id="progress-ajuste" style="width:0%"></div>
+  </div>
+
+  <main id="roadmap-container"></main>
+
+  <footer class="page-footer">
+    <button class="btn-secondary" id="btn-limpar" type="button" title="Limpa todas as marcacoes e notas (cuidado!)">
+      <span>&#8634;</span> Limpar tudo
+    </button>
+    <button class="btn-secondary" id="btn-exportar-json" type="button" title="Baixa um JSON com o estado atual">
+      <span>&darr;</span> Exportar JSON
+    </button>
+    <button class="btn-primary" id="btn-gerar-relatorio" type="button">
+      <span>&#10004;</span> Gerar relatorio com Haiku
+    </button>
+  </footer>
+</div>
+
+<!-- ===== MODAL: Configurar API Key ===== -->
+<div class="modal-overlay" id="modal-apikey" role="dialog" aria-modal="true" aria-labelledby="apikey-title">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="apikey-title">Chave da API Anthropic</h2>
+      <button class="modal-close" id="apikey-close" aria-label="Fechar">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="helper-text" style="margin-top:0;">
+        <strong>Modo preferido (sem precisar de chave):</strong> se o projeto tiver um endpoint
+        de sumarizacao no backend, configure-o em <code>prd.endpoint_relatorio</code> no JSON deste
+        arquivo. Servido via <code>http(s)://</code>, o relatorio sera gerado por esse endpoint
+        (a chave Anthropic fica no servidor). Nao precisa colar chave.
+      </p>
+      <p class="helper-text">
+        Voce esta vendo este modal porque nao ha endpoint configurado, o HTML foi aberto via
+        <code>file://</code>, ou o endpoint bloqueou. Cole sua API Key Anthropic para usar o modo
+        direto. A chave fica salva no <strong>localStorage</strong> deste navegador (nao e enviada a
+        outro lugar) — voce cola UMA vez por browser e nunca mais precisa fazer isso.
+        Obtenha em <a href="https://console.anthropic.com/" target="_blank" rel="noopener">console.anthropic.com</a>.
+      </p>
+      <label for="input-apikey">API Key</label>
+      <input type="password" id="input-apikey" placeholder="sk-ant-api03-..." autocomplete="off">
+      <p class="helper-text">Modelo: <code>claude-haiku-4-5-20251001</code>. Custo aprox: &lt; $0.01 por relatorio.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-secondary" id="apikey-cancel" type="button">Cancelar</button>
+      <button class="btn-primary" id="apikey-save" type="button">Salvar e continuar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: Relatorio Final ===== -->
+<div class="modal-overlay" id="modal-relatorio" role="dialog" aria-modal="true" aria-labelledby="relatorio-title">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="relatorio-title">Relatorio do Roadmap</h2>
+      <button class="modal-close" id="relatorio-close" aria-label="Fechar">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="helper-text" style="margin-top:0;">
+        Texto gerado pelo Claude Haiku, pronto para copiar e colar no Claude Code/Cursor.
+        Edite livremente antes de enviar.
+      </p>
+      <div id="relatorio-saved-info" class="saved-info" style="display:none;"></div>
+      <textarea id="relatorio-output" class="report-output" spellcheck="false"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-secondary" id="relatorio-baixar" type="button">
+        <span>&darr;</span> Baixar .md
+      </button>
+      <button class="btn-secondary" id="relatorio-regen" type="button">
+        <span>&#8634;</span> Regenerar
+      </button>
+      <button class="btn-primary" id="relatorio-copy" type="button">
+        <span>&#10064;</span> Copiar para clipboard
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- =========================================================
+     DADOS DO ROADMAP (substituir o conteudo abaixo na geracao)
+     ========================================================= -->
+<script id="roadmap-data" type="application/json">
+{
+  "prd": {
+    "numero": "PRD-XXX",
+    "titulo": "Titulo da PRD",
+    "resumo": "Resumo curto da PRD em 1-2 frases.",
+    "data_geracao": "2026-05-16",
+    "tempo_estimado": "~30 minutos",
+    "branch": "main",
+    "commit_base": "abc1234",
+    "endpoint_relatorio": ""
+  },
+  "secoes": [
+    {
+      "nome": "Fluxos a validar visualmente",
+      "icone": "F",
+      "itens": [
+        {
+          "id": "f-001",
+          "titulo": "Exemplo: tela X",
+          "objetivo": "Conferir alinhamento de cards, animacao de spinner e responsividade.",
+          "passos": [
+            "Logar com o usuario de teste",
+            "Navegar para a tela X",
+            "Conferir item Z"
+          ],
+          "criterio_aceitacao": "Cards alinhados, spinner aparece em <300ms e desaparece em <3s.",
+          "arquivos": ["<caminho/da/pagina>", "<caminho/do/script>"],
+          "urls": ["<base-url-local-do-projeto>/..."]
+        }
+      ]
+    },
+    {
+      "nome": "Integracoes externas (smoke test)",
+      "icone": "I",
+      "itens": [
+        {
+          "id": "i-001",
+          "titulo": "Integracao externa: disparo de teste",
+          "objetivo": "Confirmar que a integracao externa dispara sem erro 5xx (ver Perfil > Integracoes).",
+          "passos": [
+            "Forcar o disparo (cron/job/acao manual)",
+            "Conferir o log de status do servico",
+            "Confirmar que o efeito chegou ao destino de teste (whitelist do safe mode)"
+          ],
+          "criterio_aceitacao": "Status OK no log + efeito entregue apenas ao destino de teste.",
+          "arquivos": ["<helper/da/integracao>", "<job/que/dispara>"],
+          "urls": []
+        }
+      ]
+    },
+    {
+      "nome": "Banco de dados",
+      "icone": "B",
+      "itens": []
+    },
+    {
+      "nome": "Edge cases",
+      "icone": "E",
+      "itens": []
+    }
+  ]
+}
+</script>
+
+<script>
+(function() {
+  'use strict';
+
+  // ================== STATE ==================
+  var roadmapData = null;
+  var storageKey = 'harness-roadmap-state';
+  var apiKeyStorage = 'harness-anthropic-apikey';
+  var itemState = {}; // { id: { status, notas } }
+
+  // ================== INIT ==================
+  function init() {
+    var raw = document.getElementById('roadmap-data').textContent;
+    try {
+      roadmapData = JSON.parse(raw);
+    } catch (e) {
+      mostrarToast('JSON do roadmap invalido: ' + e.message, 'error');
+      return;
+    }
+
+    storageKey = 'harness-roadmap-' + (roadmapData.prd.numero || 'XXX');
+
+    renderHeader();
+    carregarEstado();
+    renderItens();
+    atualizarStats();
+    bindEventos();
+  }
+
+  // ================== HEADER ==================
+  function renderHeader() {
+    document.title = 'Roadmap ' + roadmapData.prd.numero + ' - ' + roadmapData.prd.titulo;
+    document.getElementById('page-title').textContent = document.title;
+    document.getElementById('badge-prd').textContent = roadmapData.prd.numero;
+    document.getElementById('prd-titulo').textContent = roadmapData.prd.titulo;
+    document.getElementById('prd-resumo').textContent = roadmapData.prd.resumo || '';
+    document.getElementById('prd-data-geracao').textContent = roadmapData.prd.data_geracao || '-';
+    document.getElementById('prd-tempo-estimado').textContent = roadmapData.prd.tempo_estimado || '~30min';
+
+    var total = 0;
+    (roadmapData.secoes || []).forEach(function(s) { total += (s.itens || []).length; });
+    document.getElementById('prd-total-itens').textContent = total;
+  }
+
+  // ================== RENDER ITENS ==================
+  function renderItens() {
+    var container = document.getElementById('roadmap-container');
+    container.innerHTML = '';
+
+    (roadmapData.secoes || []).forEach(function(secao) {
+      if (!secao.itens || !secao.itens.length) return;
+
+      var section = document.createElement('section');
+      section.className = 'roadmap-section';
+
+      var header = document.createElement('div');
+      header.className = 'section-header';
+      header.innerHTML =
+        '<span class="section-icon">' + escapeHtml(secao.icone || '#') + '</span>' +
+        '<h2 class="section-title">' + escapeHtml(secao.nome) + '</h2>' +
+        '<span class="section-count">' + secao.itens.length + ' iten(s)</span>';
+      section.appendChild(header);
+
+      secao.itens.forEach(function(item) {
+        section.appendChild(renderItem(item, secao.nome));
+      });
+
+      container.appendChild(section);
+    });
+  }
+
+  function renderItem(item, secaoNome) {
+    var card = document.createElement('div');
+    card.className = 'item-card';
+    card.setAttribute('data-item-id', item.id);
+    card.setAttribute('data-secao', secaoNome);
+
+    var statusAtual = (itemState[item.id] && itemState[item.id].status) || '';
+    if (statusAtual) card.setAttribute('data-status', statusAtual);
+
+    var notasAtuais = (itemState[item.id] && itemState[item.id].notas) || '';
+
+    var passosHtml = '';
+    if (item.passos && item.passos.length) {
+      passosHtml = '<div class="meta-block"><span class="meta-label">Passos</span><ol class="meta-value">' +
+        item.passos.map(function(p) { return '<li>' + escapeHtml(p) + '</li>'; }).join('') +
+        '</ol></div>';
+    }
+
+    var criterioHtml = item.criterio_aceitacao ? (
+      '<div class="meta-block"><span class="meta-label">Criterio OK</span>' +
+      '<span class="meta-value">' + escapeHtml(item.criterio_aceitacao) + '</span></div>'
+    ) : '';
+
+    var arquivosHtml = '';
+    if (item.arquivos && item.arquivos.length) {
+      arquivosHtml = '<div class="meta-block"><span class="meta-label">Arquivos</span>' +
+        '<div class="meta-tags meta-value">' +
+        item.arquivos.map(function(a) { return '<span class="tag">' + escapeHtml(a) + '</span>'; }).join('') +
+        '</div></div>';
+    }
+
+    var urlsHtml = '';
+    if (item.urls && item.urls.length) {
+      urlsHtml = '<div class="meta-block"><span class="meta-label">URLs</span>' +
+        '<div class="meta-tags meta-value">' +
+        item.urls.map(function(u) {
+          var safe = escapeAttr(u);
+          return '<a class="tag url" href="' + safe + '" target="_blank" rel="noopener">' + escapeHtml(u) + '</a>';
+        }).join('') +
+        '</div></div>';
+    }
+
+    card.innerHTML =
+      '<div class="item-head">' +
+        '<h3 class="item-title">' + escapeHtml(item.titulo) + '</h3>' +
+        '<span class="item-id">' + escapeHtml(item.id) + '</span>' +
+      '</div>' +
+      (item.objetivo ? '<div class="item-meta"><div class="meta-block"><span class="meta-label">Objetivo</span><span class="meta-value">' + escapeHtml(item.objetivo) + '</span></div></div>' : '') +
+      '<div class="item-meta">' + passosHtml + criterioHtml + arquivosHtml + urlsHtml + '</div>' +
+      '<div class="status-buttons" data-item-id="' + escapeAttr(item.id) + '">' +
+        botaoStatus('aprovado', 'Aprovado', statusAtual) +
+        botaoStatus('rejeitado', 'Rejeitado', statusAtual) +
+        botaoStatus('ajuste', 'Ajuste necessario', statusAtual) +
+      '</div>' +
+      '<div class="item-notes">' +
+        '<label for="notes-' + escapeAttr(item.id) + '">Observacoes (o que voce viu, screenshots, logs, hipotese de causa)</label>' +
+        '<textarea id="notes-' + escapeAttr(item.id) + '" class="notes-input" data-item-id="' + escapeAttr(item.id) + '" ' +
+        'placeholder="Ex: spinner ficou girando >30s ao salvar. Console mostra 500 em api/X. Suspeita: campo Y nullable.">' +
+        escapeHtml(notasAtuais) + '</textarea>' +
+      '</div>';
+
+    return card;
+  }
+
+  function botaoStatus(tipo, label, statusAtual) {
+    var ativo = statusAtual === tipo ? ' active ' + tipo : '';
+    var icone = tipo === 'aprovado' ? '&#10004;' : (tipo === 'rejeitado' ? '&#10008;' : '&#9888;');
+    return '<button type="button" class="btn-status' + ativo + '" data-status="' + tipo + '">' +
+      '<span class="icon">' + icone + '</span>' + escapeHtml(label) +
+      '</button>';
+  }
+
+  // ================== EVENTOS ==================
+  function bindEventos() {
+    document.getElementById('roadmap-container').addEventListener('click', function(e) {
+      var btn = e.target.closest('.btn-status');
+      if (!btn) return;
+      var grupo = btn.parentElement;
+      var itemId = grupo.getAttribute('data-item-id');
+      var status = btn.getAttribute('data-status');
+      definirStatus(itemId, status);
+    });
+
+    document.getElementById('roadmap-container').addEventListener('input', function(e) {
+      if (!e.target.classList.contains('notes-input')) return;
+      var itemId = e.target.getAttribute('data-item-id');
+      setNota(itemId, e.target.value);
+    });
+
+    document.getElementById('btn-limpar').addEventListener('click', limparTudo);
+    document.getElementById('btn-exportar-json').addEventListener('click', exportarJson);
+    document.getElementById('btn-gerar-relatorio').addEventListener('click', iniciarGeracaoRelatorio);
+
+    // Modal API Key
+    document.getElementById('apikey-close').addEventListener('click', fecharModalApiKey);
+    document.getElementById('apikey-cancel').addEventListener('click', fecharModalApiKey);
+    document.getElementById('apikey-save').addEventListener('click', salvarApiKey);
+
+    // Modal Relatorio
+    document.getElementById('relatorio-close').addEventListener('click', function() {
+      document.getElementById('modal-relatorio').classList.remove('open');
+    });
+    document.getElementById('relatorio-regen').addEventListener('click', iniciarGeracaoRelatorio);
+    document.getElementById('relatorio-copy').addEventListener('click', copiarRelatorio);
+    document.getElementById('relatorio-baixar').addEventListener('click', baixarRelatorioMd);
+
+    // ESC fecha modais abertos
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.open').forEach(function(m) { m.classList.remove('open'); });
+      }
+    });
+  }
+
+  // ================== STATE MANAGEMENT ==================
+  function definirStatus(itemId, status) {
+    if (!itemState[itemId]) itemState[itemId] = { status: '', notas: '' };
+    // Toggle: se ja esta no mesmo status, desmarca
+    itemState[itemId].status = (itemState[itemId].status === status) ? '' : status;
+    salvarEstado();
+    atualizarCardVisual(itemId);
+    atualizarStats();
+  }
+
+  function setNota(itemId, valor) {
+    if (!itemState[itemId]) itemState[itemId] = { status: '', notas: '' };
+    itemState[itemId].notas = valor;
+    salvarEstado();
+  }
+
+  function atualizarCardVisual(itemId) {
+    var card = document.querySelector('.item-card[data-item-id="' + itemId + '"]');
+    if (!card) return;
+    var status = itemState[itemId] && itemState[itemId].status;
+    if (status) card.setAttribute('data-status', status);
+    else card.removeAttribute('data-status');
+
+    var botoes = card.querySelectorAll('.btn-status');
+    botoes.forEach(function(b) {
+      var t = b.getAttribute('data-status');
+      b.classList.remove('active', 'aprovado', 'rejeitado', 'ajuste');
+      if (t === status) b.classList.add('active', t);
+    });
+  }
+
+  function carregarEstado() {
+    try {
+      var raw = localStorage.getItem(storageKey);
+      if (raw) itemState = JSON.parse(raw) || {};
+    } catch (e) { itemState = {}; }
+  }
+
+  function salvarEstado() {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(itemState));
+    } catch (e) {
+      mostrarToast('Falha ao salvar estado: ' + e.message, 'error');
+    }
+  }
+
+  // ================== STATS ==================
+  function atualizarStats() {
+    var total = 0, aprovado = 0, rejeitado = 0, ajuste = 0;
+    (roadmapData.secoes || []).forEach(function(s) {
+      (s.itens || []).forEach(function(item) {
+        total++;
+        var st = (itemState[item.id] && itemState[item.id].status) || '';
+        if (st === 'aprovado') aprovado++;
+        else if (st === 'rejeitado') rejeitado++;
+        else if (st === 'ajuste') ajuste++;
+      });
+    });
+    var pendente = total - aprovado - rejeitado - ajuste;
+
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-aprovado').textContent = aprovado;
+    document.getElementById('stat-rejeitado').textContent = rejeitado;
+    document.getElementById('stat-ajuste').textContent = ajuste;
+    document.getElementById('stat-pendente').textContent = pendente;
+
+    var pct = function(n) { return total ? (n * 100 / total) + '%' : '0%'; };
+    document.getElementById('progress-aprovado').style.width = pct(aprovado);
+    document.getElementById('progress-rejeitado').style.width = pct(rejeitado);
+    document.getElementById('progress-ajuste').style.width = pct(ajuste);
+  }
+
+  // ================== LIMPAR / EXPORTAR ==================
+  function limparTudo() {
+    if (!confirm('Tem certeza? Isso apaga todas as marcacoes e notas deste roadmap.')) return;
+    itemState = {};
+    salvarEstado();
+    renderItens();
+    atualizarStats();
+    mostrarToast('Roadmap limpo.', 'success');
+  }
+
+  function exportarJson() {
+    var payload = montarPayloadCompleto();
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'roadmap-' + roadmapData.prd.numero + '-' + dataParaSlug() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    mostrarToast('JSON exportado.', 'success');
+  }
+
+  // ================== GERACAO DE RELATORIO (IA) ==================
+  // Estrategia em dois caminhos (NENHUM exige login):
+  //  (1) Endpoint de backend OPCIONAL: configure prd.endpoint_relatorio no JSON.
+  //      Servido via http(s), o HTML chama esse endpoint (a chave da IA fica no servidor).
+  //  (2) Sem endpoint configurado, ou HTML aberto via file:// -> fallback: chamada direta
+  //      a Anthropic usando API key colada pelo usuario (modal -> localStorage, 1x por browser).
+  function modoEndpointLocal() {
+    var origem = window.location.origin || '';
+    var temEndpoint = !!(roadmapData && roadmapData.prd && roadmapData.prd.endpoint_relatorio);
+    return temEndpoint && (origem.indexOf('http://') === 0 || origem.indexOf('https://') === 0);
+  }
+
+  function caminhoEndpointSumarizar() {
+    // Endpoint OPCIONAL de sumarizacao no backend do projeto. Configure em
+    // roadmapData.prd.endpoint_relatorio: URL absoluta ("https://...") ou root-relativa ("/...").
+    // Se vazio, modoEndpointLocal() ja retorna false e o HTML usa o fallback direto.
+    var ep = (roadmapData && roadmapData.prd && roadmapData.prd.endpoint_relatorio) || '';
+    if (/^https?:\/\//i.test(ep) || ep.indexOf('/') === 0) return ep;
+    return window.location.origin + (ep ? ('/' + ep) : '');
+  }
+
+  function iniciarGeracaoRelatorio() {
+    if (modoEndpointLocal()) {
+      gerarRelatorioViaEndpoint();
+      return;
+    }
+    var key = localStorage.getItem(apiKeyStorage);
+    if (!key) {
+      document.getElementById('modal-apikey').classList.add('open');
+      setTimeout(function() { document.getElementById('input-apikey').focus(); }, 50);
+      return;
+    }
+    gerarRelatorioDireto(key);
+  }
+
+  function salvarApiKey() {
+    var input = document.getElementById('input-apikey');
+    var val = (input.value || '').trim();
+    if (!val) { mostrarToast('Cole uma API key valida.', 'error'); return; }
+    if (val.indexOf('sk-ant-') !== 0) {
+      if (!confirm('A chave nao comeca com "sk-ant-". Tentar mesmo assim?')) return;
+    }
+    localStorage.setItem(apiKeyStorage, val);
+    input.value = '';
+    fecharModalApiKey();
+    gerarRelatorioDireto(val);
+  }
+
+  function fecharModalApiKey() {
+    document.getElementById('modal-apikey').classList.remove('open');
+  }
+
+  function comecarLoading() {
+    var btn = document.getElementById('btn-gerar-relatorio');
+    var btnRegen = document.getElementById('relatorio-regen');
+    btn._original = btn._original || btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-spinner"></span> Gerando&hellip;';
+    if (btnRegen) {
+      btnRegen.disabled = true;
+      btnRegen.innerHTML = '<span class="loading-spinner"></span> Gerando&hellip;';
+    }
+  }
+
+  function terminarLoading() {
+    var btn = document.getElementById('btn-gerar-relatorio');
+    var btnRegen = document.getElementById('relatorio-regen');
+    btn.disabled = false;
+    if (btn._original) btn.innerHTML = btn._original;
+    if (btnRegen) {
+      btnRegen.disabled = false;
+      btnRegen.innerHTML = '<span>&#8634;</span> Regenerar';
+    }
+  }
+
+  function exibirRelatorio(texto, meta) {
+    document.getElementById('relatorio-output').value = texto;
+    document.getElementById('modal-relatorio').classList.add('open');
+
+    // Banner de persistencia (so vem preenchido quando endpoint local responde — file:// nunca grava)
+    var info = document.getElementById('relatorio-saved-info');
+    info.className = 'saved-info';
+    info.style.display = 'none';
+    info.innerHTML = '';
+
+    if (meta && meta.relatorioPath) {
+      info.classList.add('ok');
+      info.innerHTML = '&#128190; Salvo em: <code>' + escapeHtml(meta.relatorioPath) + '</code>';
+      info.style.display = '';
+    } else if (meta && meta.relatorioErro) {
+      info.classList.add('warning');
+      info.innerHTML = '&#9888; Nao salvo: ' + escapeHtml(meta.relatorioErro);
+      info.style.display = '';
+    }
+
+    var msg = 'Relatorio gerado.';
+    if (meta && typeof meta.custo === 'number') {
+      msg += ' Custo aprox: $' + meta.custo.toFixed(4) + ' USD.';
+    }
+    if (meta && meta.relatorioPath) {
+      msg += ' Salvo em disco.';
+    }
+    mostrarToast(msg, 'success');
+  }
+
+  function baixarRelatorioMd() {
+    var texto = document.getElementById('relatorio-output').value || '';
+    if (!texto.trim()) { mostrarToast('Relatorio vazio.', 'error'); return; }
+    var numero = (roadmapData && roadmapData.prd && roadmapData.prd.numero) || 'PRD-XXX';
+    var blob = new Blob([texto], { type: 'text/markdown' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'roadmap-teste-' + numero + '-' + dataParaSlug() + '.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    mostrarToast('Download iniciado: ' + a.download, 'success');
+  }
+
+  function gerarRelatorioViaEndpoint() {
+    comecarLoading();
+    var payload = montarPayloadCompleto();
+    var endpoint = caminhoEndpointSumarizar();
+
+    fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function(r) {
+      return r.json().then(function(data) { return { status: r.status, ok: r.ok, data: data }; }).catch(function() {
+        return { status: r.status, ok: r.ok, data: { status: 'ERRO', message: 'Resposta nao-JSON do servidor (HTTP ' + r.status + ')' } };
+      });
+    }).then(function(res) {
+      terminarLoading();
+      if (!res.ok || (res.data && res.data.status && res.data.status !== 'OK')) {
+        var code = (res.data && res.data.code) || '';
+        var msg = (res.data && res.data.message) || ('HTTP ' + res.status);
+        if (code === 'PROD_DISABLED' || code === 'NOT_LOCALHOST') {
+          mostrarToast('Endpoint bloqueado: ' + msg + ' Caindo para modo API key.', 'error');
+          var key = localStorage.getItem(apiKeyStorage);
+          if (key) { gerarRelatorioDireto(key); return; }
+          document.getElementById('modal-apikey').classList.add('open');
+          return;
+        }
+        mostrarToast('Endpoint local falhou (' + (code || res.status) + '): ' + msg, 'error');
+        return;
+      }
+      var dataResp = (res.data && res.data.data) || {};
+      var texto = dataResp.markdown || '';
+      var custo = dataResp.custo_estimado_usd || null;
+      var relatorioPath = dataResp.relatorio_path || null;
+      var relatorioErro = dataResp.relatorio_erro || null;
+      if (!texto) { mostrarToast('Endpoint retornou resposta vazia.', 'error'); return; }
+      exibirRelatorio(texto, { custo: custo, relatorioPath: relatorioPath, relatorioErro: relatorioErro });
+    }).catch(function(err) {
+      terminarLoading();
+      mostrarToast('Erro de rede no endpoint local: ' + err.message + '. Verifique se o servidor local esta rodando.', 'error');
+    });
+  }
+
+  function gerarRelatorioDireto(apiKey) {
+    comecarLoading();
+    var payload = montarPayloadCompleto();
+    var systemPrompt = montarSystemPrompt();
+    var userPrompt = montarUserPrompt(payload);
+
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2400,
+        temperature: 0.3,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }]
+      })
+    }).then(function(r) {
+      return r.json().then(function(data) { return { status: r.status, ok: r.ok, data: data }; });
+    }).then(function(res) {
+      terminarLoading();
+      if (!res.ok) {
+        var msg = (res.data && res.data.error && res.data.error.message) || ('HTTP ' + res.status);
+        mostrarToast('Falha na API Anthropic: ' + msg, 'error');
+        if (res.status === 401) localStorage.removeItem(apiKeyStorage);
+        return;
+      }
+      var texto = (res.data.content && res.data.content[0] && res.data.content[0].text) || '';
+      if (!texto) { mostrarToast('API retornou resposta vazia.', 'error'); return; }
+      exibirRelatorio(texto, null);
+    }).catch(function(err) {
+      terminarLoading();
+      mostrarToast('Erro de rede: ' + err.message, 'error');
+    });
+  }
+
+  function copiarRelatorio() {
+    var ta = document.getElementById('relatorio-output');
+    ta.select();
+    try {
+      var ok = document.execCommand('copy');
+      if (ok) mostrarToast('Copiado para o clipboard. Cole no Claude/Cursor.', 'success');
+      else if (navigator.clipboard) {
+        navigator.clipboard.writeText(ta.value).then(function() {
+          mostrarToast('Copiado para o clipboard. Cole no Claude/Cursor.', 'success');
+        });
+      }
+    } catch (e) {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(ta.value).then(function() {
+          mostrarToast('Copiado para o clipboard.', 'success');
+        }, function() {
+          mostrarToast('Nao foi possivel copiar. Selecione manualmente.', 'error');
+        });
+      }
+    }
+  }
+
+  // ================== PAYLOAD + PROMPT ==================
+  function montarPayloadCompleto() {
+    var itens = [];
+    (roadmapData.secoes || []).forEach(function(secao) {
+      (secao.itens || []).forEach(function(item) {
+        var st = (itemState[item.id] && itemState[item.id].status) || 'pendente';
+        var notas = (itemState[item.id] && itemState[item.id].notas) || '';
+        itens.push({
+          id: item.id,
+          secao: secao.nome,
+          titulo: item.titulo,
+          objetivo: item.objetivo || '',
+          passos: item.passos || [],
+          criterio_aceitacao: item.criterio_aceitacao || '',
+          arquivos: item.arquivos || [],
+          urls: item.urls || [],
+          status: st,
+          notas_usuario: notas
+        });
+      });
+    });
+
+    var resumo = {
+      total: itens.length,
+      aprovado: itens.filter(function(i) { return i.status === 'aprovado'; }).length,
+      rejeitado: itens.filter(function(i) { return i.status === 'rejeitado'; }).length,
+      ajuste: itens.filter(function(i) { return i.status === 'ajuste'; }).length,
+      pendente: itens.filter(function(i) { return i.status === 'pendente'; }).length
+    };
+
+    return {
+      prd: roadmapData.prd,
+      resumo: resumo,
+      itens: itens
+    };
+  }
+
+  function montarSystemPrompt() {
+    return [
+      'Voce e um assistente que organiza o resultado de testes manuais de uma PRD de um projeto de software para que outra IA (Claude Code) implemente correcoes.',
+      '',
+      'Voce recebera:',
+      '- Metadados da PRD (numero, titulo, resumo, branch, commit base).',
+      '- Lista de itens testados, cada um com objetivo, passos, criterio de aceitacao, arquivos envolvidos, URLs.',
+      '- Status marcado pelo testador (aprovado | rejeitado | ajuste | pendente) e notas livres.',
+      '',
+      'Seu trabalho: produzir um RELATORIO em Markdown bem estruturado, conciso e acionavel, focado no que precisa ser corrigido. NAO repetir verbatim as notas do usuario — interpretar, normalizar pt-BR, inferir causa-raiz quando possivel, agrupar problemas relacionados.',
+      '',
+      'ESTRUTURA OBRIGATORIA do output:',
+      '',
+      '```',
+      '# Relatorio de Teste Manual — <PRD-NNN>',
+      '',
+      '## Resumo',
+      '- X aprovados / Y rejeitados / Z em ajuste / W pendentes (de N total)',
+      '- Veredito geral: <pronto para commit | precisa de correcoes pontuais | precisa de revisao ampla>',
+      '',
+      '## Itens que precisam de correcao',
+      '',
+      '### <Titulo do item> [<id>] — <rejeitado|ajuste>',
+      '- **Sintoma observado:** <1-2 frases interpretando as notas do usuario>',
+      '- **Hipotese de causa-raiz:** <quando notas + arquivos do item sugerem; senao, "investigar">',
+      '- **Arquivos suspeitos:** <lista derivada do campo arquivos + urls + notas>',
+      '- **Passos para reproduzir:** <derivado dos passos do item + notas>',
+      '- **Acao sugerida:** <verbo no imperativo, ex: "Adicionar try/catch em X", "Validar compatibilidade com a runtime de producao">',
+      '',
+      '(repetir para cada item rejeitado/ajuste)',
+      '',
+      '## Itens pendentes (nao testados)',
+      '- <id> — <titulo> (motivo se mencionado nas notas)',
+      '',
+      '## Notas do testador nao acionaveis (informativo)',
+      '- <observacoes uteis mas que nao se traduzem em fix direto, ex: sugestoes UX>',
+      '',
+      '## Proximos passos sugeridos para o Claude Code',
+      '1. <prioridade 1 — qual fix abordar primeiro>',
+      '2. <prioridade 2>',
+      '3. ...',
+      '```',
+      '',
+      'REGRAS:',
+      '- Pt-BR sem perda de acentuacao.',
+      '- NAO incluir itens APROVADOS (so contam no resumo).',
+      '- Se nenhum item foi rejeitado/ajuste, dizer "Nenhuma correcao necessaria" e omitir a secao.',
+      '- Notas do usuario podem estar truncadas ou abreviadas — expandir para frases completas.',
+      '- Citar arquivo:linha quando o usuario mencionou linha especifica.',
+      '- Evitar bullets vazios; se nao ha hipotese de causa, escrever "investigar" explicitamente.',
+      '- Output final deve ser APENAS o Markdown, sem preambulo, sem assinatura, sem fences extras.'
+    ].join('\n');
+  }
+
+  function montarUserPrompt(payload) {
+    return 'Aqui esta o resultado do roadmap de teste manual. Gere o relatorio conforme as instrucoes.\n\n' +
+      '```json\n' + JSON.stringify(payload, null, 2) + '\n```';
+  }
+
+  // ================== UTILS ==================
+  function escapeHtml(s) {
+    if (s === null || s === undefined) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function escapeAttr(s) { return escapeHtml(s); }
+
+  function dataParaSlug() {
+    var d = new Date();
+    var pad = function(n) { return n < 10 ? '0' + n : '' + n; };
+    return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes());
+  }
+
+  function mostrarToast(msg, tipo) {
+    var t = document.getElementById('toast');
+    t.className = 'toast show ' + (tipo || '');
+    t.textContent = msg;
+    clearTimeout(t._timer);
+    t._timer = setTimeout(function() { t.classList.remove('show'); }, 3500);
+  }
+
+  // ================== BOOT ==================
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

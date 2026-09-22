@@ -1,0 +1,8 @@
+# CRLF mata hook bash (\r no fim de cada comando) e agente YAML (classe do bug 2.3.0).
+# Este arquivo vive DENTRO de .claude/ de proposito: git aplica .gitattributes por
+# diretorio, e o sync do harness copia a subarvore inteira — a protecao viaja junto.
+*.sh   text eol=lf
+*.mjs  text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+*.yml  text eol=lf

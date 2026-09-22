@@ -1,0 +1,6 @@
+// tabula runs (harness >= 3.4.10 ou ts >= 29/08) por dev/maquina — uso: node runs2.js <jsonl>...
+const fs=require('fs');const files=process.argv.slice(2);const seen=new Set();
+const fmt=t=>{if(!t)return'';return new Date(t*1000).toLocaleString('sv-SE',{timeZone:'America/Sao_Paulo'}).slice(5,16)};
+for(const f of files){if(!fs.existsSync(f))continue;for(const l of fs.readFileSync(f,'utf8').split('\n').filter(Boolean)){let o;try{o=JSON.parse(l)}catch{continue}
+const h=o.harness||'';if(!(h>='3.4.10'||(o.ts_start||0)>=1788300000))continue;const k=o.label+'|'+o.ts_end;if(seen.has(k))continue;seen.add(k);
+console.log([(o.maquina||f.replace(/.*runs\//,'').replace('.jsonl','')).slice(0,22).padEnd(22),h.padEnd(6),o.label.padEnd(16),fmt(o.ts_start),'dur='+Math.round((o.elapsed_s||0)/60)+'m','act='+Math.round((+o.elapsed_active_s||0)/60)+'m','tasks='+o.tasks,'cic='+o.ciclos,'sub='+o.subagents,'par='+o.parallel_factor,'out='+Math.round((+o.tokens_output||0)/1000)+'k','tot='+Math.round((+o.tokens_total||0)/1e6)+'M','gates='+(o.min_gates||''),'hermE/C='+(o.min_hermes_e||'')+'/'+(o.min_hermes_c||''),'turnH='+(o.turnos_hermes||''),'lpt='+(o.linhas_por_task||''),'waitH='+o.wait_human_min,'perm='+o.permission_prompts,'preset='+o.preset].join(' | '));if(o.extra)console.log('        extra: '+String(o.extra).slice(0,230))}}

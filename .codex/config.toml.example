@@ -1,0 +1,38 @@
+# .codex/config.toml.example — harness Beta Sistemas (2.0.0)
+# EXEMPLO comentado, NAO ativo. O Codex le .codex/config.toml do repo somente com o
+# projeto TRUSTED ([projects."<path>"] trust_level = "trusted" no ~/.codex/config.toml
+# de cada maquina). Copie para .codex/config.toml SOMENTE se este projeto precisar de
+# overrides — o harness funciona sem este arquivo (hooks vem de .codex/hooks.json;
+# agentes de .codex/agents/). Nunca coloque segredos aqui (arquivo versionado).
+#
+# NOTA (3.5.2): o MODELO nao se declara aqui nem no ~/.codex/config.toml — quem manda e o
+# harness, via HARNESS_DELEGATE_CODEX_MODEL (default gpt-5.6-sol), que a delegacao e o
+# preflight passam como `--model`. Motivo: o app do Codex Desktop REESCREVE o config global
+# a cada update (11/09/2026 gravou `gpt-6-astra` e derrubou o codex-cli em todos os
+# projetos). Slugs mudam rapido (gpt-5.2/5.3-codex ja foram deprecados) — trocar o knob e
+# uma linha. O esforco continua regulado por model_reasoning_effort nos agentes
+# (.codex/agents/*.toml). Ver PLATAFORMAS.md §5.
+
+# --- Sandbox / aprovacoes (padrao recomendado do harness) --------------------
+# workspace-write = edita o repo, SEM rede (protecao extra contra disparo acidental
+# de integracao — WAHA/Calendar/etc; ver PLATAFORMAS.md §6). Liberar rede e decisao
+# consciente por projeto:
+#
+# sandbox_mode = "workspace-write"
+# approval_policy = "on-request"
+#
+# [sandbox_workspace_write]
+# network_access = false
+
+# --- Subagentes --------------------------------------------------------------
+# Defaults do Codex: max_threads = 6, max_depth = 1. As ondas da prd-exec usam a
+# delegacao paralela nativa; suba max_threads so se a maquina aguentar.
+#
+# [agents]
+# max_threads = 6
+
+# --- Rules (allowlist de comandos; EXPERIMENTAL) -----------------------------
+# O equivalente Codex da allowlist estreita do Claude. Gere a partir da tabela
+# "Execucao autonoma" do Perfil com:
+#   bash .claude/harness-doctor.sh --gen-rules
+# e salve o resultado revisado em .codex/rules/harness.rules (ver .codex/rules/README.md).

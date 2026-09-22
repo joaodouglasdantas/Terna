@@ -1,0 +1,314 @@
+{
+  "permissions": {
+    "allow": [
+      "AskUserQuestion",
+      "Bash(bash .claude/harness-doctor.sh:*)",
+      "Bash(bash .claude/hooks/harness-metrics.sh:*)",
+      "Bash(bash .claude/hooks/harness-worktree.sh info)",
+      "Bash(bash .claude/hooks/harness-worktree.sh lock:*)",
+      "Bash(bash .claude/hooks/harness-worktree.sh unlock:*)",
+      "Bash(bash .claude/hooks/task-packet.sh:*)",
+      "Bash(bash .claude/hooks/review-packet.sh:*)",
+      "Bash(bash .claude/hooks/perfil-frescor.sh:*)",
+      "Bash(bash .claude/hooks/agent-stall.sh:*)",
+      "Bash(bash .claude/hooks/carga-maquina.sh:*)",
+      "Bash(node .claude/hooks/frentes.mjs:*)",
+      "Bash(node .claude/hooks/task-telemetry.mjs:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git rev-parse:*)",
+      "Bash(git ls-files:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/sync-memory.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/rag-ensure-index.sh",
+            "async": true,
+            "timeout": 600
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/presence.mjs --start",
+            "async": true,
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/harness-daemon.mjs --ensure",
+            "async": true,
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/doctor-cached.sh 2>/dev/null",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/rag-inject.sh",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f .claude/.harness-run/daemon.on ]; then curl -sf -m 8 --data-binary @- http://127.0.0.1:47831/h/UserPromptSubmit/presence || { rm -f .claude/.harness-run/daemon.on; node .claude/hooks/presence.mjs --prompt </dev/null; }; else node .claude/hooks/presence.mjs --prompt; fi",
+            "async": true,
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/harness-metrics-auto.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/rag-capture-session.sh",
+            "async": true,
+            "timeout": 120
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f .claude/.harness-run/daemon.on ]; then curl -sf -m 8 --data-binary @- http://127.0.0.1:47831/h/SessionEnd/presence || { rm -f .claude/.harness-run/daemon.on; node .claude/hooks/presence.mjs --end </dev/null; }; else node .claude/hooks/presence.mjs --end; fi",
+            "async": true,
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f .claude/.harness-run/daemon.on ]; then curl -sf -m 8 --data-binary @- http://127.0.0.1:47831/h/SubagentStart/presence || { rm -f .claude/.harness-run/daemon.on; node .claude/hooks/presence.mjs --agent-start </dev/null; }; else node .claude/hooks/presence.mjs --agent-start; fi",
+            "async": true,
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f .claude/.harness-run/daemon.on ]; then curl -sf -m 8 --data-binary @- http://127.0.0.1:47831/h/SubagentStop/presence || { rm -f .claude/.harness-run/daemon.on; node .claude/hooks/presence.mjs --agent-end </dev/null; }; else node .claude/hooks/presence.mjs --agent-end; fi",
+            "async": true,
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f .claude/.harness-run/daemon.on ]; then curl -sf -m 8 --data-binary @- http://127.0.0.1:47831/h/PreToolUse/guard-bash || { rm -f .claude/.harness-run/daemon.on; echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"[guard-bash] harness-daemon fora do ar; voltei ao modo direto (node). Re-execute o mesmo comando UMA vez.\"}}'; }; else node .claude/hooks/guard-bash.mjs; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard-agent.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f .claude/.harness-run/daemon.on ]; then curl -sf -m 8 --data-binary @- http://127.0.0.1:47831/h/PreToolUse/guard-folego || { rm -f .claude/.harness-run/daemon.on; node .claude/hooks/guard-folego.mjs </dev/null; }; else node .claude/hooks/guard-folego.mjs; fi",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard-question.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/harness-metrics-auto.sh --skill",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard-dt.sh",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard-migration.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard-write.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/denied.sh"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/notify.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/lint.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard-agent.sh --post",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f .claude/.harness-run/daemon.on ]; then curl -sf -m 8 --data-binary @- http://127.0.0.1:47831/h/PostToolUse/guard-bash-post || { rm -f .claude/.harness-run/daemon.on; node .claude/hooks/guard-bash.mjs --post </dev/null; }; else node .claude/hooks/guard-bash.mjs --post; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/rag-capture-agent.sh",
+            "async": true,
+            "timeout": 120
+          }
+        ]
+      },
+      {
+        "matcher": "Agent|Task|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f .claude/.harness-run/daemon.on ]; then curl -sf -m 8 --data-binary @- http://127.0.0.1:47831/h/PostToolUse/presence || { rm -f .claude/.harness-run/daemon.on; node .claude/hooks/presence.mjs --prompt </dev/null; }; else node .claude/hooks/presence.mjs --prompt; fi",
+            "async": true,
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f .claude/.harness-run/daemon.on ]; then curl -sf -m 8 --data-binary @- http://127.0.0.1:47831/h/PostToolUse/guard-bash-post || { rm -f .claude/.harness-run/daemon.on; node .claude/hooks/guard-bash.mjs --post </dev/null; }; else node .claude/hooks/guard-bash.mjs --post; fi"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/guard-stop.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

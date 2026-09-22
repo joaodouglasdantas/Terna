@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(bash .claude/harness-doctor.sh:*)",
+      "Bash(bash .claude/hooks/external-review.sh:*)",
+      "Bash(bash .claude/hooks/codex-review.sh:*)",
+      "Bash(bash .claude/scripts/gen-adapters.sh:*)",
+      "Bash(codex exec review:*)",
+      "Bash(codex -c model_reasoning_effort=low exec review:*)",
+      "Bash(codex -c model_reasoning_effort=medium exec review:*)",
+      "Bash(codex -c model_reasoning_effort=high exec review:*)",
+      "Bash(php -l:*)",
+      "Bash(node --check:*)",
+      "Bash(python3 -m py_compile:*)",
+      "Bash(npx playwright test:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run:*)"
+    ]
+  }
+}

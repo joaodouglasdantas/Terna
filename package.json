@@ -1,0 +1,17 @@
+{
+  "name": "harness-referencia",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Harness padrao Beta Sistemas. As deps abaixo servem ao modulo OPCIONAL de RAG (captura de conhecimento) — instale-as so ao ativar o RAG num projeto. Ver .claude/RAG.md e .claude/RAG-PORTING.md.",
+  "scripts": {
+    "rag:embed": "tsx .claude/scripts/embed.ts",
+    "rag:search": "tsx .claude/scripts/search.ts",
+    "rag:reindex": "tsx .claude/scripts/reindex.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4",
+    "better-sqlite3": "^12",
+    "sqlite-vec": "^0.1",
+    "@huggingface/transformers": "^4"
+  }
+}

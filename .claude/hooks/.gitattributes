@@ -1,0 +1,11 @@
+# 3.5.7 — hooks/_defaults.env e hooks/_camadas.txt sao SOURCEADOS pelo bash (hooks/_env.sh) e lidos linha a linha
+# pelo Node: CRLF poe um \r no fim de cada valor (HARNESS_DUELO='auto\r') e quebra toda comparacao em silencio — a
+# mesma classe do bug 2.3.0 (CRLF matava hook bash e agente YAML). O .claude/.gitattributes de cada projeto pode ser
+# customizado (a Mariana tem regras proprias) e por isso nao viaja no sync; ESTE vive dentro de hooks/, que e nucleo
+# e e copiado inteiro — a protecao chega junto. Medido 16/09 no sync da Mariana (core.autocrlf=true): git avisou
+# "LF will be replaced by CRLF" justamente nos dois arquivos novos.
+*.env text eol=lf
+*.txt text eol=lf
+*.sh  text eol=lf
+*.mjs text eol=lf
+.gitattributes text eol=lf
