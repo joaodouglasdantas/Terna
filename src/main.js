@@ -8,9 +8,10 @@ const ALTURA_CHAO = 3 * TILE;
 const Y_CHAO = ALTURA - ALTURA_CHAO;
 
 const FOLGA_TUFOS = 4;
-const chao = criarChao(LARGURA, ALTURA_CHAO, FOLGA_TUFOS);
+const chao = criarChao(MUNDO, ALTURA_CHAO, FOLGA_TUFOS);
 
 let ANIMACOES = null;
+let folhaCenario = null;
 
 const DURACAO_QUADRO = {
   parado: 0.6,
@@ -24,10 +25,12 @@ const VELOCIDADE = 90; // pixels por segundo
 const FORCA_PULO = 300; // pixels por segundo — segurando o botão, sobe ~70px
 const CORTE_PULO = 90; // pixels por segundo — ao soltar na subida, a velocidade cai para isto
 const GRAVIDADE = 640; // pixels por segundo²
+const SEGUIR_CAMERA = 5; // quanto maior, mais rápido a câmera alcança o personagem
 
 // `x` é o eixo do corpo e `y` a linha dos pés: os quadros variam de largura e altura, o apoio não.
+// Começa no meio do mapa, com espaço para andar para os dois lados.
 const personagem = {
-  x: 70,
+  x: MUNDO / 2,
   y: Y_CHAO,
   vx: 0,
   vy: 0,
@@ -39,6 +42,9 @@ const personagem = {
   quadro: 0,
   tempoQuadro: 0,
 };
+
+// `x` é a borda esquerda da tela no mapa (0 a MUNDO - LARGURA).
+const camera = { x: (MUNDO - LARGURA) / 2 };
 
 function animacaoDoEstado() {
   if (personagem.deitado) return 'deitado';
@@ -74,36 +80,6 @@ window.addEventListener('keydown', (evento) => {
 window.addEventListener('keyup', (evento) => {
   teclas[evento.code] = false;
 });
-
-const ceu = ctx.createLinearGradient(0, 0, 0, Y_CHAO);
-ceu.addColorStop(0, '#5fb4f0');
-ceu.addColorStop(1, '#bfe6ff');
-
-const fundo = criarFundo(LARGURA, Y_CHAO);
-const vegetacao = criarVegetacao(LARGURA, ALTURA, Y_CHAO);
-const sol = criarSol(36);
-const SOL_X = LARGURA - 70;
-const SOL_Y = 46;
-
-function criarSol(diametro) {
-  const canvasSol = document.createElement('canvas');
-  canvasSol.width = diametro;
-  canvasSol.height = diametro;
-  const ctxSol = canvasSol.getContext('2d');
-  const raio = diametro / 2;
-
-  ctxSol.fillStyle = '#ffe066';
-  ctxSol.beginPath();
-  ctxSol.arc(raio, raio, raio - 4, 0, Math.PI * 2);
-  ctxSol.fill();
-
-  ctxSol.fillStyle = '#fff3b0';
-  ctxSol.beginPath();
-  ctxSol.arc(raio, raio, raio - 8, 0, Math.PI * 2);
-  ctxSol.fill();
-
-  return canvasSol;
-}
 
 function atualizar(dt) {
   const esquerda = teclas['ArrowLeft'] || teclas['KeyA'];
@@ -150,20 +126,36 @@ function atualizar(dt) {
   avancarAnimacao(dt);
   const { imagem, eixo } = spriteAtual();
   const esquerdaDoEixo = personagem.direcao === 1 ? eixo : imagem.width - eixo;
-  personagem.x = Math.max(esquerdaDoEixo, Math.min(LARGURA - (imagem.width - esquerdaDoEixo), personagem.x));
+  personagem.x = Math.max(esquerdaDoEixo, Math.min(MUNDO - (imagem.width - esquerdaDoEixo), personagem.x));
+
+  // A câmera persegue o personagem com suavidade, mantendo-o no meio da tela, e para nas
+  // bordas do mapa: ali quem anda até a beirada é o personagem.
+  const alvo = Math.max(0, Math.min(MUNDO - LARGURA, personagem.x - LARGURA / 2));
+  camera.x += (alvo - camera.x) * Math.min(1, dt * SEGUIR_CAMERA);
+  atualizarPassaros(dt, LARGURA, Math.round(camera.x));
 }
 
-function desenhar() {
-  ctx.fillStyle = ceu;
-  ctx.fillRect(0, 0, LARGURA, ALTURA);
-  ctx.drawImage(sol, SOL_X - sol.width / 2, SOL_Y - sol.height / 2);
-  ctx.drawImage(fundo, 0, 0);
+// `tempo` em segundos desde o início: move sol, nuvens, o balanço das árvores e a luz.
+// O fundo é desenhado em coordenadas de tela, com paralaxe; chão, plantas da frente e o
+// personagem em coordenadas do mapa, deslocados pela câmera.
+function desenhar(tempo) {
+  const camX = Math.round(camera.x);
+  const luz = luzDoSol(tempo, LARGURA);
+  desenharFundo(ctx, folhaCenario, tempo, luz, camX, LARGURA, ALTURA, Y_CHAO);
+
+  ctx.save();
+  ctx.translate(-camX, 0);
   ctx.drawImage(chao, 0, Y_CHAO - FOLGA_TUFOS);
-  ctx.drawImage(vegetacao, 0, 0);
+  desenharVegetacao(ctx, folhaCenario, tempo, luz, Y_CHAO, camX, LARGURA);
 
   const { imagem, eixo } = spriteAtual();
   const x = Math.round(personagem.x);
   const topo = Math.round(personagem.y) - imagem.height;
+
+  // A sombra fica no chão durante o pulo, menor e mais fraca quanto mais alto ele está.
+  const alturaPulo = Y_CHAO - personagem.y;
+  const perto = Math.max(0.3, 1 - alturaPulo / 90);
+  desenharSombra(ctx, luz, personagem.x, Y_CHAO, 18 * perto, perto);
 
   ctx.save();
   if (personagem.direcao === -1) {
@@ -174,6 +166,9 @@ function desenhar() {
     ctx.drawImage(imagem, x - eixo, topo);
   }
   ctx.restore();
+  ctx.restore();
+
+  desenharLuz(ctx, luz, LARGURA, ALTURA);
 }
 
 let ultimoTempo = 0;
@@ -182,11 +177,12 @@ function loop(tempoAtual) {
   ultimoTempo = tempoAtual;
 
   atualizar(dt);
-  desenhar();
+  desenhar(tempoAtual / 1000);
   requestAnimationFrame(loop);
 }
 
-carregarAnimacoesPersonagem().then((animacoes) => {
+Promise.all([carregarAnimacoesPersonagem(), carregarFolhaCenario()]).then(([animacoes, folha]) => {
   ANIMACOES = animacoes;
+  folhaCenario = folha;
   requestAnimationFrame(loop);
 });
