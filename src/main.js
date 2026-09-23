@@ -10,10 +10,7 @@ const Y_CHAO = ALTURA - ALTURA_CHAO;
 const FOLGA_TUFOS = 4;
 const chao = criarChao(LARGURA, ALTURA_CHAO, FOLGA_TUFOS);
 
-const ANIMACOES = {};
-Object.entries(QUADROS_PERSONAGEM).forEach(([nome, quadros]) => {
-  ANIMACOES[nome] = quadros.map((linhas) => criarSprite(linhas, PALETA_PERSONAGEM));
-});
+let ANIMACOES = null;
 
 const DURACAO_QUADRO = {
   parado: 0.6,
@@ -24,18 +21,20 @@ const DURACAO_QUADRO = {
 };
 
 const VELOCIDADE = 90; // pixels por segundo
-const FORCA_PULO = 220; // pixels por segundo
+const FORCA_PULO = 300; // pixels por segundo — segurando o botão, sobe ~70px
+const CORTE_PULO = 90; // pixels por segundo — ao soltar na subida, a velocidade cai para isto
 const GRAVIDADE = 640; // pixels por segundo²
 
-// `y` é a linha dos pés: os quadros têm alturas diferentes, o apoio no chão não.
+// `x` é o eixo do corpo e `y` a linha dos pés: os quadros variam de largura e altura, o apoio não.
 const personagem = {
-  x: 60,
+  x: 70,
   y: Y_CHAO,
   vx: 0,
   vy: 0,
   direcao: 1, // 1 = direita, -1 = esquerda
   noChao: true,
   deitado: false,
+  pularSegurado: false,
   animacao: 'parado',
   quadro: 0,
   tempoQuadro: 0,
@@ -125,11 +124,18 @@ function atualizar(dt) {
       personagem.vx = VELOCIDADE;
       personagem.direcao = 1;
     }
-    if (pular && personagem.noChao) {
+    // Só pula ao apertar de novo: segurar o botão no pouso não emenda outro pulo.
+    if (pular && !personagem.pularSegurado && personagem.noChao) {
       personagem.vy = -FORCA_PULO;
       personagem.noChao = false;
     }
   }
+
+  // Soltar o botão ainda na subida corta o impulso: toque rápido = pulo curto, segurar = pulo alto.
+  if (!pular && personagem.vy < -CORTE_PULO) {
+    personagem.vy = -CORTE_PULO;
+  }
+  personagem.pularSegurado = Boolean(pular);
 
   personagem.vy += GRAVIDADE * dt;
   personagem.x += personagem.vx * dt;
@@ -142,7 +148,9 @@ function atualizar(dt) {
   }
 
   avancarAnimacao(dt);
-  personagem.x = Math.max(0, Math.min(LARGURA - spriteAtual().width, personagem.x));
+  const { imagem, eixo } = spriteAtual();
+  const esquerdaDoEixo = personagem.direcao === 1 ? eixo : imagem.width - eixo;
+  personagem.x = Math.max(esquerdaDoEixo, Math.min(LARGURA - (imagem.width - esquerdaDoEixo), personagem.x));
 }
 
 function desenhar() {
@@ -153,16 +161,17 @@ function desenhar() {
   ctx.drawImage(chao, 0, Y_CHAO - FOLGA_TUFOS);
   ctx.drawImage(vegetacao, 0, 0);
 
-  const sprite = spriteAtual();
-  const topo = personagem.y - sprite.height;
+  const { imagem, eixo } = spriteAtual();
+  const x = Math.round(personagem.x);
+  const topo = Math.round(personagem.y) - imagem.height;
 
   ctx.save();
   if (personagem.direcao === -1) {
-    ctx.translate(personagem.x + sprite.width, topo);
+    ctx.translate(x + eixo, topo);
     ctx.scale(-1, 1);
-    ctx.drawImage(sprite, 0, 0);
+    ctx.drawImage(imagem, 0, 0);
   } else {
-    ctx.drawImage(sprite, personagem.x, topo);
+    ctx.drawImage(imagem, x - eixo, topo);
   }
   ctx.restore();
 }
@@ -177,4 +186,7 @@ function loop(tempoAtual) {
   requestAnimationFrame(loop);
 }
 
-requestAnimationFrame(loop);
+carregarAnimacoesPersonagem().then((animacoes) => {
+  ANIMACOES = animacoes;
+  requestAnimationFrame(loop);
+});

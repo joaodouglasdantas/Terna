@@ -1,3 +1,21 @@
+// Cada caractere das matrizes é 1 pixel; '.' (ou qualquer símbolo fora da paleta) é transparente.
+function criarSprite(linhas, paleta) {
+  const canvas = document.createElement('canvas');
+  canvas.width = linhas[0].length;
+  canvas.height = linhas.length;
+  const ctx = canvas.getContext('2d');
+  linhas.forEach((linha, y) => {
+    [...linha].forEach((simbolo, x) => {
+      const cor = paleta[simbolo];
+      if (cor) {
+        ctx.fillStyle = cor;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    });
+  });
+  return canvas;
+}
+
 const CORES_FUNDO = {
   colinaLongeCorpo: '#84b184',
   colinaLongeTopo: '#9bc396',
