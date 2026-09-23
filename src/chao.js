@@ -38,6 +38,69 @@ const PEDRAS = [
   ['.LLP.', 'LPPPD', 'PPPDD', '.DDD.'],
 ];
 
+// Fósseis enterrados: osso claro (B), sombra do osso (b) e cavidades (d). Peixe, amonite,
+// crânio de dinossauro, bicho de quatro patas deitado e um osso solto.
+const FOSSEIS = [
+  [
+    'b..............bb.',
+    'bb..b.b.b.b.b.bBBb',
+    '.bBBBBBBBBBBBBBBdB',
+    'bb..b.b.b.b.b.bBBb',
+    'b..............bb.',
+  ],
+  [
+    '..bbbbb..',
+    '.bBBBBBb.',
+    'bBbbbbbBb',
+    'bBbBBBbBb',
+    'bBbBdbbBb',
+    'bBbbBbBBb',
+    'bBBbbbBb.',
+    '.bBBBBb..',
+    '..bbbb...',
+  ],
+  [
+    '....bbbbbbb.....',
+    '..bbBBBBBBBbb...',
+    '.bBBBBBddBBBBbb.',
+    'bBBBBBBddBBBBBBb',
+    'bBBBBBBBBBbbbbb.',
+    '.bBBb.B.B.B.b...',
+    '..bBBBBBBBBBBb..',
+    '...bbbbbbbbbb...',
+  ],
+  [
+    '..........b.b.b.b...........',
+    '.........bBbBbBbBb.....bbb..',
+    'bBBBBBBBBBBBBBBBBBBBBBbBBdBb',
+    '.....bb..bBbBbBbBb.bb.bBBBb.',
+    '....b..b..b.b.b.b..b..bbb...',
+    '...b....b.........b.b.......',
+    '..bb...bb........bb.bb......',
+  ],
+  [
+    'bb....bb',
+    'bBBBBBBb',
+    'bb....bb',
+  ],
+];
+const CORES_FOSSIL = { B: '#e3d6b4', b: '#b3a27e', d: '#4a3526' };
+const TRECHO_FOSSIL = 220; // um fóssil a cada tantos pixels de mapa
+
+const ESPESSURA_GRAMA = 6;
+
+// A terra escurece com a profundidade: cada pixel é multiplicado por um fator que vai de
+// `topo` (logo abaixo da grama) a `fundo` (a base da tela), em degraus pontilhados.
+// Ossos e bichos na terra escurecem só `destaque` disso, para não sumirem no fundo.
+const ESCURECER_TERRA = { topo: 0.88, fundo: 0.46, degrau: 0.06, destaque: 0.5 };
+
+// Fator de escuridão a `profundidade` px abaixo do topo de uma terra de `alturaTerra` px.
+function fatorTerra(profundidade, alturaTerra, destaque = false) {
+  const t = Math.max(0, Math.min(1, profundidade / alturaTerra));
+  const fator = ESCURECER_TERRA.topo + (ESCURECER_TERRA.fundo - ESCURECER_TERRA.topo) * t;
+  return destaque ? 1 - (1 - fator) * ESCURECER_TERRA.destaque : fator;
+}
+
 // Pré-renderiza o chão uma vez; `folgaTufos` é o espaço acima da grama para tufos e flores.
 function criarChao(largura, alturaChao, folgaTufos = 4) {
   const canvas = document.createElement('canvas');
@@ -56,7 +119,7 @@ function criarChao(largura, alturaChao, folgaTufos = 4) {
   };
 
   const topoGrama = folgaTufos;
-  const espessuraGrama = 6;
+  const espessuraGrama = ESPESSURA_GRAMA;
   const topoTerra = topoGrama + espessuraGrama;
 
   // Borda de baixo da grama, coluna a coluna: reta com escorridos arredondados.
@@ -126,6 +189,27 @@ function criarChao(largura, alturaChao, folgaTufos = 4) {
     });
     ctx.fillStyle = CORES_CHAO.terraFunda;
     ctx.fillRect(x0 + 1, y0 + forma.length, forma[0].length - 1, 1);
+  }
+
+  // Fósseis no fundo da terra, um por trecho do mapa em ordem embaralhada, às vezes
+  // espelhados, com uma linha de sombra embaixo como as pedras.
+  const inicioFossil = inteiro(FOSSEIS.length);
+  const ossos = new Set(); // pixels dos fósseis, que escurecem menos
+
+  for (let i = 0; i < Math.floor(largura / TRECHO_FOSSIL); i++) {
+    const forma = FOSSEIS[(inicioFossil + i * 2) % FOSSEIS.length];
+    const w = forma[0].length;
+    const espelhado = aleatorio() < 0.5;
+    const x0 = i * TRECHO_FOSSIL + inteiro(TRECHO_FOSSIL - w);
+    const y0 = topoTerra + 14 + inteiro(alturaTerra - 16 - forma.length);
+    forma.forEach((linha, dy) => {
+      [...linha].forEach((simbolo, dx) => {
+        if (!CORES_FOSSIL[simbolo]) return;
+        const x = x0 + (espelhado ? w - 1 - dx : dx);
+        ponto(x, y0 + dy, CORES_FOSSIL[simbolo]);
+        ossos.add((y0 + dy) * largura + x);
+      });
+    });
   }
 
   // Sombra que a grama projeta na terra logo abaixo da borda.
@@ -199,6 +283,23 @@ function criarChao(largura, alturaChao, folgaTufos = 4) {
       ponto(x, topoGrama - 3, MIOLO_FLOR);
     }
   }
+
+  // Escurece a terra (não a grama) com a profundidade, em degraus com o mesmo pontilhado
+  // de Bayer da terra.
+  const imagem = ctx.getImageData(0, 0, largura, altura);
+  for (let x = 0; x < largura; x++) {
+    for (let y = fundoGrama[x]; y < altura; y++) {
+      const osso = ossos.has(y * largura + x);
+      const degraus = fatorTerra(y - topoTerra, altura - topoTerra, osso) / ESCURECER_TERRA.degrau;
+      const base = Math.floor(degraus);
+      const fator = ((degraus - base) * 16 > BAYER[y % 4][x % 4] ? base + 1 : base) * ESCURECER_TERRA.degrau;
+      const i = (y * largura + x) * 4;
+      imagem.data[i] *= fator;
+      imagem.data[i + 1] *= fator;
+      imagem.data[i + 2] *= fator;
+    }
+  }
+  ctx.putImageData(imagem, 0, 0);
 
   return canvas;
 }

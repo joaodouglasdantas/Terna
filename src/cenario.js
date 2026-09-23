@@ -106,16 +106,19 @@ const QUADROS_PASSARO = {
   ],
 };
 
-const PALETA_PASSARO = {
-  T: '#2a3346',
-  W: '#33405a',
-  w: '#6a7a96',
-  B: '#4a5a76',
-  H: '#4a5a76',
-  E: '#11151f',
-  L: '#c3ccd9',
-  Y: '#e2a33b',
-};
+// Espécies (cores) de pássaro. Um bando é sempre todo da mesma cor.
+const CORES_PASSARO = [
+  // azulado
+  { T: '#2a3346', W: '#33405a', w: '#6a7a96', B: '#4a5a76', H: '#4a5a76', E: '#11151f', L: '#c3ccd9', Y: '#e2a33b' },
+  // pardal
+  { T: '#3f2c1f', W: '#4f3826', w: '#9c7b55', B: '#7a5a3e', H: '#6b4c34', E: '#11151f', L: '#dccaa8', Y: '#d9a45a' },
+  // cardeal
+  { T: '#5e1616', W: '#7a1f1f', w: '#c2503e', B: '#ad2d25', H: '#bf3528', E: '#11151f', L: '#e3a38e', Y: '#f0b040' },
+  // pintassilgo: amarelo com asas e cauda pretas, para não sumir na copa do ipê
+  { T: '#1c1c22', W: '#1c1c22', w: '#e8e4d8', B: '#f0cf1e', H: '#f0cf1e', E: '#11151f', L: '#f6e27a', Y: '#e08a2b' },
+  // melro, com o olho amarelo
+  { T: '#121217', W: '#1d1d25', w: '#4d4d5c', B: '#2a2a34', H: '#2a2a34', E: '#f0c040', L: '#4a4a58', Y: '#f0a020' },
+];
 
 // Distâncias dos bandos: os de longe são menores, voam mais devagar, andam menos com a
 // câmera e passam por trás das nuvens. O de perto usa o sprite no tamanho original.
@@ -125,14 +128,13 @@ const NIVEIS_PASSARO = [
   { escala: 0.5, paralaxe: 0.3, ritmo: 0.65, atrasDasNuvens: true },
 ];
 
-const spritesPassaro = Object.fromEntries(
-  Object.entries(QUADROS_PASSARO).map(([nome, linhas]) => [nome, criarSprite(linhas, PALETA_PASSARO)]),
-);
-// Sequência do bater de asas em cada distância: cima, meio, baixo, meio.
+// Sequência do bater de asas em cada distância e cor: cima, meio, baixo, meio.
+// BATER_ASAS[nivel][cor][quadro].
 const BATER_ASAS = NIVEIS_PASSARO.map(({ escala }) =>
-  [spritesPassaro.cima, spritesPassaro.meio, spritesPassaro.baixo, spritesPassaro.meio].map((s) =>
-    reduzirSprite(s, escala),
-  ),
+  CORES_PASSARO.map((paleta) => {
+    const s = Object.fromEntries(Object.entries(QUADROS_PASSARO).map(([nome, linhas]) => [nome, criarSprite(linhas, paleta)]));
+    return [s.cima, s.meio, s.baixo, s.meio].map((sprite) => reduzirSprite(sprite, escala));
+  }),
 );
 
 // Intervalos [mín, máx] sorteados a cada bando; tempos em segundos, velocidade em px/s
@@ -371,13 +373,15 @@ function soltarBando(largura, camX) {
   const direcao = Math.random() < 0.5 ? 1 : -1;
   const velocidade = sortear(PASSAROS.velocidade) * ritmo;
   const yLider = sortear(PASSAROS.altura);
-  const largo = BATER_ASAS[nivel][0].width;
+  const largo = BATER_ASAS[nivel][0][0].width;
+  const cor = Math.floor(Math.random() * CORES_PASSARO.length);
   const xLider = (direcao === 1 ? -largo : largura) + camX * paralaxe;
   const quantidade = Math.round(sortear(PASSAROS.quantidade));
   for (let i = 0; i < quantidade; i++) {
     const fileira = Math.ceil(i / 2);
     passaros.push({
       nivel,
+      cor,
       x: xLider - direcao * fileira * (largo + (3 + Math.random() * 2) * escala),
       y: yLider + (i % 2 ? -1 : 1) * fileira * (7 + Math.random() * 2) * escala,
       vx: direcao * velocidade, // mesma velocidade para o V não se desfazer na travessia
@@ -394,7 +398,7 @@ function atualizarPassaros(dt, largura, camX) {
   });
   passaros = passaros.filter((p) => {
     const x = naTela(p, camX);
-    const largo = BATER_ASAS[p.nivel][0].width;
+    const largo = BATER_ASAS[p.nivel][0][0].width;
     if (x < -300 || x > largura + 300) return false;
     return p.vx > 0 ? x < largura : x > -largo;
   });
@@ -412,7 +416,7 @@ function desenharPassaros(ctx, camX, atrasDasNuvens) {
     const nivel = NIVEIS_PASSARO[p.nivel];
     if (nivel.atrasDasNuvens !== atrasDasNuvens) return;
     const noCiclo = p.tempo % PASSAROS.ciclo;
-    const quadros = BATER_ASAS[p.nivel];
+    const quadros = BATER_ASAS[p.nivel][p.cor];
     const quadro = noCiclo < PASSAROS.batendo ? Math.floor(noCiclo / PASSAROS.quadroAsa) % quadros.length : 1;
     const sprite = quadros[quadro];
     const x = Math.round(naTela(p, camX));
@@ -513,18 +517,27 @@ function plantaIluminada(folha, grupo, indice, quadro, luz, nevoa) {
 // poucos pixels do contorno. `vistaX` é a borda esquerda da tela na camada: plantas fora da
 // tela não são desenhadas.
 function desenharFileira(ctx, folha, tempo, luz, grupo, plantas, apoio, vistaX, largura, nevoa = false) {
-  const rajada = 0.65 + 0.35 * Math.sin((2 * Math.PI * tempo) / VENTO.periodoRajada);
   plantas.forEach(({ indice, x }) => {
     const quadros = QUADROS_CENARIO[grupo][indice];
-    const { w, h, m } = quadros[0];
-    // O recorte tem `m` px a mais à esquerda para a copa vergar; a base ocupa o resto.
-    const esquerda = Math.round(x - (w - m) / 2) - m;
+    const { w, h } = quadros[0];
+    const esquerda = esquerdaDaPlanta(quadros[0], x);
     if (esquerda + w + 2 < vistaX || esquerda - 2 > vistaX + largura) return;
-    const fase = 2 * Math.PI * (tempo / VENTO.periodo + x / VENTO.onda);
-    const forca = (rajada * (1 - Math.cos(fase))) / 2 * (nevoa ? VENTO.fundo : 1);
-    const quadro = Math.round(forca * (quadros.length - 1));
+    const quadro = quadroDoVento(tempo, x, quadros.length, nevoa);
     ctx.drawImage(plantaIluminada(folha, grupo, indice, quadro, luz, nevoa), esquerda, apoio - h);
   });
+}
+
+// O recorte tem `m` px a mais à esquerda para a copa vergar; a base ocupa o resto.
+function esquerdaDaPlanta({ w, m }, x) {
+  return Math.round(x - (w - m) / 2) - m;
+}
+
+// Quadro do vento da planta em `x` no instante `tempo` (0 = repouso).
+function quadroDoVento(tempo, x, totalQuadros, nevoa = false) {
+  const rajada = 0.65 + 0.35 * Math.sin((2 * Math.PI * tempo) / VENTO.periodoRajada);
+  const fase = 2 * Math.PI * (tempo / VENTO.periodo + x / VENTO.onda);
+  const forca = (rajada * (1 - Math.cos(fase))) / 2 * (nevoa ? VENTO.fundo : 1);
+  return Math.round(forca * (totalQuadros - 1));
 }
 
 // Sombra macia e achatada no chão, deslocada para o lado oposto ao sol e mais comprida

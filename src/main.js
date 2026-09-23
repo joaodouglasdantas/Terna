@@ -133,6 +133,8 @@ function atualizar(dt) {
   const alvo = Math.max(0, Math.min(MUNDO - LARGURA, personagem.x - LARGURA / 2));
   camera.x += (alvo - camera.x) * Math.min(1, dt * SEGUIR_CAMERA);
   atualizarPassaros(dt, LARGURA, Math.round(camera.x));
+  atualizarAnimais(dt, personagem, Math.round(camera.x), LARGURA);
+  atualizarMinhocas(dt);
 }
 
 // `tempo` em segundos desde o início: move sol, nuvens, o balanço das árvores e a luz.
@@ -146,7 +148,9 @@ function desenhar(tempo) {
   ctx.save();
   ctx.translate(-camX, 0);
   ctx.drawImage(chao, 0, Y_CHAO - FOLGA_TUFOS);
+  desenharMinhocas(ctx, camX, LARGURA);
   desenharVegetacao(ctx, folhaCenario, tempo, luz, Y_CHAO, camX, LARGURA);
+  desenharAnimais(ctx, luz, tempo, camX, LARGURA);
 
   const { imagem, eixo } = spriteAtual();
   const x = Math.round(personagem.x);
@@ -166,6 +170,7 @@ function desenhar(tempo) {
     ctx.drawImage(imagem, x - eixo, topo);
   }
   ctx.restore();
+  desenharAnimaisNoAr(ctx, luz, tempo, camX, LARGURA);
   ctx.restore();
 
   desenharLuz(ctx, luz, LARGURA, ALTURA);
@@ -184,5 +189,7 @@ function loop(tempoAtual) {
 Promise.all([carregarAnimacoesPersonagem(), carregarFolhaCenario()]).then(([animacoes, folha]) => {
   ANIMACOES = animacoes;
   folhaCenario = folha;
+  prepararAnimais(folha, Y_CHAO);
+  prepararMinhocas(Y_CHAO, ALTURA_CHAO);
   requestAnimationFrame(loop);
 });

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jogo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [".claude/.harness-run/tmp/servidor.js"],
+      "port": 5502
+    }
+  ]
+}
