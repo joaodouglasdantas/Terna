@@ -24,7 +24,7 @@ import {
 import { QUADROS_CENARIO } from '../gerado/cenario-quadros';
 import { contexto2d, criarSprite, novoCanvas } from '../motor/imagens';
 import { sortear } from '../motor/matematica';
-import type { Luz, Paleta, Sprite } from '../motor/tipos';
+import type { Luz, Paleta, Sprite, Vista } from '../motor/tipos';
 import {
   ARVORES_CHAO,
   BATER_ASAS,
@@ -402,8 +402,9 @@ const sorteioInteiro = ([min, max]: Intervalo): number => Math.floor(min + Math.
 const ladoAleatorio = (): number => (Math.random() < 0.5 ? -1 : 1);
 const corAleatoria = (): number => Math.floor(Math.random() * CORES_PASSARO.length);
 const limitarNoMapa = (x: number, margem = 8): number => Math.max(margem, Math.min(MUNDO - margem, x));
-const foraDaTela = (x: number, y: number, camX: number, largura: number): boolean =>
-  x < camX - MARGEM_TELA || x > camX + largura + MARGEM_TELA || y < -MARGEM_TELA;
+// Fora da tela = fora de todas as vistas (com a tela dividida, das duas metades).
+const foraDaTela = (x: number, y: number, vistas: readonly Vista[]): boolean =>
+  y < -MARGEM_TELA || vistas.every((v) => x < v.x - MARGEM_TELA || x > v.x + v.largura + MARGEM_TELA);
 
 function criarAnimal(tipo: TipoAnimal, x: number): Animal {
   const base = { x, y: yChaoAnimais, casa: x, direcao: ladoAleatorio(), tempo: Math.random() * 10 };
@@ -462,6 +463,14 @@ export function prepararAnimais(folha: CanvasImageSource, yChao: number): void {
     }
   }
 }
+
+// Com você e o sósia no mapa, cada bicho se preocupa com quem estiver mais perto dele.
+function maisPerto(ponto: Ponto, pessoas: readonly Jogador[]): Jogador {
+  return pessoas.reduce((perto, p) => (Math.abs(p.x - ponto.x) < Math.abs(perto.x - ponto.x) ? p : perto));
+}
+
+const longeDeTodos = (x: number, pessoas: readonly Jogador[], folga: number): boolean =>
+  pessoas.every((p) => Math.abs(x - p.x) > folga);
 
 // Onde o animal está em relação ao personagem: distância na horizontal e para que lado fugir.
 function distancia(animal: Ponto, jogador: Jogador): { longe: number; fuga: number } {
@@ -848,11 +857,11 @@ function novaAve(lugar: LugarDePouso, cor: number): Ave {
 }
 
 // Lugar para um pássaro que vai chegar: às vezes perto de um já pousado (e muitas vezes da
-// mesma cor dele), senão numa árvore da frente ou no chão, na tela e longe do personagem.
-function escolherPouso(jogador: Jogador, camX: number, largura: number): { lugar: LugarDePouso; cor: number } | null {
-  const naTela = (x: number): boolean => x > camX + 20 && x < camX + largura - 20;
+// mesma cor dele), senão numa árvore da frente ou no chão, na tela e longe dos personagens.
+function escolherPouso(pessoas: readonly Jogador[], vistas: readonly Vista[]): { lugar: LugarDePouso; cor: number } | null {
+  const naTela = (x: number): boolean => vistas.some((v) => x > v.x + 20 && x < v.x + v.largura - 20);
   const longeDoJogador = (x: number, arvore: ArvoreDoMapa | null): boolean =>
-    Math.abs(x - jogador.x) > (arvore ? AVES.susto.arvore : AVES.susto.chao) + 30;
+    longeDeTodos(x, pessoas, (arvore ? AVES.susto.arvore : AVES.susto.chao) + 30);
   const pousadas = aves.filter((ave) => ave.estado !== 'voando');
 
   if (pousadas.length && Math.random() < AVES.junto) {
@@ -881,7 +890,8 @@ function escolherPouso(jogador: Jogador, camX: number, largura: number): { lugar
     }
   }
   for (let tentativa = 0; tentativa < 10; tentativa++) {
-    const x = camX + 30 + Math.random() * (largura - 60);
+    const vista = vistas[Math.floor(Math.random() * vistas.length)];
+    const x = vista.x + 30 + Math.random() * (vista.largura - 60);
     if (longeDoJogador(x, null) && lugarLivre(x, null)) {
       return { lugar: { x, y: yChaoAnimais, arvore: null }, cor: corAleatoria() };
     }
@@ -889,16 +899,18 @@ function escolherPouso(jogador: Jogador, camX: number, largura: number): { lugar
   return null;
 }
 
-// Um pássaro chega voando de fora da tela, do lado mais longe do personagem, e pousa.
-function chegarAve(jogador: Jogador, camX: number, largura: number): void {
-  const pouso = escolherPouso(jogador, camX, largura);
+// Um pássaro chega voando de fora da tela, do lado mais longe do personagem, e pousa. Entra
+// pela borda da vista onde vai pousar (com a tela dividida, pode entrar pela divisão).
+function chegarAve(pessoas: readonly Jogador[], vistas: readonly Vista[]): void {
+  const pouso = escolherPouso(pessoas, vistas);
   if (!pouso) return;
   const { lugar, cor } = pouso;
-  const lado = Math.sign(lugar.x - jogador.x) || 1;
+  const lado = Math.sign(lugar.x - maisPerto(lugar, pessoas).x) || 1;
+  const vista = vistas.find((v) => lugar.x >= v.x && lugar.x <= v.x + v.largura) ?? vistas[0];
   const ave = novaAve(lugar, cor);
   ave.estado = 'chegando';
   ave.alvo = { ...lugar };
-  ave.x = lado > 0 ? camX + largura + 20 : camX - 20;
+  ave.x = lado > 0 ? vista.x + vista.largura + 20 : vista.x - 20;
   ave.y = sortear([10, 60]);
   ave.direcao = -lado;
   aves.push(ave);
@@ -1025,23 +1037,24 @@ function atualizarAnimal(animal: Animal, dt: number, jogador: Jogador): void {
   }
 }
 
-// Um lugar do mapa fora da tela e longe do personagem para um animal nascer (null se não
+// Um lugar do mapa fora da tela e longe dos personagens para um animal nascer (null se não
 // achar desta vez).
-function lugarParaNascer(jogador: Jogador, camX: number, largura: number): number | null {
+function lugarParaNascer(pessoas: readonly Jogador[], vistas: readonly Vista[]): number | null {
   for (let tentativa = 0; tentativa < 20; tentativa++) {
     const x = 30 + Math.random() * (MUNDO - 60);
-    if (foraDaTela(x, yChaoAnimais, camX, largura) && Math.abs(x - jogador.x) > LONGE_AO_NASCER) return x;
+    if (foraDaTela(x, yChaoAnimais, vistas) && longeDeTodos(x, pessoas, LONGE_AO_NASCER)) return x;
   }
   return null;
 }
 
-// `jogador` é o personagem (x = eixo do corpo, no mapa); `camX` a borda esquerda da tela.
-export function atualizarAnimais(dt: number, jogador: Jogador, camX: number, largura: number): void {
+// `pessoas` são você e o sósia (x = eixo do corpo, no mapa); `vistas`, os trechos do mapa na
+// tela (dois quando ela está dividida).
+export function atualizarAnimais(dt: number, pessoas: readonly Jogador[], vistas: readonly Vista[]): void {
   animais.forEach((animal) => {
     animal.tempo += dt;
-    atualizarAnimal(animal, dt, jogador);
+    atualizarAnimal(animal, dt, maisPerto(animal, pessoas));
     // Assustado e fora da tela: foi embora do mapa.
-    if (animal.medo && foraDaTela(animal.x, animal.y, camX, largura)) animal.sumiu = true;
+    if (animal.medo && foraDaTela(animal.x, animal.y, vistas)) animal.sumiu = true;
   });
 
   // Cada um que sumiu abre uma vaga; depois de um tempo nasce outro fora da tela.
@@ -1052,7 +1065,7 @@ export function atualizarAnimais(dt: number, jogador: Jogador, camX: number, lar
   reposicoes.forEach((vaga) => {
     vaga.espera -= dt;
     if (vaga.espera > 0) return;
-    const x = lugarParaNascer(jogador, camX, largura);
+    const x = lugarParaNascer(pessoas, vistas);
     if (x === null) return;
     animais.push(criarAnimal(vaga.tipo, x));
     vaga.preenchida = true;
@@ -1061,15 +1074,15 @@ export function atualizarAnimais(dt: number, jogador: Jogador, camX: number, lar
 
   aves.forEach((ave) => {
     ave.tempo += dt;
-    atualizarAve(ave, dt, jogador);
+    atualizarAve(ave, dt, maisPerto(ave, pessoas));
   });
-  aves = aves.filter((ave) => ave.estado !== 'voando' || !foraDaTela(ave.x, ave.y, camX, largura));
+  aves = aves.filter((ave) => ave.estado !== 'voando' || !foraDaTela(ave.x, ave.y, vistas));
 
   // Pássaros novos chegam um de cada vez, até o máximo.
   if (aves.filter((ave) => ave.estado !== 'voando').length >= AVES.maximo) return;
   esperaAve -= dt;
   if (esperaAve <= 0) {
-    chegarAve(jogador, camX, largura);
+    chegarAve(pessoas, vistas);
     esperaAve = sortear(AVES.chegada);
   }
 }

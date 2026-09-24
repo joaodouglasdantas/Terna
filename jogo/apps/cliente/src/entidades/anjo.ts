@@ -17,6 +17,7 @@ export interface CorpoAnjo {
   vy: number;
   direcao: 1 | -1;
   noChao: boolean;
+  planando: boolean; // descendo devagar com o botão de pulo segurado
 }
 
 // O quadro que vai para a tela e onde: `x` e `topo` já arredondados, como no desenho do sprite.
@@ -36,56 +37,97 @@ export interface Pose {
 const ACENDER: Record<Forma, number> = { anjo: 0.9, base: 0.55 };
 const APAGAR: Record<Forma, number> = { anjo: 0.6, base: 0.4 };
 const COR_LUZ = '255, 246, 222';
+// A forma de anjo dura um minuto: acabado o tempo, ele volta sozinho à forma base — mesmo no
+// ar, e aí despenca. O R desfaz antes, se quiser.
+export const DURACAO_ANJO = 60; // segundos
 
 type Fase = 'parado' | 'acendendo' | 'apagando';
-const estado = {
-  forma: 'base' as Forma,
-  fase: 'parado' as Fase,
-  tempoFase: 0,
-};
 
-export function formaAtual(): Forma {
-  return estado.forma;
+// Tudo o que é de um anjo só: cada personagem (você e o sósia) tem o seu.
+export interface Anjo {
+  forma: Forma;
+  fase: Fase;
+  tempoFase: number;
+  restaAnjo: number; // segundos que ainda restam na forma de anjo
+  batida: Batida;
+  coracoes: Coracao[];
+  faiscas: Faisca[];
+  sobraFaiscas: number;
+  plumas: Pluma[];
+  sobraPlumas: number;
+}
+
+export function criarAnjo(): Anjo {
+  return {
+    forma: 'base',
+    fase: 'parado',
+    tempoFase: 0,
+    restaAnjo: 0,
+    batida: { fase: 0, centro: 48, amplitude: 7, periodo: 1.8 },
+    coracoes: [],
+    faiscas: [],
+    sobraFaiscas: 0,
+    plumas: [],
+    sobraPlumas: 0,
+  };
+}
+
+export function formaAtual(anjo: Anjo): Forma {
+  return anjo.forma;
 }
 
 // Enquanto a luz sobe o personagem fica parado: é a pose da transformação.
-export function transformando(): boolean {
-  return estado.fase === 'acendendo';
+export function transformando(anjo: Anjo): boolean {
+  return anjo.fase === 'acendendo';
 }
 
-export function alternarForma(): void {
-  if (estado.fase !== 'parado') return;
-  estado.fase = 'acendendo';
-  estado.tempoFase = 0;
-  if (estado.forma === 'anjo') soltarCoracoes();
+export function alternarForma(anjo: Anjo): void {
+  if (anjo.fase !== 'parado') return;
+  anjo.fase = 'acendendo';
+  anjo.tempoFase = 0;
+  if (anjo.forma === 'anjo') soltarCoracoes(anjo);
 }
 
-function destino(): Forma {
-  if (estado.fase === 'acendendo') return estado.forma === 'anjo' ? 'base' : 'anjo';
-  return estado.forma;
+function destino(anjo: Anjo): Forma {
+  if (anjo.fase === 'acendendo') return anjo.forma === 'anjo' ? 'base' : 'anjo';
+  return anjo.forma;
+}
+
+// A barra do tempo de anjo: quanto dela está cheio (0 a 1) e se está em uso. Virando anjo,
+// ela enche junto com a luz; de anjo, esvazia com o minuto; voltando, fica onde parou. Na
+// forma base fica cheia e apagada — pronta — e se refaz enquanto a luz da volta apaga.
+export function barraDoAnjo(anjo: Anjo): { cheia: number; ativa: boolean; resta: number } {
+  if (anjo.fase === 'acendendo') {
+    const p = Math.min(1, anjo.tempoFase / ACENDER[destino(anjo)]);
+    if (destino(anjo) === 'anjo') return { cheia: p, ativa: true, resta: DURACAO_ANJO };
+    return { cheia: anjo.restaAnjo / DURACAO_ANJO, ativa: true, resta: anjo.restaAnjo };
+  }
+  if (anjo.forma === 'anjo') return { cheia: anjo.restaAnjo / DURACAO_ANJO, ativa: true, resta: anjo.restaAnjo };
+  const refazendo = anjo.fase === 'apagando' ? suavizar(0, 1, anjo.tempoFase / APAGAR.base) : 1;
+  return { cheia: refazendo, ativa: false, resta: DURACAO_ANJO };
 }
 
 // Quanto a luz cobre o corpo (raio a partir do peito) e com que força.
-function luzNoCorpo(): { raio: number; forca: number } {
-  if (estado.fase === 'acendendo') {
-    const p = estado.tempoFase / ACENDER[destino()];
+function luzNoCorpo(anjo: Anjo): { raio: number; forca: number } {
+  if (anjo.fase === 'acendendo') {
+    const p = anjo.tempoFase / ACENDER[destino(anjo)];
     return { raio: 2 + p * p * 30, forca: 0.35 + 0.65 * p };
   }
-  if (estado.fase === 'apagando') {
-    const p = estado.tempoFase / APAGAR[estado.forma];
+  if (anjo.fase === 'apagando') {
+    const p = anjo.tempoFase / APAGAR[anjo.forma];
     return { raio: 40, forca: (1 - p) ** 1.5 };
   }
   return { raio: 0, forca: 0 };
 }
 
 // 0 = asas recolhidas (somem), 1 = abertas. Abrem com um leve passo além do fim.
-function aberturaAsas(): number {
-  if (estado.forma !== 'anjo') return 0;
-  if (estado.fase === 'apagando') {
-    const p = Math.min(1, estado.tempoFase / APAGAR.anjo);
+function aberturaAsas(anjo: Anjo): number {
+  if (anjo.forma !== 'anjo') return 0;
+  if (anjo.fase === 'apagando') {
+    const p = Math.min(1, anjo.tempoFase / APAGAR.anjo);
     return 1 + 1.6 * (p - 1) ** 3 + 0.6 * (p - 1) ** 2;
   }
-  if (estado.fase === 'acendendo') return 1 - suavizar(0, 1, estado.tempoFase / ACENDER.base);
+  if (anjo.fase === 'acendendo') return 1 - suavizar(0, 1, anjo.tempoFase / ACENDER.base);
   return 1;
 }
 
@@ -159,14 +201,22 @@ function asa(comprimento: number, angulo: number, lado: keyof typeof CORES_ASA):
   return nova;
 }
 
-// A batida muda com o que o corpo faz: devagar parado, mais viva andando, forte subindo e
-// quase parada (asas abertas, planando) caindo. Centro e amplitude mudam aos poucos.
-const batida = { fase: 0, centro: 48, amplitude: 7, periodo: 1.8 };
+// A batida muda com o que o corpo faz: devagar parado, mais viva andando, forte subindo, larga e
+// compassada planando (segurando o ar) e quase parada caindo solto, com as asas levantadas pelo
+// vento. Centro e amplitude mudam aos poucos.
+interface Batida {
+  fase: number;
+  centro: number;
+  amplitude: number;
+  periodo: number;
+}
 
-function atualizarBatida(dt: number, corpo: CorpoAnjo): void {
+function atualizarBatida(batida: Batida, dt: number, corpo: CorpoAnjo): void {
   let alvo = { centro: 48, amplitude: 7, periodo: 1.8 };
   if (!corpo.noChao) {
-    alvo = corpo.vy < 0 ? { centro: 34, amplitude: 38, periodo: 0.3 } : { centro: 20, amplitude: 6, periodo: 0.6 };
+    if (corpo.vy < 0) alvo = { centro: 34, amplitude: 38, periodo: 0.3 };
+    else if (corpo.planando) alvo = { centro: 26, amplitude: 30, periodo: 0.45 };
+    else alvo = { centro: 64, amplitude: 4, periodo: 0.5 };
   } else if (corpo.vx !== 0) {
     alvo = { centro: 40, amplitude: 14, periodo: 0.7 };
   }
@@ -177,7 +227,7 @@ function atualizarBatida(dt: number, corpo: CorpoAnjo): void {
   batida.fase += (dt * Math.PI * 2) / batida.periodo;
 }
 
-function desenharAsas(ctx: CanvasRenderingContext2D, pose: Pose, abertura: number): void {
+function desenharAsas(ctx: CanvasRenderingContext2D, pose: Pose, abertura: number, batida: Batida): void {
   const [ox, oy] = pose.quadro.ombro;
   const comprimento = COMPRIMENTO_ASA * abertura;
   const angulo = batida.centro + batida.amplitude * Math.sin(batida.fase);
@@ -239,10 +289,9 @@ interface Coracao {
 
 const INDO = 0.8;
 const ARRASTO = 0.03; // segundos: a 90 px/s o coração fica ~3 px para trás do lugar
-let coracoes: Coracao[] = [];
 
-function soltarCoracoesDoPeito(corpo: CorpoAnjo): void {
-  coracoes = LUGARES_CORACOES.map((lugar, i) => ({
+function soltarCoracoesDoPeito(anjo: Anjo, corpo: CorpoAnjo): void {
+  anjo.coracoes = LUGARES_CORACOES.map((lugar, i) => ({
     x: corpo.x,
     y: corpo.y - 16,
     dx: 0,
@@ -256,12 +305,12 @@ function soltarCoracoesDoPeito(corpo: CorpoAnjo): void {
   }));
 }
 
-function soltarCoracoes(): void {
-  for (const c of coracoes) c.saindo = true;
+function soltarCoracoes(anjo: Anjo): void {
+  for (const c of anjo.coracoes) c.saindo = true;
 }
 
-function atualizarCoracoes(dt: number, tempo: number, corpo: CorpoAnjo): void {
-  for (const c of coracoes) {
+function atualizarCoracoes(anjo: Anjo, dt: number, tempo: number, corpo: CorpoAnjo): void {
+  for (const c of anjo.coracoes) {
     c.idade += dt;
     if (c.saindo) {
       c.resta -= dt;
@@ -277,10 +326,10 @@ function atualizarCoracoes(dt: number, tempo: number, corpo: CorpoAnjo): void {
     c.x = corpo.x + c.dx;
     c.y = corpo.y + c.dy;
   }
-  coracoes = coracoes.filter((c) => c.resta > 0);
+  anjo.coracoes = anjo.coracoes.filter((c) => c.resta > 0);
 }
 
-function desenharCoracoes(ctx: CanvasRenderingContext2D, tempo: number): void {
+function desenharCoracoes(ctx: CanvasRenderingContext2D, coracoes: readonly Coracao[], tempo: number): void {
   for (const c of coracoes) {
     const sprite = c.lugar.grande ? CORACAO : CORACAO_PEQUENO;
     const surgir = Math.min(1, c.idade / 0.25);
@@ -318,40 +367,169 @@ interface Faisca {
 }
 
 const CORES_FAISCA = ['#fffbe8', '#ffe79a', '#ffd0e4'];
-let faiscas: Faisca[] = [];
-let sobraFaiscas = 0;
 
-function novaFaisca(x: number, y: number, vx: number, vy: number): void {
+function novaFaisca(anjo: Anjo, x: number, y: number, vx: number, vy: number): void {
   const total = 0.5 + Math.random() * 0.5;
-  faiscas.push({ x, y, vx, vy, vida: total, total, cor: CORES_FAISCA[(Math.random() * CORES_FAISCA.length) | 0] });
+  anjo.faiscas.push({ x, y, vx, vy, vida: total, total, cor: CORES_FAISCA[(Math.random() * CORES_FAISCA.length) | 0] });
 }
 
-function atualizarFaiscas(dt: number, pose: Pose): void {
-  if (estado.fase === 'acendendo') {
-    sobraFaiscas += dt * 40;
-    for (; sobraFaiscas >= 1; sobraFaiscas--) {
+function atualizarFaiscas(anjo: Anjo, dt: number, pose: Pose): void {
+  if (anjo.fase === 'acendendo') {
+    anjo.sobraFaiscas += dt * 40;
+    for (; anjo.sobraFaiscas >= 1; anjo.sobraFaiscas--) {
       const { x, y } = noMapa(pose, Math.random() * pose.quadro.w, Math.random() * pose.quadro.h);
-      novaFaisca(x, y, (Math.random() - 0.5) * 10, -15 - Math.random() * 25);
+      novaFaisca(anjo, x, y, (Math.random() - 0.5) * 10, -15 - Math.random() * 25);
     }
   }
-  for (const f of faiscas) {
+  for (const f of anjo.faiscas) {
     f.vida -= dt;
     f.vy -= 12 * dt;
     f.x += f.vx * dt;
     f.y += f.vy * dt;
   }
-  faiscas = faiscas.filter((f) => f.vida > 0);
+  anjo.faiscas = anjo.faiscas.filter((f) => f.vida > 0);
 }
 
-function estourarFaiscas(corpo: CorpoAnjo): void {
+function estourarFaiscas(anjo: Anjo, corpo: CorpoAnjo): void {
   for (let i = 0; i < 18; i++) {
     const a = (i / 18) * Math.PI * 2;
     const v = 30 + Math.random() * 30;
-    novaFaisca(corpo.x, corpo.y - 16, Math.cos(a) * v, Math.sin(a) * v - 10);
+    novaFaisca(anjo, corpo.x, corpo.y - 16, Math.cos(a) * v, Math.sin(a) * v - 10);
   }
 }
 
-function desenharFaiscas(ctx: CanvasRenderingContext2D): void {
+// ---- Plumas ----
+// Andando ou voando, o anjo solta das asas pontinhos brancos e suaves que ficam para trás e
+// descem devagar, balançando, até sumir — como penugem. Nascem num ponto qualquer da asa de
+// perto, na batida em que ela está. Ficam no mapa (não seguem o corpo) e terminam de cair
+// mesmo se ele voltar à forma base.
+interface Pluma {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  vida: number;
+  total: number;
+  fase: number; // do balanço
+  suave: boolean; // com um halo fraco em volta do ponto
+}
+
+const PLUMAS_POR_SEGUNDO = 14;
+
+function soltarPlumas(anjo: Anjo, dt: number, corpo: CorpoAnjo, pose: Pose): void {
+  const andandoOuVoando = !corpo.noChao || corpo.vx !== 0;
+  if (anjo.forma !== 'anjo' || anjo.fase === 'acendendo' || !andandoOuVoando || pose.deFrente) return;
+  anjo.sobraPlumas += dt * PLUMAS_POR_SEGUNDO;
+  const [ox, oy] = pose.quadro.ombro;
+  const angulo = anjo.batida.centro + anjo.batida.amplitude * Math.sin(anjo.batida.fase);
+  for (; anjo.sobraPlumas >= 1; anjo.sobraPlumas--) {
+    // Um ponto do leque: `phi` a partir de trás (0°), subindo; `r` da raiz até perto da ponta.
+    const phi = ((angulo - LEQUE_ASA * (0.15 + 0.85 * Math.random())) * Math.PI) / 180;
+    const r = COMPRIMENTO_ASA * (0.5 + 0.45 * Math.random());
+    const { x, y } = noMapa(pose, ox - Math.cos(phi) * r, oy - Math.sin(phi) * r);
+    const total = 1.1 + Math.random() * 0.9;
+    anjo.plumas.push({
+      x,
+      y,
+      vx: -corpo.direcao * (2 + Math.random() * 6),
+      vy: 3 + Math.random() * 5,
+      vida: total,
+      total,
+      fase: Math.random() * Math.PI * 2,
+      suave: Math.random() < 0.5,
+    });
+  }
+}
+
+function atualizarPlumas(anjo: Anjo, dt: number, tempo: number): void {
+  for (const p of anjo.plumas) {
+    p.vida -= dt;
+    p.x += (p.vx + Math.sin(tempo * 3 + p.fase) * 5) * dt;
+    p.y += p.vy * dt;
+  }
+  anjo.plumas = anjo.plumas.filter((p) => p.vida > 0);
+}
+
+function desenharPlumas(ctx: CanvasRenderingContext2D, plumas: readonly Pluma[]): void {
+  for (const p of plumas) {
+    // Surge rápido e some devagar.
+    const alfa = Math.min(1, (p.total - p.vida) / 0.12) * (p.vida / p.total) ** 0.6;
+    const x = Math.round(p.x);
+    const y = Math.round(p.y);
+    ctx.fillStyle = `rgba(255, 255, 255, ${alfa})`;
+    ctx.fillRect(x, y, 1, 1);
+    if (p.suave) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${alfa * 0.4})`;
+      ctx.fillRect(x - 1, y, 1, 1);
+      ctx.fillRect(x + 1, y, 1, 1);
+      ctx.fillRect(x, y - 1, 1, 1);
+      ctx.fillRect(x, y + 1, 1, 1);
+    }
+  }
+}
+
+// ---- Auréola ----
+// Um anel dourado flutuando em cima da cabeça, com um brilho em volta que pulsa e, de tempos
+// em tempos, um reflexo que corre pela borda de cima. Fica sobre o eixo do corpo (que no anjo
+// é o da cabeça) e acompanha o topo de cada pose; aparece e some junto com as asas.
+const AUREOLA = criarSprite(['..wwwww..', '.y.....y.', '..yyyyy..'], { w: '#fffbe6', y: '#ffd966' });
+const ACIMA_DA_CABECA = 2; // pixels entre o topo da cabeça e a auréola
+const REFLEXO = { ciclo: 1.8, corrida: 0.45 }; // segundos: de quanto em quanto e quanto dura
+// Quanto o que fica em cima da cabeça (o nome) sobe para dar lugar à auréola, com ela aberta.
+const LUGAR_DA_AUREOLA = 7;
+
+export function alturaDaAureola(anjo: Anjo): number {
+  return LUGAR_DA_AUREOLA * Math.max(0, Math.min(1, aberturaAsas(anjo)));
+}
+
+// Espaço que a auréola ocupa em cima da cabeça, parada (sem flutuar).
+export const ALTURA_AUREOLA = ACIMA_DA_CABECA + AUREOLA.height;
+
+// Para a foto do painel: olhos de coração e auréola parados sobre um quadro já desenhado com o
+// canto de cima em (x, y) e o eixo do corpo na coluna `eixo`.
+export function enfeitarRetratoDeAnjo(
+  ctx: CanvasRenderingContext2D,
+  quadro: QuadroPersonagem,
+  eixo: number,
+  x: number,
+  y: number,
+): void {
+  for (const [c, r] of quadro.olhos) ctx.drawImage(CORACAO_PEQUENO, x + c - 1, y + r - 1);
+  ctx.drawImage(AUREOLA, x + eixo - (AUREOLA.width >> 1), y - ALTURA_AUREOLA);
+}
+
+function desenharAureola(ctx: CanvasRenderingContext2D, pose: Pose, abertura: number, tempo: number): void {
+  const alfa = Math.max(0, Math.min(1, abertura));
+  const flutua = Math.round(Math.sin(tempo * 2.2) * 0.8);
+  const x = pose.x - (AUREOLA.width >> 1);
+  const y = pose.topo - ACIMA_DA_CABECA - AUREOLA.height + flutua;
+  const cx = pose.x + 0.5;
+  const cy = y + AUREOLA.height / 2;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const pulso = 0.8 + 0.2 * Math.sin(tempo * 3.1);
+  const brilho = ctx.createRadialGradient(cx, cy, 0, cx, cy, 9);
+  brilho.addColorStop(0, `rgba(255, 232, 150, ${0.5 * alfa * pulso})`);
+  brilho.addColorStop(1, 'rgba(255, 232, 150, 0)');
+  ctx.fillStyle = brilho;
+  ctx.fillRect(cx - 9, cy - 9, 18, 18);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = alfa;
+  ctx.drawImage(AUREOLA, x, y);
+  // O reflexo: um ponto branco que atravessa a borda de cima, da esquerda para a direita.
+  const noCiclo = tempo % REFLEXO.ciclo;
+  if (noCiclo < REFLEXO.corrida) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x + 2 + Math.floor((noCiclo / REFLEXO.corrida) * 5), y, 1, 1);
+  }
+  ctx.restore();
+}
+
+function desenharFaiscas(ctx: CanvasRenderingContext2D, faiscas: readonly Faisca[]): void {
   for (const f of faiscas) {
     ctx.globalAlpha = Math.min(1, (f.vida / f.total) * 1.5);
     ctx.fillStyle = f.cor;
@@ -362,22 +540,32 @@ function desenharFaiscas(ctx: CanvasRenderingContext2D): void {
 
 // ---- Laço ----
 
-export function atualizarAnjo(dt: number, tempo: number, corpo: CorpoAnjo, pose: Pose): void {
-  if (estado.fase !== 'parado') {
-    estado.tempoFase += dt;
-    if (estado.fase === 'acendendo' && estado.tempoFase >= ACENDER[destino()]) {
-      estado.forma = destino();
-      estado.fase = 'apagando';
-      estado.tempoFase = 0;
-      estourarFaiscas(corpo);
-      if (estado.forma === 'anjo') soltarCoracoesDoPeito(corpo);
-    } else if (estado.fase === 'apagando' && estado.tempoFase >= APAGAR[estado.forma]) {
-      estado.fase = 'parado';
+export function atualizarAnjo(anjo: Anjo, dt: number, tempo: number, corpo: CorpoAnjo, pose: Pose): void {
+  if (anjo.fase !== 'parado') {
+    anjo.tempoFase += dt;
+    if (anjo.fase === 'acendendo' && anjo.tempoFase >= ACENDER[destino(anjo)]) {
+      anjo.forma = destino(anjo);
+      anjo.fase = 'apagando';
+      anjo.tempoFase = 0;
+      estourarFaiscas(anjo, corpo);
+      if (anjo.forma === 'anjo') {
+        anjo.restaAnjo = DURACAO_ANJO;
+        soltarCoracoesDoPeito(anjo, corpo);
+      }
+    } else if (anjo.fase === 'apagando' && anjo.tempoFase >= APAGAR[anjo.forma]) {
+      anjo.fase = 'parado';
     }
   }
-  atualizarBatida(dt, corpo);
-  atualizarCoracoes(dt, tempo, corpo);
-  atualizarFaiscas(dt, pose);
+  // O minuto de anjo corre desde a troca; acabou, a volta começa sozinha.
+  if (anjo.forma === 'anjo' && anjo.fase !== 'acendendo') {
+    anjo.restaAnjo = Math.max(0, anjo.restaAnjo - dt);
+    if (anjo.restaAnjo === 0) alternarForma(anjo);
+  }
+  atualizarBatida(anjo.batida, dt, corpo);
+  atualizarCoracoes(anjo, dt, tempo, corpo);
+  atualizarFaiscas(anjo, dt, pose);
+  soltarPlumas(anjo, dt, corpo, pose);
+  atualizarPlumas(anjo, dt, tempo);
 }
 
 // Coloca o contexto no espaço do quadro: (0, 0) é o canto de cima do recorte, e o eixo x
@@ -387,10 +575,14 @@ function noQuadro(ctx: CanvasRenderingContext2D, pose: Pose): void {
   ctx.scale(pose.direcao, 1);
 }
 
-// Antes do sprite: a aura e as asas (o que fica atrás do corpo).
-export function desenharAnjoAtras(ctx: CanvasRenderingContext2D, tempo: number, pose: Pose): void {
-  if (estado.forma !== 'anjo') return;
-  const abertura = aberturaAsas();
+// Antes do sprite: a aura, as asas e as plumas que saem delas (o que fica atrás do corpo). As
+// plumas já soltas terminam de cair mesmo depois de ele voltar à forma base.
+export function desenharAnjoAtras(ctx: CanvasRenderingContext2D, anjo: Anjo, tempo: number, pose: Pose): void {
+  if (anjo.forma !== 'anjo') {
+    desenharPlumas(ctx, anjo.plumas);
+    return;
+  }
+  const abertura = aberturaAsas(anjo);
 
   const centro = noMapa(pose, pose.quadro.w / 2, pose.quadro.h * 0.5);
   ctx.save();
@@ -405,9 +597,10 @@ export function desenharAnjoAtras(ctx: CanvasRenderingContext2D, tempo: number, 
   if (abertura > 0.05) {
     ctx.save();
     noQuadro(ctx, pose);
-    desenharAsas(ctx, pose, abertura);
+    desenharAsas(ctx, pose, abertura, anjo.batida);
     ctx.restore();
   }
+  desenharPlumas(ctx, anjo.plumas);
 }
 
 const silhuetas = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
@@ -454,10 +647,10 @@ function desenharTarja(ctx: CanvasRenderingContext2D, quadro: QuadroPersonagem, 
   }
 }
 
-// Depois do sprite: a tarja, os corações dos olhos, a luz da transformação, os corações em volta
-// e as faíscas.
-export function desenharAnjoNaFrente(ctx: CanvasRenderingContext2D, tempo: number, pose: Pose): void {
-  if (estado.forma === 'anjo') {
+// Depois do sprite: a tarja, os corações dos olhos, a auréola, a luz da transformação, os
+// corações em volta e as faíscas.
+export function desenharAnjoNaFrente(ctx: CanvasRenderingContext2D, anjo: Anjo, tempo: number, pose: Pose): void {
+  if (anjo.forma === 'anjo') {
     ctx.save();
     noQuadro(ctx, pose);
     desenharTarja(ctx, pose.quadro, tempo);
@@ -465,9 +658,11 @@ export function desenharAnjoNaFrente(ctx: CanvasRenderingContext2D, tempo: numbe
     // olho. Sem brilho somado: sobre a pele clara ele amarelava.
     for (const [c, r] of pose.quadro.olhos) ctx.drawImage(CORACAO_PEQUENO, c - 1, r - 1);
     ctx.restore();
+    const abertura = aberturaAsas(anjo);
+    if (abertura > 0.05) desenharAureola(ctx, pose, abertura, tempo);
   }
 
-  const { raio, forca } = luzNoCorpo();
+  const { raio, forca } = luzNoCorpo(anjo);
   if (forca > 0) {
     const { w, h } = pose.quadro;
     const peito = { x: w / 2, y: h * 0.5 };
@@ -500,6 +695,6 @@ export function desenharAnjoNaFrente(ctx: CanvasRenderingContext2D, tempo: numbe
     ctx.restore();
   }
 
-  desenharCoracoes(ctx, tempo);
-  desenharFaiscas(ctx);
+  desenharCoracoes(ctx, anjo.coracoes, tempo);
+  desenharFaiscas(ctx, anjo.faiscas);
 }

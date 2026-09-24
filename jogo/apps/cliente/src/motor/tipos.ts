@@ -18,6 +18,13 @@ export interface Sprite {
 // Símbolo da matriz de pixels → cor.
 export type Paleta = Record<string, string>;
 
+// Trecho do mapa que aparece na tela, de `x` a `x + largura`: um só com a tela inteira, dois
+// com a tela dividida (um em cada metade).
+export interface Vista {
+  x: number;
+  largura: number;
+}
+
 // Onde o sol está e quanto ele ilumina (ver luzDoSol em mundo/cenario.ts).
 export interface Luz {
   x: number;

@@ -312,10 +312,13 @@ const naTela = (p: PassaroDeFundo, camX: number): number => p.x - camX * NIVEIS_
 // Solta um bando em V entrando por um dos lados da tela, numa distância sorteada; os
 // seguidores vêm atrás e alternam acima/abaixo. Cada fileira recua um passo fixo maior que
 // o sprite, e o sorteio só varia um pouco dentro dele: dois pássaros nunca se sobrepõem.
-function soltarBando(largura: number, camX: number): void {
+function soltarBando(largura: number, camEsquerda: number, camDireita: number): void {
   const nivel = Math.floor(Math.random() * NIVEIS_PASSARO.length);
   const { escala, paralaxe, ritmo } = NIVEIS_PASSARO[nivel];
   const direcao = Math.random() < 0.5 ? 1 : -1;
+  // Com a tela dividida, quem entra pela esquerda entra na metade da esquerda e quem entra pela
+  // direita, na da direita.
+  const camX = direcao === 1 ? camEsquerda : camDireita;
   const velocidade = sortear(PASSAROS.velocidade) * ritmo;
   const yLider = sortear(PASSAROS.altura);
   const largo = BATER_ASAS[nivel][0][0].width;
@@ -335,14 +338,16 @@ function soltarBando(largura: number, camX: number): void {
   }
 }
 
-// Sai quando passa da borda para onde voa; se a câmera o deixar muito para trás, também.
-export function atualizarPassaros(dt: number, largura: number, camX: number): void {
+// Sai quando passa da borda para onde voa; se a câmera o deixar muito para trás, também. As
+// câmeras são as das duas metades da tela (iguais quando ela não está dividida): a borda
+// para onde ele voa é a da metade daquele lado.
+export function atualizarPassaros(dt: number, largura: number, camEsquerda: number, camDireita: number): void {
   passaros.forEach((p) => {
     p.x += p.vx * dt;
     p.tempo += dt;
   });
   passaros = passaros.filter((p) => {
-    const x = naTela(p, camX);
+    const x = naTela(p, p.vx > 0 ? camDireita : camEsquerda);
     const largo = BATER_ASAS[p.nivel][0][0].width;
     if (x < -300 || x > largura + 300) return false;
     return p.vx > 0 ? x < largura : x > -largo;
@@ -351,7 +356,7 @@ export function atualizarPassaros(dt: number, largura: number, camX: number): vo
   if (passaros.length) return;
   esperaBando -= dt;
   if (esperaBando <= 0) {
-    soltarBando(largura, camX);
+    soltarBando(largura, camEsquerda, camDireita);
     esperaBando = sortear(PASSAROS.intervalo);
   }
 }

@@ -4,29 +4,27 @@
 import { MUNDO } from '@terna/compartilhado';
 import { atualizarAnimais, desenharAnimais, desenharAnimaisNoAr, prepararAnimais } from './entidades/animais';
 import {
-  alternarForma,
-  atualizarAnjo,
-  desenharAnjoAtras,
-  desenharAnjoNaFrente,
-  formaAtual,
-  transformando,
-  type Pose,
-} from './entidades/anjo';
-import {
+  acimaDaCabeca,
+  atualizarPersonagem,
   carregarAnimacoesPersonagem,
-  quadroPersonagem,
-  type AnimacoesPersonagem,
-  type Forma,
-  type NomeAnimacao,
+  criarPersonagem,
+  desenharPersonagem,
+  desenharSombraDoPersonagem,
+  prepararPersonagens,
+  type Controles,
+  type Personagem,
 } from './entidades/personagem';
+import { criarCerebroSosia, pensarSosia, type CerebroSosia } from './entidades/sosia';
+import { desenharEtiquetas, type Etiqueta } from './interface/etiqueta';
+import { desenharPainel, type CorDoJogador } from './interface/painel';
 import { contexto2d } from './motor/imagens';
-import type { Sprite } from './motor/tipos';
+import { suavizar } from './motor/matematica';
+import type { Luz, Vista } from './motor/tipos';
 import {
   atualizarPassaros,
   carregarFolhaCenario,
   desenharFundo,
   desenharLuz,
-  desenharSombra,
   desenharVegetacao,
   luzDoSol,
 } from './mundo/cenario';
@@ -50,93 +48,74 @@ const Y_CHAO = ALTURA - ALTURA_CHAO;
 const FOLGA_TUFOS = 4;
 const chao = criarChao(MUNDO, ALTURA_CHAO, FOLGA_TUFOS);
 
-let ANIMACOES: Record<Forma, AnimacoesPersonagem>;
-let folhaCenario: HTMLImageElement;
-
-const DURACAO_QUADRO: Record<NomeAnimacao, number> = {
-  parado: 0.6,
-  andando: 0.11,
-  subindo: 0.2,
-  caindo: 0.2,
-};
-
-const VELOCIDADE = 90; // pixels por segundo
-const FORCA_PULO = 260; // pixels por segundo — segurando o botão, sobe ~53px
-const CORTE_PULO = 90; // pixels por segundo — ao soltar na subida, a velocidade cai para isto
-const GRAVIDADE = 640; // pixels por segundo²
 const SEGUIR_CAMERA = 5; // quanto maior, mais rápido a câmera alcança o personagem
-// O sprite é desenhado alguns pixels abaixo da linha do chão: os pés afundam na grama em vez
-// de ficar equilibrados na borda de cima dela.
-const AFUNDAR_NA_GRAMA = 2;
+// O sósia começa um pouco à direita, olhando para você, e anda em volta desse lugar.
+const CASA_SOSIA = MUNDO / 2 + 70;
+// Quem é quem, na cor de cada um — você em azul, o sósia em vermelho: o nome em cima da cabeça,
+// a borda do painel e o fundo da foto (a `clara`).
+const PLAYER_1: Etiqueta & CorDoJogador = { texto: 'PLAYER 1', cor: '#5fb2ff', clara: '#d3e9ff' };
+const PLAYER_2: Etiqueta & CorDoJogador = { texto: 'PLAYER 2', cor: '#ff5a67', clara: '#ffd8dc' };
 
-// `x` é o eixo do corpo e `y` a linha dos pés: os quadros variam de largura e altura, o apoio não.
-// Começa no meio do mapa, com espaço para andar para os dois lados.
-const personagem: {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  direcao: 1 | -1;
-  noChao: boolean;
-  pularSegurado: boolean;
-  transformarSegurado: boolean;
-  animacao: NomeAnimacao;
-  quadro: number;
-  tempoQuadro: number;
-} = {
-  x: MUNDO / 2,
-  y: Y_CHAO,
-  vx: 0,
-  vy: 0,
-  direcao: 1, // 1 = direita, -1 = esquerda
-  noChao: true,
-  pularSegurado: false,
-  transformarSegurado: false,
-  animacao: 'parado',
-  quadro: 0,
-  tempoQuadro: 0,
-};
+let folhaCenario: HTMLImageElement;
+// Você começa no meio do mapa, com espaço para andar para os dois lados.
+let jogador: Personagem;
+let sosia: Personagem;
+let cerebroSosia: CerebroSosia;
 
-// `x` é a borda esquerda da tela no mapa (0 a MUNDO - LARGURA).
-const camera = { x: (MUNDO - LARGURA) / 2 };
+// ---- Câmera e tela dividida ----
+// Cada metade da tela é uma janela sobre uma tela inteira com câmera própria: a da esquerda
+// mostra a parte de 0 a METADE da vista da câmera `esquerda`; a da direita, a parte de METADE
+// a LARGURA da vista da câmera `direita`. Com as duas câmeras no mesmo lugar as metades se
+// encaixam e a tela é uma só. Enquanto os dois cabem juntos na tela, as duas câmeras seguem o
+// ponto do meio entre eles. Passando disso, a tela se divide — quem está mais à esquerda fica
+// na metade da esquerda — e, ao longo de SEPARANDO pixels de afastamento, cada câmera vai
+// centralizar o seu personagem na sua metade. A divisão nasce sem tranco (no começo as metades
+// mostram a mesma imagem de antes) e some do mesmo jeito quando eles se reaproximam.
+// Céu, sol e luz são da tela, não do mapa: ficam no mesmo lugar nas duas metades.
+const METADE = LARGURA / 2;
+const MARGEM_JUNTOS = 40; // pixels da borda: mais perto disso, um sairia da vista do outro
+const JUNTOS = LARGURA - 2 * MARGEM_JUNTOS; // maior distância entre os dois com a tela inteira
+const SEPARANDO = 120; // pixels de afastamento para cada metade centralizar o seu personagem
+const DIVISAO_APARECE = 12; // pixels de diferença entre as câmeras até a linha ficar inteira
 
-function animacaoDoEstado(): NomeAnimacao {
-  if (!personagem.noChao) return personagem.vy < 0 ? 'subindo' : 'caindo';
-  return personagem.vx !== 0 ? 'andando' : 'parado';
+// `esquerda` e `direita`: borda esquerda da tela inteira de cada câmera, no mapa (0 a MUNDO - LARGURA).
+// `dividida` só liga com as câmeras a 1 px uma da outra e só desliga abaixo de meio pixel: com
+// menos que isso, o arredondamento fazia a tela piscar entre inteira e dividida.
+const camera = { esquerda: (MUNDO - LARGURA) / 2, direita: (MUNDO - LARGURA) / 2, dividida: false };
+
+const limitarCamera = (x: number): number => Math.max(0, Math.min(MUNDO - LARGURA, x));
+
+function atualizarCamera(dt: number): void {
+  const [a, b] = jogador.x <= sosia.x ? [jogador.x, sosia.x] : [sosia.x, jogador.x];
+  const juntos = (a + b) / 2 - METADE;
+  const separar = suavizar(JUNTOS, JUNTOS + SEPARANDO, b - a);
+  // Separados: `a` no meio da metade da esquerda (x = METADE / 2), `b` no meio da da direita.
+  const alvoEsquerda = limitarCamera(juntos + (a - METADE / 2 - juntos) * separar);
+  const alvoDireita = limitarCamera(juntos + (b - (METADE + METADE / 2) - juntos) * separar);
+  // As câmeras perseguem o alvo com suavidade e param nas bordas do mapa: ali quem anda até a
+  // beirada é o personagem.
+  const k = Math.min(1, dt * SEGUIR_CAMERA);
+  camera.esquerda += (alvoEsquerda - camera.esquerda) * k;
+  camera.direita += (alvoDireita - camera.direita) * k;
+  const diferenca = Math.abs(camera.direita - camera.esquerda);
+  camera.dividida = diferenca >= (camera.dividida ? 0.5 : 1);
 }
 
-function avancarAnimacao(dt: number): void {
-  const animacao = animacaoDoEstado();
-  if (animacao !== personagem.animacao) {
-    personagem.animacao = animacao;
-    personagem.quadro = 0;
-    personagem.tempoQuadro = 0;
-    return;
-  }
-
-  personagem.tempoQuadro += dt;
-  const passo = DURACAO_QUADRO[animacao];
-  if (personagem.tempoQuadro >= passo) {
-    personagem.tempoQuadro -= passo;
-    personagem.quadro = (personagem.quadro + 1) % ANIMACOES.base[animacao].length;
-  }
+// Onde cada câmera está, em pixels inteiros. Sem divisão, a tela inteira usa a da esquerda.
+function camerasNaTela(): { esquerda: number; direita: number; dividida: boolean } {
+  const esquerda = Math.round(camera.esquerda);
+  const direita = camera.dividida ? Math.round(camera.direita) : esquerda;
+  return { esquerda, direita, dividida: camera.dividida };
 }
 
-function spriteAtual(): Sprite {
-  return ANIMACOES[formaAtual()][personagem.animacao][personagem.quadro];
-}
-
-function poseAtual(): Pose {
-  const { imagem, eixo } = spriteAtual();
-  return {
-    quadro: quadroPersonagem(personagem.animacao, personagem.quadro),
-    imagem,
-    eixo,
-    x: Math.round(personagem.x),
-    topo: Math.round(personagem.y) - imagem.height + AFUNDAR_NA_GRAMA,
-    direcao: personagem.direcao,
-    deFrente: personagem.animacao === 'parado',
-  };
+// Os trechos do mapa que aparecem: um com a tela inteira, dois com ela dividida.
+function vistas(): Vista[] {
+  const { esquerda, direita, dividida } = camerasNaTela();
+  if (!dividida) return [{ x: esquerda, largura: LARGURA }];
+  return [
+    { x: esquerda, largura: METADE },
+    { x: direita + METADE, largura: METADE },
+  ];
 }
 
 const teclas: Record<string, boolean> = {};
@@ -147,101 +126,102 @@ window.addEventListener('keyup', (evento) => {
   teclas[evento.code] = false;
 });
 
+function lerTeclado(): Controles {
+  return {
+    esquerda: Boolean(teclas['ArrowLeft'] || teclas['KeyA']),
+    direita: Boolean(teclas['ArrowRight'] || teclas['KeyD']),
+    pular: Boolean(teclas['Space'] || teclas['ArrowUp'] || teclas['KeyW']),
+    transformar: Boolean(teclas['KeyR']), // R alterna entre a forma base e a de anjo
+  };
+}
+
 function atualizar(dt: number, tempo: number): void {
-  // R alterna entre a forma base e a de anjo; durante a transformação o corpo não responde.
-  const transformar = teclas['KeyR'];
-  if (transformar && !personagem.transformarSegurado) alternarForma();
-  personagem.transformarSegurado = Boolean(transformar);
-  const livre = !transformando();
+  atualizarPersonagem(jogador, lerTeclado(), dt, tempo);
+  atualizarPersonagem(sosia, pensarSosia(cerebroSosia, sosia, dt), dt, tempo);
 
-  const esquerda = livre && (teclas['ArrowLeft'] || teclas['KeyA']);
-  const direita = livre && (teclas['ArrowRight'] || teclas['KeyD']);
-  const pular = livre && (teclas['Space'] || teclas['ArrowUp'] || teclas['KeyW']);
-
-  personagem.vx = 0;
-  if (esquerda) {
-    personagem.vx = -VELOCIDADE;
-    personagem.direcao = -1;
-  }
-  if (direita) {
-    personagem.vx = VELOCIDADE;
-    personagem.direcao = 1;
-  }
-  // Só pula ao apertar de novo: segurar o botão no pouso não emenda outro pulo.
-  if (pular && !personagem.pularSegurado && personagem.noChao) {
-    personagem.vy = -FORCA_PULO;
-    personagem.noChao = false;
-  }
-
-  // Soltar o botão ainda na subida corta o impulso: toque rápido = pulo curto, segurar = pulo alto.
-  if (!pular && personagem.vy < -CORTE_PULO) {
-    personagem.vy = -CORTE_PULO;
-  }
-  personagem.pularSegurado = Boolean(pular);
-
-  personagem.vy += GRAVIDADE * dt;
-  personagem.x += personagem.vx * dt;
-  personagem.y += personagem.vy * dt;
-
-  if (personagem.y >= Y_CHAO) {
-    personagem.y = Y_CHAO;
-    personagem.vy = 0;
-    personagem.noChao = true;
-  }
-
-  avancarAnimacao(dt);
-  const { imagem, eixo } = spriteAtual();
-  const esquerdaDoEixo = personagem.direcao === 1 ? eixo : imagem.width - eixo;
-  personagem.x = Math.max(esquerdaDoEixo, Math.min(MUNDO - (imagem.width - esquerdaDoEixo), personagem.x));
-
-  // A câmera persegue o personagem com suavidade, mantendo-o no meio da tela, e para nas
-  // bordas do mapa: ali quem anda até a beirada é o personagem.
-  const alvo = Math.max(0, Math.min(MUNDO - LARGURA, personagem.x - LARGURA / 2));
-  camera.x += (alvo - camera.x) * Math.min(1, dt * SEGUIR_CAMERA);
-  atualizarAnjo(dt, tempo, personagem, poseAtual());
-  atualizarPassaros(dt, LARGURA, Math.round(camera.x));
-  atualizarAnimais(dt, personagem, Math.round(camera.x), LARGURA);
+  atualizarCamera(dt);
+  const { esquerda, direita } = camerasNaTela();
+  atualizarPassaros(dt, LARGURA, esquerda, direita);
+  atualizarAnimais(dt, [jogador, sosia], vistas());
   atualizarMinhocas(dt);
 }
 
-// `tempo` em segundos desde o início: move sol, nuvens, o balanço das árvores e a luz.
-// O fundo é desenhado em coordenadas de tela, com paralaxe; chão, plantas da frente e o
-// personagem em coordenadas do mapa, deslocados pela câmera.
-function desenhar(tempo: number): void {
-  const camX = Math.round(camera.x);
-  const luz = luzDoSol(tempo, LARGURA);
+// Uma tela inteira vista pela câmera `camX`, recortada na faixa de `x0` a `x0 + largura` da
+// tela. O fundo é desenhado em coordenadas de tela, com paralaxe; chão, plantas da frente e os
+// personagens em coordenadas do mapa, deslocados pela câmera.
+function desenharVista(tempo: number, luz: Luz, camX: number, x0: number, largura: number): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x0, 0, largura, ALTURA);
+  ctx.clip();
   desenharFundo(ctx, folhaCenario, tempo, luz, camX, LARGURA, ALTURA, Y_CHAO);
 
-  ctx.save();
   ctx.translate(-camX, 0);
   ctx.drawImage(chao, 0, Y_CHAO - FOLGA_TUFOS);
   desenharMinhocas(ctx, camX, LARGURA);
   desenharVegetacao(ctx, folhaCenario, tempo, luz, Y_CHAO, camX, LARGURA);
   desenharAnimais(ctx, luz, tempo, camX, LARGURA);
 
-  const pose = poseAtual();
-  const { imagem, eixo, x, topo } = pose;
-
-  // A sombra fica no chão durante o pulo, menor e mais fraca quanto mais alto ele está.
-  const alturaPulo = Y_CHAO - personagem.y;
-  const perto = Math.max(0.3, 1 - alturaPulo / 90);
-  desenharSombra(ctx, luz, personagem.x, Y_CHAO, 18 * perto, perto);
-  desenharAnjoAtras(ctx, tempo, pose);
-
-  ctx.save();
-  if (personagem.direcao === -1) {
-    ctx.translate(x + eixo, topo);
-    ctx.scale(-1, 1);
-    ctx.drawImage(imagem, 0, 0);
-  } else {
-    ctx.drawImage(imagem, x - eixo, topo);
-  }
-  ctx.restore();
-  desenharAnjoNaFrente(ctx, tempo, pose);
+  // O sósia atrás e você na frente, quando um passa pelo outro.
+  desenharSombraDoPersonagem(ctx, sosia, luz);
+  desenharSombraDoPersonagem(ctx, jogador, luz);
+  desenharPersonagem(ctx, sosia, tempo);
+  desenharPersonagem(ctx, jogador, tempo);
   desenharAnimaisNoAr(ctx, luz, tempo, camX, LARGURA);
   ctx.restore();
+}
 
+// Os nomes em cima de cada um, na vista da câmera `camX` recortada como em desenharVista. O
+// sósia vem primeiro: juntos, o nome dele é o que sobe.
+function desenharNomes(camX: number, x0: number, largura: number): void {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x0, 0, largura, ALTURA);
+  ctx.clip();
+  ctx.translate(-camX, 0);
+  desenharEtiquetas(
+    ctx,
+    [
+      { etiqueta: PLAYER_2, x: sosia.x, y: sosia.y, acima: acimaDaCabeca(sosia) },
+      { etiqueta: PLAYER_1, x: jogador.x, y: jogador.y, acima: acimaDaCabeca(jogador) },
+    ],
+    { x: camX + x0, largura },
+  );
+  ctx.restore();
+}
+
+// A linha no meio da tela dividida: um vão escuro com um fio claro de cada lado. Vai
+// aparecendo conforme as câmeras se afastam, junto com a diferença entre as metades.
+function desenharDivisao(forca: number): void {
+  ctx.fillStyle = `rgba(18, 22, 38, ${0.85 * forca})`;
+  ctx.fillRect(METADE - 1, 0, 2, ALTURA);
+  ctx.fillStyle = `rgba(255, 250, 235, ${0.45 * forca})`;
+  ctx.fillRect(METADE - 2, 0, 1, ALTURA);
+  ctx.fillRect(METADE + 1, 0, 1, ALTURA);
+}
+
+// `tempo` em segundos desde o início: move sol, nuvens, o balanço das árvores e a luz.
+function desenhar(tempo: number): void {
+  const luz = luzDoSol(tempo, LARGURA);
+  const { esquerda, direita, dividida } = camerasNaTela();
+  if (dividida) {
+    desenharVista(tempo, luz, esquerda, 0, METADE);
+    desenharVista(tempo, luz, direita, METADE, METADE);
+  } else {
+    desenharVista(tempo, luz, esquerda, 0, LARGURA);
+  }
   desenharLuz(ctx, luz, LARGURA, ALTURA);
+  // Os nomes vêm depois da luz, para o sol não tingir o azul e o vermelho.
+  if (dividida) {
+    desenharNomes(esquerda, 0, METADE);
+    desenharNomes(direita, METADE, METADE);
+  } else {
+    desenharNomes(esquerda, 0, LARGURA);
+  }
+  if (dividida) desenharDivisao(Math.min(1, Math.abs(direita - esquerda) / DIVISAO_APARECE));
+  // Os painéis ficam sempre no mesmo canto: o seu à esquerda, o do sósia à direita.
+  desenharPainel(ctx, jogador, PLAYER_1, 'esquerda', LARGURA, tempo);
+  desenharPainel(ctx, sosia, PLAYER_2, 'direita', LARGURA, tempo);
 }
 
 let ultimoTempo = 0;
@@ -255,7 +235,10 @@ function loop(tempoAtual: number): void {
 }
 
 Promise.all([carregarAnimacoesPersonagem(), carregarFolhaCenario()]).then(([animacoes, folha]) => {
-  ANIMACOES = animacoes;
+  prepararPersonagens(animacoes, Y_CHAO);
+  jogador = criarPersonagem(MUNDO / 2);
+  sosia = criarPersonagem(CASA_SOSIA, -1);
+  cerebroSosia = criarCerebroSosia(CASA_SOSIA);
   folhaCenario = folha;
   prepararAnimais(folha, Y_CHAO);
   prepararMinhocas(Y_CHAO, ALTURA_CHAO);
