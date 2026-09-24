@@ -1,3 +1,5 @@
+<p align="center"><img src="fontes/logo.png" alt="Terna" width="520"></p>
+
 # Terna — o jogo
 
 Jogo de plataforma 2D em pixel art. Roda no navegador hoje e está preparado para virar app
