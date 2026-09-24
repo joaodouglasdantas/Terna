@@ -1,0 +1,11 @@
+// Publicação do jogo no Cloudflare Workers (só arquivos estáticos: a pasta dist/ do build).
+// Servir arquivos estáticos é grátis e sem limite de acessos no plano Free.
+// O deploy é feito pelo Workers Builds a cada push (ver jogo/DEPLOY.md).
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "terna",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./dist"
+  }
+}

@@ -1,6 +1,6 @@
 # Perfil — RESUMO para subagentes (2.4.0)
 
-> **Sincronizado com o Perfil:** `191477373932522` (2026-08-13) — carimbo do `perfil-frescor.sh`; NAO edite a mao.
+> **Sincronizado com o Perfil:** `32405125337816` (2026-09-23) — carimbo do `perfil-frescor.sh`; NAO edite a mao.
 
 > **O QUE É ESTE ARQUIVO.** Destilado (~2 KB) do `PERFIL-PROJETO.md` com SÓ os fatos
 > operativos que um subagente (hefesto, sherlock, beholder, michelangelo, atlas,
@@ -24,48 +24,56 @@
 
 ## Identificação e stack
 
-- **Projeto:** `<nome + slug>`
-- **Stack:** `<ex: PHP 7.4 + MySQL + jQuery>`
-- **Compatibilidade de produção (TETO):** `<ex: PHP 7.4 — nada de sintaxe 8.x>`
+- **Projeto:** Terna (`terna`) — jogo de plataforma 2D em pixel art
+- **Stack:** TypeScript em tudo; monorepo npm workspaces em `jogo/`. Cliente: Vite + Canvas 2D
+  (web; app de PC depois). Servidor: Node 22 + Fastify 5 + WebSocket + Drizzle. Banco: Postgres
+  (PGlite embutido em dev/teste). Contratos e dados do jogo: `@terna/compartilhado` (zod).
+- **Compatibilidade de produção (TETO):** Node >= 22.12; navegador ES2022; nenhuma dependência nativa.
 
 ## CLI e banco (caminhos ABSOLUTOS — nunca assuma PATH)
 
-- **Interpretador:** `<ex: C:/laragon/bin/php/php-7.4.33/php.exe>`
-- **Cliente de banco:** `<ex: C:/laragon/bin/mysql/.../mysql.exe -u root -pSenha>`
-- **Banco de teste local:** `<nome>` · **Smoke test:** `<comando>`
-- **Base URL local:** `<ex: http://localhost/projeto>`
+- **Interpretador:** `C:/Program Files/nodejs/node.exe` (🔧 confirmar) · pacotes: `npm`, sempre em `jogo/`
+- **Cliente de banco:** N/A em dev (PGlite em `jogo/apps/servidor/dados/banco/`)
+- **Banco de teste:** PGlite em memória, um por arquivo de teste · **Smoke test:** `curl http://localhost:3001/api/saude`
+- **Base URL local:** `http://localhost:5173` (API em `/api`, repassada pelo Vite para a porta 3001)
+- **Verificar:** `npm --prefix jogo run typecheck` e `npm --prefix jogo test`
 
 ## Estrutura (onde as coisas ficam)
 
-- **Endpoints/API:** `<caminho>` · **Páginas/views:** `<caminho>` · **JS:** `<caminho>`
-- **Migrations:** `<caminho>` · **Mapa do schema:** `<arquivo>`
-- **Doc raiz de convenções:** `<ex: CLAUDE.md>`
+- **API:** `jogo/apps/servidor/src/rotas/` · **Tempo real:** `src/tempo-real/` · **Jogo:** `jogo/apps/cliente/src/`
+- **Migrations:** `jogo/apps/servidor/drizzle/` · **Mapa do schema:** `jogo/apps/servidor/src/banco/schema.ts`
+- **Contratos/dados do jogo:** `jogo/packages/compartilhado/src/` · **Arte:** `jogo/fontes/` → `jogo/ferramentas/`
+- **Doc raiz de convenções:** `jogo/README.md`
 
 ## Réguas críticas (a triagem do review ancora AQUI)
 
-1. **Datas de negócio:** vêm da origem/payload, NUNCA `NOW()`/relógio do servidor
-   (auditoria `created_at` pode). Timezone: `<tz>`.
-2. **Auth na primeira linha** de todo endpoint, antes de banco/efeito.
-3. **Idempotência de envios:** registro processado por worker externo é marcado
-   "enviado" na criação.
-4. **Soft delete:** `<sim/não — coluna>`; nunca DELETE físico se sim.
-5. **Prepared statements sempre** — nunca concatenação em SQL.
+1. **Auth antes de tudo:** rota de jogador chama `exigirJogador` antes de tocar o banco; o
+   WebSocket autentica no `preValidation` (antes do upgrade).
+2. **Toda entrada validada com o esquema zod de `@terna/compartilhado`** (HTTP e WebSocket).
+3. **Drizzle com query builder/`sql` template** — nunca concatenar texto em SQL.
+4. **Segredos:** senha só como hash scrypt; token de sessão só como hash sha256 no banco.
+5. **Sem datas de negócio:** só carimbos técnicos `timestamptz` (ISO UTC na API).
 
 ## Armadilhas específicas do projeto
 
-- `<colar/atualizar a lista curta de anti-patterns do Perfil → Armadilhas>`
+- Contrato novo → só em `@terna/compartilhado`, nunca duplicado num lado.
+- Save mudou de formato → `DadosSaveV2` + conversão em `atualizarSave`; nunca editar a V1.
+- `src/gerado/` e `src/assets/*.png` do cliente são gerados: mude o gerador ou a fonte.
+- Dado do jogo (números, itens, mapa) vai em `compartilhado/src/conteudo/`, não no banco.
+- Valor vindo do cliente (pontuação, posição) só tem validação de faixa: não confie para prêmio.
 
 ## Integrações com efeito colateral irreversível
 
-- `<listar: integração → helper/interceptor central → palavras-chave>` (ou "Nenhuma")
-- **Safe mode:** `<flag + como validar>`
+- Nenhuma. **Safe mode:** N/A.
 
 ## Armadilhas de teste/seed (E2E)
 
-- **Framework:** `<ex: Playwright>` · **Specs:** `<dir>` · **Screenshots:** `<pasta>`
-- **Comando (spec único):** `<comando>`
-- **Verificação visual (agentes):** `<estado do Playwright + fatos desta máquina — ex.: "1.58.2 + 3 navegadores; ⚠️ Browser pane NÃO funciona nesta máquina">` — evidência é PNG do Playwright na pasta acima; pane é sonda de **1 tentativa** (PLATAFORMAS.md §7)
-- `<colar a lista curada de tropeços de seed/ambiente do Perfil>`
+- **Framework:** Vitest (sem E2E ainda) · **Specs:** `jogo/apps/*/test/`, `jogo/packages/*/test/`
+- **Comando (spec único):** `cd jogo/apps/<app> && npx vitest run test/<arquivo>.test.ts`
+- **Verificação visual (agentes):** Playwright não instalado no projeto; comparar canvas com
+  `Math.random` semeado e `requestAnimationFrame` controlado (Perfil → Armadilhas de teste).
+- Nomes de conta únicos por teste (banco em memória vive o arquivo inteiro).
+- WebSocket: ouvir em `onInit` do `injectWS(url, {}, { onInit })` — o `bem-vindo` chega na conexão.
 
 ## Convenções da casa adotadas aqui
 

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Banco local do servidor (PGlite) e configurações da máquina.
+apps/servidor/dados/
+apps/servidor/.env
+.env
+.env.local

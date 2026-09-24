@@ -1,0 +1,36 @@
+{
+  "name": "@terna/servidor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "API e tempo real do jogo: contas, saves, ranking e multiplayer, com banco Postgres.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "npm run typecheck && tsup",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "db:gerar": "drizzle-kit generate",
+    "db:migrar": "tsx src/banco/migrar.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.6",
+    "@types/pg": "^8.23.1",
+    "@types/ws": "^8.18.1",
+    "drizzle-kit": "^0.31.11",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.15",
+    "vitest": "^5.0.1"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/rate-limit": "^11.2.0",
+    "@fastify/websocket": "^11.3.1",
+    "@terna/compartilhado": "*",
+    "drizzle-orm": "^0.45.3",
+    "fastify": "^5.12.5",
+    "pg": "^8.23.0",
+    "zod": "^4.6.5"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "terna",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Terna — jogo de plataforma 2D (cliente web + servidor com banco).",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n servidor,cliente -c blue,green \"npm:dev:servidor\" \"npm:dev:cliente\"",
+    "dev:cliente": "npm run dev -w @terna/cliente",
+    "dev:servidor": "npm run dev -w @terna/servidor",
+    "build": "npm run build -w @terna/cliente && npm run build -w @terna/servidor",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:gerar": "npm run db:gerar -w @terna/servidor",
+    "db:migrar": "npm run db:migrar -w @terna/servidor",
+    "arte:cenario": "node ferramentas/gerar-cenario.cjs",
+    "arte:personagem": "node ferramentas/gerar-personagem.cjs"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5",
+    "typescript": "^7.0.2",
+    "wrangler": "^4.137.0"
+  }
+}

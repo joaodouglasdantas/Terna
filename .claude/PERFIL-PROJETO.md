@@ -28,10 +28,10 @@
 
 | Campo | Valor |
 |-------|-------|
-| **Nome do projeto** | `<ex: Sistema XPTO>` |
-| **Slug** | `<ex: sistema-xpto — usado em nomes de pasta/relatório>` |
-| **Repositório / deploy** | `<ex: GitLab CI na branch main; ou GitHub Actions; ou deploy manual>` |
-| **Stack resumida** | `<ex: PHP 7.4 + MySQL + jQuery; ou Node 20 + Express + Postgres>` |
+| **Nome do projeto** | `Terna` (jogo de plataforma 2D em pixel art) |
+| **Slug** | `terna` |
+| **Repositório / deploy** | `GitHub joaodouglasdantas/Terna, branch main; sem deploy automatizado ainda` |
+| **Stack resumida** | `TypeScript em tudo. Cliente: Vite + Canvas 2D (web agora; app de PC via Tauri/Electron depois). Servidor: Node 22 + Fastify 5 + WebSocket + Drizzle ORM. Banco: PostgreSQL (PGlite embutido em dev/teste). Monorepo npm workspaces em jogo/` |
 
 ---
 
@@ -42,11 +42,11 @@ Se o projeto roda em mais de um SO (ex: Windows e macOS), liste os dois; quem ex
 
 | Campo | Valor |
 |-------|-------|
-| **Interpretador (run/lint)** | `<ex: C:/laragon/bin/php/php-8.1.10-Win32-vs16-x64/php.exe — ou: node>` |
-| **Interpretador (alt. SO)** | `<ex: /Applications/MAMP/bin/php/php7.3.33/bin/php — ou "N/A">` |
-| **Cliente de banco** | `<ex: C:/laragon/bin/mysql/mysql-8.0.30-winx64/bin/mysql.exe — ou: psql — ou "N/A">` |
-| **Cliente de banco (alt. SO)** | `<ex: /Applications/MAMP/Library/bin/mysql — ou "N/A">` |
-| **Gerenciador de pacotes** | `<ex: composer — ou: npm/pnpm/yarn>` |
+| **Interpretador (run/lint)** | `C:/Program Files/nodejs/node.exe` (padrão do instalador do Node 22.12+ — 🔧 confirmar nesta máquina) |
+| **Interpretador (alt. SO)** | `N/A` |
+| **Cliente de banco** | `N/A em dev` — o banco local é PGlite (arquivo em `jogo/apps/servidor/dados/banco/`), acessado só pelo servidor. Com Postgres de verdade: `psql` |
+| **Cliente de banco (alt. SO)** | `N/A` |
+| **Gerenciador de pacotes** | `npm` (workspaces; rodar sempre dentro de `jogo/`) |
 
 ---
 
@@ -71,8 +71,11 @@ Se o projeto roda em mais de um SO (ex: Windows e macOS), liste os dois; quem ex
 
 | Comando (estreito; `*` final = aceita argumentos) | Por que é seguro |
 |---|---|
-| 🔧 `<ex: php artisan test *>` | 🔧 `<roda a suite local — sem efeito externo>` |
-| 🔧 `<ex: composer dump-autoload>` | 🔧 `<regenera autoload — idempotente>` |
+| `npm --prefix jogo run typecheck` | só checa tipos — não escreve nada |
+| `npm --prefix jogo test` | testes unitários e de API com banco PGlite **em memória** — sem efeito externo |
+| `npm --prefix jogo run build` | gera `dist/` do cliente e do servidor — idempotente |
+| `npm --prefix jogo run arte:cenario` | regenera `assets/cenario.png` + `gerado/cenario-quadros.ts` a partir de `jogo/fontes/` — determinístico |
+| `npm --prefix jogo run arte:personagem` | regenera o sprite do personagem a partir de `jogo/fontes/SpriteBase.png` — determinístico |
 
 > **Banco de dados:** nunca allowliste o cliente (`mysql`, `psql`) direto. Crie um
 > wrapper **versionado** que só alcance o banco de TESTE (ex.: `.claude/scripts/db-test.sh`)
@@ -92,13 +95,13 @@ Se o projeto roda em mais de um SO (ex: Windows e macOS), liste os dois; quem ex
 
 | Campo | Valor |
 |-------|-------|
-| **SGBD** | `<ex: MySQL 8 / MariaDB / PostgreSQL / SQLite — ou "N/A">` |
-| **Host** | `<ex: localhost / 127.0.0.1>` |
-| **Database** | `<ex: meu_projeto_local>` |
-| **Usuário** | `<ex: root>` |
-| **Senha** | `<ex: senha-local>` |
-| **Comando de smoke test** | `<ex: <cliente> -u root -p<senha> <db> -e "SELECT 1;">` |
-| **Soft delete** | `<ex: coluna status (1 ativo, 0 inativo); nunca DELETE — ou "N/A">` |
+| **SGBD** | `PostgreSQL` — em dev é o **PGlite** (Postgres compilado para WASM, embutido no Node); em produção, Postgres via `DATABASE_URL` |
+| **Host** | `N/A (PGlite é um arquivo)` · Postgres opcional: `localhost:5432` via `jogo/docker-compose.yml` |
+| **Database** | PGlite: `jogo/apps/servidor/dados/banco/` (gitignored) · testes: `memoria` (um banco novo por arquivo de teste) · Postgres opcional: `terna` |
+| **Usuário** | Postgres opcional: `terna` |
+| **Senha** | Postgres opcional: `terna` (só local, do docker-compose) |
+| **Comando de smoke test** | `curl http://localhost:3001/api/saude` → `{"ok":true}` (faz `select 1` no banco) |
+| **Soft delete** | `N/A` — apagar jogador apaga sessões, saves e recordes em cascata (FK `ON DELETE CASCADE`) |
 
 ---
 
@@ -113,16 +116,16 @@ Se o projeto roda em mais de um SO (ex: Windows e macOS), liste os dois; quem ex
 
 | Campo | Valor |
 |-------|-------|
-| **Como o app resolve o banco** | `<ex: getenv(DB_NAME) > api/conexao.local.php > default versionado — ou: .env DB_DATABASE>` |
-| **URL muda por** | `<pasta (Laragon/MAMP) / porta (dev server)>` |
+| **Como o app resolve o banco** | `DATABASE_URL` (Postgres) > `PASTA_BANCO` (PGlite) > padrão `./dados/banco`, lidos do ambiente ou de `jogo/apps/servidor/.env` |
+| **URL muda por** | porta (dev server): `PORTA` do servidor e `--port` do Vite |
 
 ## Aplicação (URL local)
 
 | Campo | Valor |
 |-------|-------|
-| **Base URL local** | `<ex: http://localhost/meu-projeto/ — ou: http://localhost:3000>` |
-| **Base URL da API** | `<ex: http://localhost/meu-projeto/api/ — ou: http://localhost:3000/api>` |
-| **Como subir o dev server** | `<ex: Laragon já serve via Apache — ou: npm run dev>` |
+| **Base URL local** | `http://localhost:5173` (Vite) |
+| **Base URL da API** | `http://localhost:5173/api` (o Vite repassa para o servidor em `http://localhost:3001/api`, inclusive o WebSocket `/api/tempo-real`) |
+| **Como subir o dev server** | `cd jogo && npm install && npm run dev` (sobe servidor + cliente juntos) |
 
 ---
 
@@ -134,9 +137,9 @@ aqui o que está configurado, para referência humana.
 
 | Campo | Valor |
 |-------|-------|
-| **Comando de lint** | `<ex: "<php-cli> -l {file}" — ou "node --check {file}" — ou vazio p/ desligar>` |
-| **Extensões verificadas** | `<ex: php — ou: js,jsx,ts,tsx>` |
-| **Bloqueante?** | `<Sim (recomendado p/ erro de sintaxe) / Não>` |
+| **Comando de lint** | vazio (desligado) — TypeScript não tem checagem de sintaxe por arquivo confiável; a checagem é `npm --prefix jogo run typecheck` (projeto inteiro) |
+| **Extensões verificadas** | `N/A` |
+| **Bloqueante?** | `Não` — mas uma task só está pronta com `typecheck` e `test` passando |
 
 > Regra: use uma checagem **somente de sintaxe** para bloquear (php -l, node --check,
 > tsc --noEmit por arquivo). Lint de estilo (eslint full) é melhor não-bloqueante.
@@ -147,17 +150,17 @@ aqui o que está configurado, para referência humana.
 
 | Campo | Valor |
 |-------|-------|
-| **Framework** | `<ex: Playwright / Cypress — ou "Nenhum">` |
-| **Diretório dos specs** | `<ex: tests/e2e/>` |
-| **Base URL** | `<ex: http://localhost/meu-projeto/admin/>` |
-| **Login de teste (usuário)** | `<ex: ADMIN_TESTE>` |
-| **Login de teste (senha)** | `<ex: 123456>` |
-| **Seletores do login** | `<ex: input[name="login"], input[name="senha"], button[type="submit"]>` |
-| **Comando (spec único)** | `<ex: npx playwright test tests/e2e/<arquivo>.spec.js>` |
-| **Comando (suite completa)** | `<ex: npx playwright test>` |
-| **Pasta de screenshots** | `<ex: tests/e2e/screenshots/PRD-NNN/>` |
+| **Framework** | `Nenhum E2E ainda` — unitários/API com **Vitest** (`jogo/apps/*/test/`, `jogo/packages/*/test/`) |
+| **Diretório dos specs** | `N/A` (quando existir: `jogo/e2e/`) |
+| **Base URL** | `http://localhost:5173` |
+| **Login de teste (usuário)** | `N/A` — o jogo não exige login; contas de teste são criadas pelo próprio teste (`POST /api/contas`) |
+| **Login de teste (senha)** | `N/A` |
+| **Seletores do login** | `N/A` (ainda não há tela de login) |
+| **Comando (spec único)** | `cd jogo/apps/<app> && npx vitest run test/<arquivo>.test.ts` |
+| **Comando (suite completa)** | `npm --prefix jogo test` |
+| **Pasta de screenshots** | `.claude/.harness-run/tmp/screenshots/` |
 | **Headless** | `Sim (padrão — nunca usar --headed por conta própria)` |
-| **Verificação visual (agentes)** | `<estado do Playwright + fatos desta máquina — ver abaixo>` |
+| **Verificação visual (agentes)** | Playwright não instalado no projeto. Para conferir que o jogo não mudou: rodar com `Math.random` semeado e `requestAnimationFrame` controlado e comparar o canvas quadro a quadro (ver Armadilhas de teste). |
 
 > **Verificação visual (agentes) — obrigatório em projeto com front (3.0.3).** O caminho
 > canônico de evidência visual de agente é **Playwright headless gravando arquivo**
@@ -190,26 +193,8 @@ aqui o que está configurado, para referência humana.
 > Liste cada integração. Se o projeto não tem nenhuma, escreva "Nenhuma" e a
 > Fase 0 da `/prd-exec` será pulada automaticamente.
 
-### Integração: `<NOME — ex: WhatsApp (WAHA)>`
-
-| Campo | Valor |
-|-------|-------|
-| **O que faz** | `<ex: envia mensagem WhatsApp para pacientes>` |
-| **Helper/interceptor central** | `<ex: enviarMensagemWaha() em waha_config.php — todo envio passa por aqui>` |
-| **Palavras-chave de detecção** | `<ex: waha, whatsapp, enviarMensagem, alerta, cobranca, lembrete>` |
-| **Como neutralizar em local** | `<ex: flag dev_safe_mode='1' redireciona p/ whitelist>` |
-| **Armadilha de idempotência** | `<ex: marcar enviado='S' na criação mesmo em erro — senão o worker N8N reprocessa e duplica>` |
-
-### Integração: `<NOME — ex: Google Calendar>`
-
-| Campo | Valor |
-|-------|-------|
-| **O que faz** | `<...>` |
-| **Helper/interceptor central** | `<...>` |
-| **Palavras-chave de detecção** | `<...>` |
-| **Como neutralizar em local** | `<...>` |
-
-> Duplique o bloco acima para cada integração. Apague os que não usar.
+**Nenhuma.** O jogo não envia e-mail, mensagem nem cobrança. (Quando entrar e-mail de
+recuperação de senha ou pagamento, registre aqui.)
 
 ---
 
@@ -219,11 +204,11 @@ aqui o que está configurado, para referência humana.
 
 | Campo | Valor |
 |-------|-------|
-| **Flag de ativação** | `<ex: tabela configuracoes, config='dev_safe_mode', valor esperado '1'>` |
-| **Query de validação** | `<ex: <cliente> ... -e "SELECT dado_config FROM configuracoes WHERE config='dev_safe_mode';">` |
-| **Whitelist (se aplicável)** | `<ex: config='waha_test_numbers' deve ter >=1 número de teste>` |
-| **Como detectar "ambiente local"** | `<ex: baseURL contém localhost/127.0.0.1; ou existe .env.local>` |
-| **SQL pronto p/ desbloquear** | `<ex: UPDATE configuracoes SET dado_config='1' WHERE config='dev_safe_mode';>` |
+| **Flag de ativação** | `N/A — sem integrações com efeito colateral` |
+| **Query de validação** | `N/A` |
+| **Whitelist (se aplicável)** | `N/A` |
+| **Como detectar "ambiente local"** | `DATABASE_URL` vazio (PGlite local) |
+| **SQL pronto p/ desbloquear** | `N/A` |
 
 ---
 
@@ -488,8 +473,8 @@ declare aqui só para sobrescrever:
 
 | Campo | Valor |
 |-------|-------|
-| **Runtime de produção** | `<ex: PHP 7.4 (Cloudways) — não usar features 8.0+: match, ?->, enum, union types, named args, readonly, constructor promotion>` |
-| **Outras restrições** | `<ex: sem extensões além das do servidor; charset utf8mb4; etc — ou "Nenhuma">` |
+| **Runtime de produção** | Servidor: `Node >= 22.12` (usa `process.loadEnvFile`, top-level await, ESM). Cliente: navegadores com ES2022 + Canvas 2D (Chrome/Edge/Firefox/Safari atuais; WebView do Tauri) |
+| **Outras restrições** | Sem dependência nativa no servidor (tem de instalar no Windows sem compilador): hash de senha é `scrypt` do próprio Node, banco dev é PGlite (WASM) |
 
 ---
 
@@ -497,9 +482,9 @@ declare aqui só para sobrescrever:
 
 | Campo | Valor |
 |-------|-------|
-| **Timezone do projeto** | `<ex: America/Fortaleza>` |
-| **Formato de exibição** | `<ex: dd/mm/yyyy HH:mm:ss (BR)>` |
-| **Origem das datas de negócio** | `<ex: SEMPRE geradas no frontend/origem; NUNCA NOW()/CURRENT_TIMESTAMP no servidor (timezone diverge)>` |
+| **Timezone do projeto** | `America/Fortaleza` (só para exibição) |
+| **Formato de exibição** | `dd/mm/yyyy HH:mm` (BR) |
+| **Origem das datas de negócio** | Não há datas de negócio: só carimbos técnicos (`criado_em`, `atualizado_em`, `expira_em`) em `timestamptz`, gerados pelo servidor e trafegados em ISO-8601 UTC |
 
 ---
 
@@ -509,14 +494,14 @@ Onde as skills devem procurar/criar código. Ajuste aos nomes reais do projeto.
 
 | Tipo | Caminho |
 |------|---------|
-| **Endpoints / API** | `<ex: administrativo/api/<recurso>/<acao>.php — ou: src/routes/>` |
-| **Páginas / views** | `<ex: administrativo/pages/<modulo>.php — ou: src/pages/>` |
-| **JS de página** | `<ex: administrativo/assets/js/paginas/<modulo>.js — ou: N/A>` |
-| **Migrations** | `<ex: administrativo/api/database/migrations/ — ou: prisma/migrations/>` |
-| **Mapa do schema** | `<ex: database.md na raiz — ou: prisma/schema.prisma>` |
+| **Endpoints / API** | `jogo/apps/servidor/src/rotas/` (HTTP) e `jogo/apps/servidor/src/tempo-real/` (WebSocket) |
+| **Páginas / views** | `jogo/apps/cliente/src/` — `main.ts` (laço do jogo), `mundo/`, `entidades/`, `motor/` |
+| **JS de página** | `N/A` (cliente é um jogo em canvas, não páginas) · rede/save do cliente: `jogo/apps/cliente/src/rede/`, `src/save/` |
+| **Migrations** | `jogo/apps/servidor/drizzle/` (geradas por `npm run db:gerar`; aplicadas ao subir o servidor) |
+| **Mapa do schema** | `jogo/apps/servidor/src/banco/schema.ts` |
 | **PRDs** | `prds/` |
 | **Débitos técnicos** | `prds/debito_tecnico/` |
-| **Doc raiz de convenções** | `<ex: CLAUDE.md — leitura obrigatória no início das skills>` |
+| **Doc raiz de convenções** | `jogo/README.md` (arquitetura e comandos do jogo) |
 
 ---
 
@@ -535,16 +520,22 @@ Onde as skills devem procurar/criar código. Ajuste aos nomes reais do projeto.
 > massa; carimbe a que você tocar. As **regras fixas do harness** (marcadas como tal)
 > não levam carimbo — não são desta ou daquela PRD.
 
-1. **Datas de negócio do servidor** — gerar `data_*` com relógio do servidor/banco
-   (`NOW()`) em vez da origem. *Por quê:* timezone do servidor diverge do projeto →
-   data errada em relatório.
-2. **Envio assíncrono não-idempotente** — não marcar "enviado" na criação do alerta.
-   *Por quê:* o worker externo reprocessa em erro → mensagem duplicada para o cliente.
-3. **Auth fora da primeira linha** — endpoint que valida token depois de já tocar o
-   banco. *Por quê:* vazamento/efeito antes da checagem.
-4. **Reuso de cliente HTTP/conexão entre chamadas** — *Por quê:* estado residual
-   (headers, token) contamina a chamada seguinte.
-5. **`DELETE` físico em vez de soft delete** — *Por quê:* perde histórico/auditoria.
+1. **[2026-09-23 · reestruturação]** **Contrato só em `@terna/compartilhado`** — formato de
+   request/response, mensagem de tempo real ou save definido direto no cliente ou no servidor.
+   *Por quê:* os dois lados validam com os mesmos esquemas zod; duplicar faz um lado aceitar o
+   que o outro não entende.
+2. **[2026-09-23 · reestruturação]** **Mudar o formato do save sem versão nova** — alterar
+   `DadosSaveV1` em vez de criar `DadosSaveV2` + conversão em `atualizarSave`. *Por quê:* saves
+   já gravados (navegador e banco) deixam de abrir.
+3. **[2026-09-23 · reestruturação]** **Editar `src/gerado/` ou `src/assets/*.png` à mão** — são
+   saída de `jogo/ferramentas/` a partir de `jogo/fontes/`. *Por quê:* a próxima geração apaga a
+   mudança; mude o gerador ou a fonte.
+4. **[2026-09-23 · reestruturação]** **Dado do jogo no banco** — números de comportamento, itens,
+   posições do mapa vão em `@terna/compartilhado/src/conteudo/`, não em tabela. *Por quê:* o banco
+   é do jogador; conteúdo precisa de revisão/versão junto do código e o servidor valida com ele.
+5. **[2026-09-23 · reestruturação]** **Confiar em valor que vem do cliente** — pontuação de
+   ranking e posição são enviadas pelo jogador. *Por quê:* hoje só há validação de faixa; qualquer
+   coisa que valha prêmio/competição precisa ser calculada pelo servidor.
 6. **Arquivo temporário fora do projeto** *(regra fixa do harness — não remova ao adaptar)* —
    criar script de verificação/dump/CSV em `/tmp` ou em caminho de raiz (`/arquivo`).
    *Por quê:* no Git Bash/Windows, `/foo` resolve para `C:\Program Files\Git\` — fora do
@@ -567,24 +558,16 @@ Onde as skills devem procurar/criar código. Ajuste aos nomes reais do projeto.
 > Comece pelos padrões abaixo (genéricos) e **substitua/expanda com os do SEU projeto** —
 > cada um com **o que** quebra e **como** contornar:
 
-1. **FK RESTRICT no cleanup** — apagar um registro-pai no teardown com filhos referenciando
-   (FK `ON DELETE RESTRICT`) → o cleanup falha. *Contorno:* apague filho→pai, ou use o helper
-   de cleanup do projeto. Documente quais tabelas têm RESTRICT.
-2. **`LAST_INSERT_ID()` = 0 entre conexões** — quando o helper de query abre conexão nova por
-   chamada, `LAST_INSERT_ID()` numa conexão diferente do INSERT retorna 0. *Contorno:* use
-   `SELECT MAX(id)`, ou devolva o id no mesmo statement.
-3. **Coluna que não existe naquela tabela** — seed com `created_at`/coluna de auditoria numa
-   tabela que não a tem → INSERT quebra. *Contorno:* confira o schema real da tabela (mapa do
-   schema do Perfil) antes de montar o seed.
-4. **Lock de scheduler bloqueia a 2ª execução** — dispatcher/worker que usa lock (ex: `CronLock`)
-   barra a 2ª chamada no mesmo spec. *Contorno:* liberar o lock entre execuções, ou seedar o
-   estado direto em vez de disparar o dispatcher 2×.
-5. **`LIMIT N` + filtro de data exige seed "antigo"** — batch que processa `LIMIT N WHERE data < X`
-   só pega registros antigos; seed com data de hoje não entra no SELECT. *Contorno:* seedar com
-   a data que o filtro exige.
-6. **Assert frágil com dado de seed inválido** — `toBe('S')` falha quando o seed tem dado inválido
-   (ex: telefone fake) que muda o caminho do código. *Contorno:* asserir o que importa
-   (`not.toBe('N')`), ou seedar dado válido.
+1. **[2026-09-23 · reestruturação]** **Banco compartilhado entre testes** — testes de API usam
+   `novoServidor()` (`apps/servidor/test/ajuda.ts`): PGlite em memória, migrado, um por arquivo.
+   *Contorno:* nomes de conta únicos por teste (o banco vive o arquivo inteiro).
+2. **[2026-09-23 · reestruturação]** **Mensagem de boas-vindas perdida no WebSocket** — o
+   servidor manda `bem-vindo` assim que conecta. *Contorno:* ouvir em `onInit` do `injectWS`
+   (3º parâmetro: `app.injectWS(url, {}, { onInit })`), não depois do `await`.
+3. **[2026-09-23 · reestruturação]** **Comparar o jogo antes/depois de uma refatoração** —
+   `Math.random` e o relógio mudam cada execução. *Contorno:* no Playwright, `addInitScript`
+   trocando `Math.random` por um gerador com semente e `requestAnimationFrame` por uma fila
+   disparada com tempos fixos; aí o canvas (`toDataURL`) tem de sair idêntico.
 
 > Mantenha curta e específica. É lida toda vez que um spec é criado/editado.
 

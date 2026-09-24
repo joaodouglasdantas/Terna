@@ -3,9 +3,15 @@
   "configurations": [
     {
       "name": "jogo",
-      "runtimeExecutable": "node",
-      "runtimeArgs": [".claude/.harness-run/tmp/servidor.js"],
-      "port": 5502
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "jogo", "run", "dev:cliente"],
+      "port": 5173
+    },
+    {
+      "name": "jogo + servidor",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "jogo", "run", "dev"],
+      "port": 5173
     }
   ]
 }

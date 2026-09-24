@@ -1,0 +1,136 @@
+# Terna — o jogo
+
+Jogo de plataforma 2D em pixel art. Roda no navegador hoje e está preparado para virar app
+de PC. Tem servidor com banco para contas, saves na nuvem, ranking e multiplayer.
+
+Tudo do jogo mora nesta pasta `jogo/`. O resto do repositório (`.claude/`, `prds/`, `tests/`
+da raiz…) é o harness de desenvolvimento e não entra no jogo.
+
+## Rodar
+
+Precisa do **Node 22.12 ou mais novo**.
+
+```bash
+cd jogo
+npm install
+npm run dev
+```
+
+Abra <http://localhost:5173>. O `npm run dev` sobe o servidor (porta 3001) e o cliente
+(porta 5173) juntos; o cliente repassa `/api` para o servidor. Não precisa instalar banco:
+em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava em
+`apps/servidor/dados/banco/`. Para zerar o banco local, apague essa pasta.
+
+| Comando | O que faz |
+|---|---|
+| `npm run dev` | servidor + cliente, recarregando ao salvar |
+| `npm run dev:cliente` | só o jogo (sem servidor, o jogo roda igual; só a parte online não) |
+| `npm run typecheck` | confere os tipos de todos os pacotes |
+| `npm test` | testes (o servidor testa contra um banco novo na memória) |
+| `npm run build` | gera `apps/cliente/dist/` (site estático) e `apps/servidor/dist/` |
+| `npm run db:gerar` | cria a migração do banco depois de mudar `schema.ts` |
+| `npm run db:migrar` | aplica as migrações (o servidor também aplica sozinho ao subir) |
+| `npm run arte:cenario` | regera o cenário a partir de `fontes/` |
+| `npm run arte:personagem` | regera o personagem a partir de `fontes/SpriteBase.png` |
+
+## Como está organizado
+
+```
+jogo/
+├── apps/
+│   ├── cliente/          o jogo (Vite + TypeScript + Canvas 2D)
+│   │   └── src/
+│   │       ├── main.ts       laço do jogo: entrada, física do personagem, câmera, desenho
+│   │       ├── motor/        peças genéricas: carregar imagem, criar/reduzir sprite, sorteio
+│   │       ├── mundo/        céu, sol, nuvens, árvores, luz, chão e minhocas
+│   │       ├── entidades/    personagem e animais
+│   │       ├── rede/         API HTTP e conexão de tempo real com o servidor
+│   │       ├── save/         save local (navegador) ou na conta (servidor), mesmo jeito de usar
+│   │       ├── gerado/       recortes das folhas de sprite (saída das ferramentas; não editar)
+│   │       └── assets/       folhas de sprite (saída das ferramentas; não editar)
+│   └── servidor/         API + tempo real (Node + Fastify + Drizzle)
+│       ├── src/
+│       │   ├── rotas/        contas, sessões, saves, ranking
+│       │   ├── tempo-real/   WebSocket: quem está no mundo e onde
+│       │   ├── auth/         hash de senha (scrypt) e sessões (token)
+│       │   └── banco/        schema, conexão (PGlite ou Postgres) e migrações
+│       └── drizzle/          migrações SQL (versionadas)
+├── packages/
+│   └── compartilhado/    o que cliente e servidor precisam concordar
+│       └── src/
+│           ├── contas.ts, saves.ts, ranking.ts, protocolo.ts   formatos validados com zod
+│           └── conteudo/     dados do jogo (comportamento dos animais…)
+├── ferramentas/          geradores de sprite (leem fontes/, escrevem no cliente)
+└── fontes/               artes originais em alta resolução
+```
+
+### Por que assim
+
+- **Um contrato só.** Cada formato que atravessa a rede (cadastro, save, mensagem de tempo
+  real) é um esquema zod em `compartilhado`. O cliente usa o mesmo esquema para montar e o
+  servidor para validar, e o TypeScript acusa quando um lado muda e o outro não.
+- **Banco é do jogador; conteúdo é do jogo.** Contas, sessões, saves e recordes vão para o
+  Postgres. Números de comportamento, itens, mapas, falas ficam em `compartilhado/src/conteudo/`,
+  versionados com o código: passam por revisão, e cliente e servidor leem os mesmos valores
+  (o servidor vai precisar deles para validar o que os jogadores fazem no multiplayer).
+- **PGlite em dev, Postgres em produção.** É o mesmo Postgres dos dois lados, então as
+  migrações e as consultas são as mesmas; só muda o `DATABASE_URL`.
+- **Cliente independente.** O jogo roda sem servidor. A parte online (`rede/`, `save/`) é
+  opcional e o save local continua funcionando sem conta.
+
+## Banco de dados
+
+Tabelas em `apps/servidor/src/banco/schema.ts`:
+
+| Tabela | O que guarda |
+|---|---|
+| `jogadores` | conta: nome (único, sem diferenciar maiúsculas), e-mail opcional, hash da senha |
+| `sessoes` | cada login: hash do token e validade (30 dias por padrão) |
+| `saves` | até 3 espaços de save por jogador; o conteúdo é JSON validado por `DadosSave` |
+| `recordes` | melhor marca de cada jogador em cada categoria de ranking |
+
+Para mudar o banco: edite `schema.ts`, rode `npm run db:gerar` (cria o SQL em `drizzle/`),
+revise o SQL e versione. O servidor aplica a migração ao subir.
+
+Para testar com um Postgres de verdade: `docker compose up -d` e, em `apps/servidor/.env`
+(copie de `.env.exemplo`), `DATABASE_URL=postgres://terna:terna@localhost:5432/terna`.
+
+## API
+
+Tudo sob `/api`. Rotas com 🔒 pedem `Authorization: Bearer <token>`.
+
+| Rota | O que faz |
+|---|---|
+| `GET /vivo` | servidor no ar (não toca no banco: é a checagem de saúde do host) |
+| `GET /saude` | servidor e banco no ar (para diagnóstico manual) |
+| `POST /contas` | cria conta `{ nome, senha, email? }` e já devolve a sessão |
+| `POST /sessoes` | entra `{ login, senha }` (login = nome ou e-mail) |
+| `DELETE /sessoes` 🔒 | sai (invalida o token) |
+| `GET /eu` 🔒 | dados da conta |
+| `GET /saves` 🔒 · `GET /saves/:slot` 🔒 · `PUT /saves/:slot` 🔒 | saves 1 a 3 |
+| `GET /ranking/:categoria` · `POST /ranking` 🔒 | top 50 · enviar `{ categoria, valor }` |
+| `WS /tempo-real?token=…` | multiplayer: `bem-vindo`, `entrou`, `saiu`, `posicao` (ver `protocolo.ts`) |
+
+Criar conta e entrar aceitam 10 tentativas por minuto por endereço.
+
+## Publicar
+
+O passo a passo do deploy grátis (Cloudflare + Render + Neon) e a conta dos limites mensais
+estão em [DEPLOY.md](DEPLOY.md).
+
+## App de PC (depois)
+
+O build do cliente (`apps/cliente/dist/`) é um site estático com caminhos relativos, então
+dá para embrulhar num app de PC sem mudar o jogo. O caminho sugerido é o **Tauri** (app
+pequeno, usa o navegador do sistema): criar `apps/desktop/` apontando para `apps/cliente/dist`
+e definir `VITE_API_URL` com o endereço do servidor publicado. Electron também serve, com um
+instalador bem maior.
+
+## Pontos em aberto
+
+- O jogo ainda não chama a API: faltam tela de entrar/criar conta, quando salvar, e desenhar
+  os outros jogadores. As peças (`rede/api.ts`, `rede/tempo-real.ts`, `save/save.ts`) estão
+  prontas e testadas.
+- Ranking e posição vêm do cliente e só são validados por faixa. Antes de o ranking valer
+  algo, o servidor tem de calcular a pontuação.
+- Recuperar senha por e-mail ainda não existe (o e-mail já é guardado).

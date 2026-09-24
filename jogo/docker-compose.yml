@@ -1,0 +1,16 @@
+# Postgres de verdade para testar como em produção (opcional: sem ele o servidor usa o
+# PGlite embutido). Suba com `docker compose up -d` e, em apps/servidor/.env, coloque:
+# DATABASE_URL=postgres://terna:terna@localhost:5432/terna
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: terna
+      POSTGRES_PASSWORD: terna
+      POSTGRES_DB: terna
+    ports:
+      - '5432:5432'
+    volumes:
+      - dados-postgres:/var/lib/postgresql/data
+volumes:
+  dados-postgres:

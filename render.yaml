@@ -1,0 +1,41 @@
+# Servidor do jogo no Render (plano Free). Criado pelo Blueprint: Render → New → Blueprint
+# → escolher este repositório. Passo a passo e limites em jogo/DEPLOY.md.
+services:
+  - type: web
+    name: terna-servidor
+    runtime: node
+    plan: free
+    # Virginia: a região do Render mais perto do Brasil. Crie o banco no Neon em
+    # AWS US East 1 (N. Virginia), para servidor e banco ficarem lado a lado.
+    region: virginia
+    rootDir: jogo
+    buildCommand: npm ci --include=dev && npm run build -w @terna/servidor
+    startCommand: npm run start -w @terna/servidor
+    # /api/vivo não consulta o banco (se consultasse, o Neon nunca dormiria).
+    healthCheckPath: /api/vivo
+    autoDeployTrigger: commit
+    # Só faz deploy quando muda algo que o servidor usa: economiza os 500 minutos de
+    # build do mês (commits do harness ou só do cliente não disparam build aqui).
+    buildFilter:
+      paths:
+        - jogo/apps/servidor/**
+        - jogo/packages/**
+        - jogo/package.json
+        - jogo/package-lock.json
+        - jogo/tsconfig.base.json
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: HOST
+        value: 0.0.0.0
+      - key: CONFIAR_PROXY
+        value: "1"
+      - key: LOG
+        value: warn
+      # Preenchidos à mão no painel do Render (não vão para o Git):
+      # string de conexão do Neon (postgresql://...neon.tech/neondb?sslmode=require)
+      - key: DATABASE_URL
+        sync: false
+      # endereço do jogo publicado no Cloudflare (ex.: https://terna.seu-nome.workers.dev)
+      - key: ORIGENS_PERMITIDAS
+        sync: false
