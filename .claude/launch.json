@@ -11,6 +11,7 @@
       "name": "jogo + servidor",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "jogo", "run", "dev"],
+      "env": { "PORTA": "3001" },
       "port": 5173
     }
   ]

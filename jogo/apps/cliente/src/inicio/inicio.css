@@ -1,0 +1,271 @@
+/* Telas de carregamento e inicial. As cores vêm do jogo: azul e vermelho dos dois jogadores,
+   roxo do meio da logo, fundo escuro de sempre. */
+
+#inicio {
+  --fundo: #1b1b24;
+  --tinta: #f3ecff;
+  --suave: #a9a2c4;
+  --azul: #5fb2ff;
+  --vermelho: #ff5a67;
+  --roxo: #8a5cff;
+  --verde: #7fd66b;
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  font-family: 'Courier New', ui-monospace, monospace;
+  color: var(--tinta);
+}
+
+#inicio:empty {
+  display: none;
+}
+
+.inicio-tela {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center; /* não cabendo, alinha ao topo e rola em vez de cortar */
+  overflow-y: auto;
+  gap: 1.25rem;
+  padding: 16px;
+  box-sizing: border-box;
+  transition: opacity 0.35s ease;
+}
+
+.inicio-saindo {
+  opacity: 0;
+}
+
+/* ---- carregamento ---- */
+
+.inicio-carregando {
+  background: radial-gradient(ellipse at 50% 40%, #2b2440 0%, var(--fundo) 70%);
+}
+
+/* Em tela baixa o flexbox espremia a barra até sumir o recheio: sem encolher, o que não couber rola. */
+.inicio-carregando > * {
+  flex-shrink: 0;
+}
+
+/* Mesmas cores do botão: fundo escuro, borda clara, recheio roxo com um brilho em cima. */
+.inicio-barra {
+  width: min(420px, 100%);
+  height: 18px;
+  box-sizing: border-box;
+  padding: 3px;
+  background: #0e0a18;
+  border: 3px solid #d8c8ff;
+  box-shadow: 0 0 0 3px #0e0a18;
+}
+
+.inicio-barra-cheia {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(to bottom, #b89cff 0 30%, var(--roxo) 30% 75%, #6a44d8 75%);
+}
+
+.inicio-carregando[data-estado='falhou'] .inicio-barra-cheia {
+  background: linear-gradient(to bottom, #ffc79a 0 30%, #ff9a4a 30% 75%, #d8702a 75%);
+}
+
+.inicio-frase {
+  margin: 0;
+  min-height: 1.5em; /* a troca de frase não empurra o resto */
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.inicio-aviso {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--suave);
+  text-align: center;
+}
+
+.inicio-aviso:empty {
+  display: none;
+}
+
+.inicio-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.inicio-acoes:empty {
+  display: none;
+}
+
+/* A logo simples do carregamento. A imagem (1949×807) tem margem vazia em volta das letras
+   (1769×541, a partir de x 114 e y 196): a moldura tem a proporção só das letras e a imagem,
+   maior que ela, fica deslocada para as letras caberem certinho. */
+.inicio-logo-simples {
+  position: relative;
+  width: min(360px, 70vw);
+  aspect-ratio: 1769 / 541;
+  overflow: hidden;
+  filter: drop-shadow(0 0 14px rgba(138, 92, 255, 0.55));
+}
+
+.inicio-logo-simples img {
+  position: absolute;
+  width: calc(100% * 1949 / 1769);
+  left: calc(-100% * 114 / 1769);
+  top: calc(-100% * 196 / 541);
+  user-select: none;
+}
+
+/* ---- inicial ---- */
+
+/* O cenário roda atrás: o escurecido só garante que a logo e o botão se leiam. */
+.inicio-titulo-tela {
+  background: radial-gradient(ellipse at 50% 50%, rgba(16, 12, 28, 0.35) 0%, rgba(16, 12, 28, 0.78) 100%);
+  gap: 1rem;
+}
+
+.inicio-logo {
+  width: min(680px, 88vw);
+  max-height: 46vh;
+  object-fit: contain;
+  user-select: none;
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.6));
+  animation: inicio-flutua 4s ease-in-out infinite;
+}
+
+/* ---- botões ---- */
+
+.inicio-botao {
+  min-width: 9rem;
+  min-height: 2.75rem; /* alvo de toque confortável */
+  padding: 0.5rem 1.5rem;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--tinta);
+  background: var(--roxo);
+  border: 3px solid #d8c8ff;
+  box-shadow: 0 5px 0 #4a2fa0, 0 0 0 3px #0e0a18;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.15s ease;
+}
+
+.inicio-botao:hover {
+  background: #9d75ff;
+}
+
+.inicio-botao:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 #4a2fa0, 0 0 0 3px #0e0a18;
+}
+
+.inicio-botao:focus-visible {
+  outline: 3px solid var(--azul);
+  outline-offset: 4px;
+}
+
+.inicio-botao-claro {
+  background: #3a3358;
+  border-color: var(--suave);
+  box-shadow: 0 5px 0 #1f1a33, 0 0 0 3px #0e0a18;
+}
+
+.inicio-botao-claro:hover {
+  background: #4a426c;
+}
+
+/* Os modos de jogo, um embaixo do outro, com a mesma largura. */
+.inicio-modos {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.9rem;
+  width: min(18rem, 100%);
+}
+
+.inicio-jogar {
+  min-height: 3.5rem;
+  font-size: 1.35rem;
+  animation: inicio-pulsa 1.6s ease-in-out infinite;
+}
+
+/* Apagado: ainda não dá para jogar com outras pessoas. */
+.inicio-multiplayer,
+.inicio-multiplayer:hover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 3rem;
+  color: #8d86a8;
+  background: #2a2540;
+  border-color: #4a4466;
+  box-shadow: 0 5px 0 #17132a, 0 0 0 3px #0e0a18;
+  cursor: not-allowed;
+}
+
+.inicio-em-breve {
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: #1b1b24;
+  background: #ffd966;
+}
+
+.inicio-conexao {
+  margin: 0;
+  font-size: 0.9rem;
+  letter-spacing: 0.12em;
+  text-shadow: 0 0 4px #000, 0 1px 3px #000;
+  text-transform: uppercase;
+  color: var(--verde);
+}
+
+.inicio-conexao::before {
+  content: '';
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  margin-right: 0.5rem;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+.inicio-conexao[data-online='false'] {
+  color: #ffb36b;
+}
+
+
+@keyframes inicio-flutua {
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes inicio-pulsa {
+  50% {
+    box-shadow: 0 5px 0 #4a2fa0, 0 0 0 3px #0e0a18, 0 0 24px 4px rgba(138, 92, 255, 0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inicio-logo,
+  .inicio-jogar {
+    animation: none;
+  }
+}
+
+@media (max-height: 480px) {
+  .inicio-logo {
+    max-height: 38vh;
+  }
+  .inicio-titulo-tela {
+    gap: 0.6rem;
+  }
+}

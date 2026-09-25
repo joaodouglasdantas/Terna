@@ -464,9 +464,12 @@ export function prepararAnimais(folha: CanvasImageSource, yChao: number): void {
   }
 }
 
+// Ninguém no mapa (na tela inicial, antes do Jogar): alguém tão longe que nenhum bicho se assusta.
+const NINGUEM: Jogador = { x: -1e6, y: 0 };
+
 // Com você e o sósia no mapa, cada bicho se preocupa com quem estiver mais perto dele.
 function maisPerto(ponto: Ponto, pessoas: readonly Jogador[]): Jogador {
-  return pessoas.reduce((perto, p) => (Math.abs(p.x - ponto.x) < Math.abs(perto.x - ponto.x) ? p : perto));
+  return pessoas.reduce((perto, p) => (Math.abs(p.x - ponto.x) < Math.abs(perto.x - ponto.x) ? p : perto), NINGUEM);
 }
 
 const longeDeTodos = (x: number, pessoas: readonly Jogador[], folga: number): boolean =>
@@ -1047,8 +1050,8 @@ function lugarParaNascer(pessoas: readonly Jogador[], vistas: readonly Vista[]):
   return null;
 }
 
-// `pessoas` são você e o sósia (x = eixo do corpo, no mapa); `vistas`, os trechos do mapa na
-// tela (dois quando ela está dividida).
+// `pessoas` são você e o sósia (x = eixo do corpo, no mapa), ou ninguém, antes do Jogar;
+// `vistas`, os trechos do mapa na tela (dois quando ela está dividida).
 export function atualizarAnimais(dt: number, pessoas: readonly Jogador[], vistas: readonly Vista[]): void {
   animais.forEach((animal) => {
     animal.tempo += dt;

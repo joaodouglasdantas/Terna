@@ -4,5 +4,18 @@
     "lib": ["ES2023"],
     "types": ["node"]
   },
-  "include": ["src", "test", "drizzle.config.ts", "tsup.config.ts"]
+  // Pontos de entrada em `files` (o resto entra pelos imports): numa pasta sincronizada pelo
+  // OneDrive o tsc 7 não acha nada pelo `include` — ver jogo/README.md, "Cuidados ao mexer". Arquivo
+  // novo que ninguém importa (um teste novo, um script) tem de entrar nesta lista.
+  "files": [
+    "src/index.ts",
+    "src/banco/migrar.ts",
+    "test/api.test.ts",
+    "test/tempo-real.test.ts",
+    "test/banco-modelo.ts",
+    "vitest.config.ts",
+    "drizzle.config.ts",
+    "tsup.config.ts"
+  ],
+  "include": ["src", "test", "vitest.config.ts", "drizzle.config.ts", "tsup.config.ts"]
 }

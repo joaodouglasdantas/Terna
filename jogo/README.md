@@ -5,8 +5,8 @@
 Jogo de plataforma 2D em pixel art. Roda no navegador hoje e está preparado para virar app
 de PC. Tem servidor com banco para contas, saves na nuvem, ranking e multiplayer.
 
-Tudo do jogo mora nesta pasta `jogo/`. O resto do repositório (`.claude/`, `prds/`, `tests/`
-da raiz…) é o harness de desenvolvimento e não entra no jogo.
+Tudo do jogo mora nesta pasta `jogo/`. Na raiz do repositório só ficam o `render.yaml` (deploy
+do servidor) e a configuração do editor.
 
 ## Rodar
 
@@ -43,6 +43,7 @@ jogo/
 │   ├── cliente/          o jogo (Vite + TypeScript + Canvas 2D)
 │   │   └── src/
 │   │       ├── main.ts       laço do jogo: entrada, física do personagem, câmera, desenho
+│   │       ├── inicio/       carregamento (confere arte, servidor e banco) e tela inicial
 │   │       ├── motor/        peças genéricas: carregar imagem, criar/reduzir sprite, sorteio
 │   │       ├── mundo/        céu, sol, nuvens, árvores, luz, chão e minhocas
 │   │       ├── entidades/    personagem e animais
@@ -127,6 +128,26 @@ dá para embrulhar num app de PC sem mudar o jogo. O caminho sugerido é o **Tau
 pequeno, usa o navegador do sistema): criar `apps/desktop/` apontando para `apps/cliente/dist`
 e definir `VITE_API_URL` com o endereço do servidor publicado. Electron também serve, com um
 instalador bem maior.
+
+## Cuidados ao mexer
+
+- **Contrato novo só em `compartilhado`.** Formato de request/response, mensagem de tempo real
+  ou save definido direto no cliente ou no servidor faz um lado aceitar o que o outro não entende.
+- **Save mudou de formato → versão nova.** Crie `DadosSaveV2` e a conversão em `atualizarSave`;
+  alterar a V1 impede os saves já gravados (navegador e banco) de abrir.
+- **`src/gerado/` e as folhas de sprite em `src/assets/` saem das ferramentas.** Mude o gerador
+  ou a arte em `fontes/`: editar à mão some na próxima geração.
+- **Arquivo `.ts` novo que ninguém importa entra no `files` do `tsconfig.json` do pacote.** Numa
+  pasta sincronizada pelo OneDrive, o TypeScript 7 (o compilador em Go) não enxerga os arquivos
+  pelo `include` — o OneDrive os marca como reparse point — e só checa o que está em `files` ou é
+  importado a partir dele. Fora da lista, um teste ou script novo passaria no `typecheck` sem ser
+  olhado. Com o repositório fora do OneDrive, as listas `files` podem sair.
+- **Testes do servidor partem de um banco-modelo.** Criar um PGlite do zero leva de 6 a 12 s
+  (roda o `initdb` do Postgres em WASM). O setup global (`apps/servidor/test/banco-modelo.ts`)
+  migra um banco uma vez e cada arquivo de teste abre uma cópia dele (~1 s) via `novoServidor()`.
+  Nos testes, use nomes de conta únicos: o banco vive o arquivo inteiro.
+- **Tempo real nos testes:** o servidor manda `bem-vindo` assim que conecta; ouça em `onInit`
+  (`app.injectWS(url, {}, { onInit })`), não depois do `await`.
 
 ## Pontos em aberto
 

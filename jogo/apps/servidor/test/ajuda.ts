@@ -1,16 +1,16 @@
-import { join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { PGlite } from '@electric-sql/pglite';
 import type { FastifyInstance } from 'fastify';
+import { inject } from 'vitest';
 import { criarApp } from '../src/app';
-import { abrirBanco, type ConexaoBanco } from '../src/banco/conexao';
+import { conexaoPglite, type ConexaoBanco } from '../src/banco/conexao';
+import { PASTA_MIGRACOES } from './banco-modelo';
 
-// Servidor de teste com um banco novo, só na memória, já migrado.
+// Servidor de teste com um banco novo, só na memória, já migrado: uma cópia do banco-modelo
+// que o setup global (banco-modelo.ts) preparou.
 export async function novoServidor(): Promise<{ app: FastifyInstance; conexao: ConexaoBanco }> {
-  const conexao = await abrirBanco({
-    url: null,
-    pasta: 'memoria',
-    pastaMigracoes: join(import.meta.dirname, '..', 'drizzle'),
-  });
-  await conexao.migrar();
+  const modelo = new Blob([readFileSync(inject('bancoModelo'))]);
+  const conexao = await conexaoPglite(new PGlite({ loadDataDir: modelo }), PASTA_MIGRACOES);
   // Limite de tentativas alto: os testes criam muitas contas seguidas do mesmo "IP".
   const app = await criarApp({ banco: conexao.banco, origens: [], diasSessao: 30, tentativasPorMinuto: 1000 });
   return { app, conexao };

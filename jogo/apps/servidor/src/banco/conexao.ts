@@ -40,13 +40,18 @@ export async function abrirBanco({ url, pasta, pastaMigracoes }: OpcoesBanco): P
     };
   }
   if (pasta !== 'memoria') mkdirSync(pasta, { recursive: true });
-  const cliente = new PGlite(pasta === 'memoria' ? undefined : pasta);
+  return conexaoPglite(new PGlite(pasta === 'memoria' ? undefined : pasta), pastaMigracoes);
+}
+
+// A conexão sobre um PGlite já criado. Os testes usam direto: abrem cada banco a partir de uma
+// cópia de um banco já migrado, o que é bem mais rápido que criar um do zero.
+export async function conexaoPglite(cliente: PGlite, pastaMigracoes: string): Promise<ConexaoBanco> {
   await cliente.waitReady;
   const banco = drizzlePglite(cliente, { schema, casing: 'snake_case' });
   return {
     banco,
     tipo: 'pglite',
-    migrar: () => migrarPglite(banco, pastaDrizzle),
+    migrar: () => migrarPglite(banco, { migrationsFolder: pastaMigracoes }),
     fechar: () => cliente.close(),
   };
 }

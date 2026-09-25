@@ -30,10 +30,7 @@ import {
 } from './mundo/cenario';
 import { TILE, criarChao } from './mundo/chao';
 import { atualizarMinhocas, desenharMinhocas, prepararMinhocas } from './mundo/minhocas';
-import { acordarServidor } from './rede/endereco';
-
-// Publicado (com o servidor em outro endereço), já começa a acordar o servidor.
-if (import.meta.env.VITE_API_URL) acordarServidor();
+import { abrirInicio } from './inicio/inicio';
 
 const canvas = document.getElementById('jogo');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('faltou o <canvas id="jogo"> na página');
@@ -126,6 +123,10 @@ window.addEventListener('keyup', (evento) => {
   teclas[evento.code] = false;
 });
 
+// Enquanto as telas de antes do jogo estão abertas, só o cenário roda ao fundo: os dois
+// personagens, os nomes e os painéis só aparecem depois do Jogar.
+let jogando = false;
+
 function lerTeclado(): Controles {
   return {
     esquerda: Boolean(teclas['ArrowLeft'] || teclas['KeyA']),
@@ -136,13 +137,14 @@ function lerTeclado(): Controles {
 }
 
 function atualizar(dt: number, tempo: number): void {
-  atualizarPersonagem(jogador, lerTeclado(), dt, tempo);
-  atualizarPersonagem(sosia, pensarSosia(cerebroSosia, sosia, dt), dt, tempo);
-
-  atualizarCamera(dt);
+  if (jogando) {
+    atualizarPersonagem(jogador, lerTeclado(), dt, tempo);
+    atualizarPersonagem(sosia, pensarSosia(cerebroSosia, sosia, dt), dt, tempo);
+    atualizarCamera(dt);
+  }
   const { esquerda, direita } = camerasNaTela();
   atualizarPassaros(dt, LARGURA, esquerda, direita);
-  atualizarAnimais(dt, [jogador, sosia], vistas());
+  atualizarAnimais(dt, jogando ? [jogador, sosia] : [], vistas());
   atualizarMinhocas(dt);
 }
 
@@ -162,11 +164,13 @@ function desenharVista(tempo: number, luz: Luz, camX: number, x0: number, largur
   desenharVegetacao(ctx, folhaCenario, tempo, luz, Y_CHAO, camX, LARGURA);
   desenharAnimais(ctx, luz, tempo, camX, LARGURA);
 
-  // O sósia atrás e você na frente, quando um passa pelo outro.
-  desenharSombraDoPersonagem(ctx, sosia, luz);
-  desenharSombraDoPersonagem(ctx, jogador, luz);
-  desenharPersonagem(ctx, sosia, tempo);
-  desenharPersonagem(ctx, jogador, tempo);
+  if (jogando) {
+    // O sósia atrás e você na frente, quando um passa pelo outro.
+    desenharSombraDoPersonagem(ctx, sosia, luz);
+    desenharSombraDoPersonagem(ctx, jogador, luz);
+    desenharPersonagem(ctx, sosia, tempo);
+    desenharPersonagem(ctx, jogador, tempo);
+  }
   desenharAnimaisNoAr(ctx, luz, tempo, camX, LARGURA);
   ctx.restore();
 }
@@ -211,6 +215,7 @@ function desenhar(tempo: number): void {
     desenharVista(tempo, luz, esquerda, 0, LARGURA);
   }
   desenharLuz(ctx, luz, LARGURA, ALTURA);
+  if (!jogando) return;
   // Os nomes vêm depois da luz, para o sol não tingir o azul e o vermelho.
   if (dividida) {
     desenharNomes(esquerda, 0, METADE);
@@ -234,13 +239,23 @@ function loop(tempoAtual: number): void {
   requestAnimationFrame(loop);
 }
 
-Promise.all([carregarAnimacoesPersonagem(), carregarFolhaCenario()]).then(([animacoes, folha]) => {
-  prepararPersonagens(animacoes, Y_CHAO);
-  jogador = criarPersonagem(MUNDO / 2);
-  sosia = criarPersonagem(CASA_SOSIA, -1);
-  cerebroSosia = criarCerebroSosia(CASA_SOSIA);
-  folhaCenario = folha;
-  prepararAnimais(folha, Y_CHAO);
-  prepararMinhocas(Y_CHAO, ALTURA_CHAO);
-  requestAnimationFrame(loop);
+// Carregamento e tela inicial primeiro (elas conferem o servidor e o banco); o cenário começa a
+// rodar atrás da tela inicial e os personagens só entram depois do Jogar.
+void abrirInicio({
+  carregarCenario: carregarFolhaCenario,
+  carregarHerois: carregarAnimacoesPersonagem,
+  aoAbrirTitulo: (folha, animacoes) => {
+    prepararPersonagens(animacoes, Y_CHAO);
+    jogador = criarPersonagem(MUNDO / 2);
+    sosia = criarPersonagem(CASA_SOSIA, -1);
+    cerebroSosia = criarCerebroSosia(CASA_SOSIA);
+    folhaCenario = folha;
+    prepararAnimais(folha, Y_CHAO);
+    prepararMinhocas(Y_CHAO, ALTURA_CHAO);
+    requestAnimationFrame(loop);
+  },
+}).then(() => {
+  // Teclas apertadas durante a tela inicial (o Enter do botão) não valem no jogo.
+  for (const tecla of Object.keys(teclas)) teclas[tecla] = false;
+  jogando = true;
 });
