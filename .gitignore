@@ -1,44 +1,5 @@
-# Indice derivado do RAG — reconstruivel via `npm run rag:reindex`, por maquina.
-# A FONTE (.claude/knowledge/*.md) e versionada; o .db nao.
-.claude/rag/
-
-# Override de caminhos por maquina (node/php). Ver .claude/harness.env.local.example.
-.claude/harness.env.local
-
-# PROMETEU (3.0.4) — config de MAQUINA da skill /prometeu:
-#   prometeu-config.local.md  -> overrides do prometeu-config.md (base_dir, fonte...)
-#   .claude/prometeu.env      -> onde este projeto achou o clone do harness base
-# Ambos sao por maquina/por pessoa; o versionado e o prometeu-config.md da fonte.
-prometeu-config.local.md
-.claude/prometeu.env
-
-# Dependencias npm — so instaladas quando o RAG e ativado num projeto.
+# O jogo tem o próprio .gitignore em jogo/.
 node_modules/
 
-# Relatorios de code review (Codex + sherlock) — efemeros, nao versionar.
-codex-reviews/
-
-# Estado efemero da telemetria (start/stop por execucao) — descartavel.
-# O HISTORICO que viaja no git (3.2.2) e prds/_metrics/runs/<dev>@<maquina>.jsonl
-# (um arquivo por dev/maquina, append-only). O harness-runs.jsonl legado e LOCAL
-# nos projetos que o ignoram desde a 2.10.0 — ver prds/_metrics/README.md.
-.claude/.harness-run/
-
-# Saida do /harness-report (3.1.0): HTML + JSON do dashboard sao relatorio gerado,
-# regeravel a qualquer momento a partir do harness-runs.jsonl — nao versionar.
-prds/_metrics/harness-dashboard-*
-
-# Bytecode gerado ao rodar a ui-ux-pro-max (skill de terceiro versionada na 2.9.0).
-# Os .py SAO versionados; o cache compilado e por maquina/versao de Python.
-__pycache__/
-
-# LEGADO (ate a 2.6.0): a tela era gerada com o estado injetado num .local.html.
-# Desde a 2.7.0 o estado vem do bridge (.claude/harness-ui.mjs) e este arquivo nao
-# e mais criado — a linha fica porque projetos portados antes ainda o tem em disco.
-# O template (.claude/harness-config.html) E versionado.
-.claude/harness-config.local.html
-
-# 3.5.0 — transcripts CRUS de agente copiados a mao para analise: nunca versionar (podem carregar segredo e
-# codigo do cliente, pesam MB e o painel nao os le). O que vale no git sao os jsonl por dev/maquina em
-# prds/_metrics/{runs,tasks,incidentes,delegations,duelos}/. O harness-doctor.sh cobra.
-prds/_metrics/transcripts*/
+# Configuração pessoal do Claude Code (o launch.json é versionado).
+.claude/settings.local.json

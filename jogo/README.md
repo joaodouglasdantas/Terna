@@ -5,8 +5,8 @@
 Jogo de plataforma 2D em pixel art. Roda no navegador hoje e está preparado para virar app
 de PC. Tem servidor com banco para contas, saves na nuvem, ranking e multiplayer.
 
-Tudo do jogo mora nesta pasta `jogo/`. Na raiz do repositório só ficam o `render.yaml` (deploy
-do servidor) e a configuração do editor.
+Tudo do jogo mora nesta pasta `jogo/`. Na raiz do repositório só ficam um README curto, o
+`render.yaml` (deploy do servidor) e a configuração do editor e do preview do Claude Code.
 
 ## Rodar
 
