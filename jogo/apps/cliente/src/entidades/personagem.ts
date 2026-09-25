@@ -5,7 +5,7 @@
 // O corpo (física, animação e desenho) é o mesmo para você e para o sósia: cada um recebe os
 // seus `Controles` a cada quadro — os seus vêm do teclado, os do sósia do cérebro dele.
 
-import { MUNDO } from '@terna/compartilhado';
+import { MUNDO, RAJADA, VIDA_MAXIMA } from '@terna/compartilhado';
 import urlPersonagem from '../assets/personagem.png';
 import urlPersonagemAnjo from '../assets/personagem-anjo.png';
 import { QUADROS_PERSONAGEM } from '../gerado/personagem-quadros';
@@ -26,6 +26,9 @@ import {
   type Anjo,
   type Pose,
 } from './anjo';
+import { desenharArmaNaMao, type ArmaNaMao, type Ataque } from './armas';
+import { BRACO_ANJO, desenharBracoEsticado, desenharMao, ombroDe } from './braco';
+import { atualizarRecargas, avisar, criarPoderes, desenharEncanto, type Encanto, type Poderes } from './poderes';
 import { atualizarRastro, criarRastro, desenharRastro, marcarDash, marcarPuloDuplo, type Rastro } from './rastro';
 
 export type NomeAnimacao = keyof typeof QUADROS_PERSONAGEM;
@@ -96,8 +99,14 @@ const FREIO_ASAS = 1200; // pixels por segundo² — apertou de novo caindo: as 
 // O sprite é desenhado alguns pixels abaixo da linha do chão: os pés afundam na grama em vez
 // de ficar equilibrados na borda de cima dela.
 const AFUNDAR_NA_GRAMA = 2;
-// Ainda não há nada que tire vida: ela só aparece, cheia, no painel.
-export const VIDA_MAXIMA = 100;
+// Os poderes do anjo tiram vida; chegando a 0, ele cai e a partida acaba.
+export { VIDA_MAXIMA };
+// De onde saem os poderes: o peito, acima dos pés.
+const ALTURA_DO_PEITO = 18;
+// Enfeitiçado, anda até quem o acertou e para a esta distância dele.
+const PERTO_DO_DONO = 14;
+// O gesto de soltar um poder: o braço sai do ombro na direção da mira, fica um instante e volta.
+const GESTO = { duracao: 0.34, braco: 10 }; // segundos e pixels
 
 // Os botões de um quadro: segurados ou não.
 export interface Controles {
@@ -129,6 +138,12 @@ export interface Personagem {
   quadro: number;
   tempoQuadro: number;
   vida: number; // de 0 a VIDA_MAXIMA
+  ferido: number; // segundos do piscar de quem acabou de apanhar
+  encanto: Encanto | null; // enfeitiçado pela Rajada: só anda, devagar, até quem o acertou
+  gesto: { resta: number; angulo: number } | null; // o braço soltando um poder
+  poderes: Poderes;
+  arma: ArmaNaMao | null; // a espada ou o arco na mão (só a forma base)
+  ataque: Ataque | null; // o golpe ou a flechada em curso
   anjo: Anjo;
   rastro: Rastro; // os efeitos do dash e do pulo duplo
 }
@@ -163,6 +178,12 @@ export function criarPersonagem(x: number, direcao: 1 | -1 = 1): Personagem {
     quadro: 0,
     tempoQuadro: 0,
     vida: VIDA_MAXIMA,
+    ferido: 0,
+    encanto: null,
+    gesto: null,
+    poderes: criarPoderes(),
+    arma: null,
+    ataque: null,
     anjo: criarAnjo(),
     rastro: criarRastro(),
   };
@@ -170,6 +191,63 @@ export function criarPersonagem(x: number, direcao: 1 | -1 = 1): Personagem {
 
 export function formaDo(p: Personagem): Forma {
   return formaAtual(p.anjo);
+}
+
+export function peitoDo(p: Personagem): { x: number; y: number } {
+  return { x: p.x, y: p.y - ALTURA_DO_PEITO };
+}
+
+// Por que os poderes não saem agora (null = saem): só do anjo já transformado (não no meio da
+// luz), vivo e sem estar enfeitiçado.
+export function bloqueioDosPoderes(p: Personagem): string | null {
+  if (p.vida <= 0) return 'CAIU';
+  if (p.encanto) return 'ENFEITICADO';
+  if (formaDo(p) !== 'anjo' || !personagemLivre(p)) return 'SO NA FORMA DE ANJO';
+  return null;
+}
+
+export function podeUsarPoderes(p: Personagem): boolean {
+  return bloqueioDosPoderes(p) === null;
+}
+
+// O mesmo para a arma da mão, na forma base (null = ataca, se a recarga dela deixar).
+export function bloqueioDaArma(p: Personagem): string | null {
+  if (p.vida <= 0) return 'CAIU';
+  if (p.encanto) return 'ENFEITICADO';
+  if (!p.arma) return 'SEM ARMA';
+  if (!personagemLivre(p)) return 'TRANSFORMANDO';
+  return null;
+}
+
+// A arma sai pronta se clicar agora?
+export function armaPronta(p: Personagem): boolean {
+  return bloqueioDaArma(p) === null && (p.arma?.recarga ?? 1) <= 0;
+}
+
+// Só a forma base pega arma: vivo, com a mão livre e fora da transformação.
+export function podePegarArma(p: Personagem): boolean {
+  return p.vida > 0 && !p.arma && formaDo(p) === 'base' && personagemLivre(p);
+}
+
+// Começou a virar anjo (ou já é) com uma arma na mão: ela cai no chão.
+export function precisaLargarArma(p: Personagem): boolean {
+  return p.arma !== null && (formaDo(p) === 'anjo' || transformando(p.anjo));
+}
+
+// Vira o corpo para o lado de onde o poder foi mirado e estica o braço para lá. O Julgamento
+// vem do céu: o braço aponta para cima, um pouco para a frente.
+export function gesticular(p: Personagem, alvo: { x: number; y: number }, paraCima = false): void {
+  if (Math.abs(alvo.x - p.x) >= 1 && p.dash <= 0) p.direcao = alvo.x > p.x ? 1 : -1;
+  const ombro = ombroDe(p);
+  const angulo = paraCima ? Math.atan2(-1, p.direcao * 0.35) : Math.atan2(alvo.y - ombro.y, alvo.x - ombro.x);
+  p.gesto = { resta: GESTO.duracao, angulo };
+}
+
+// A ponta do braço esticado no gesto: de onde os poderes saem (sem gesto, o peito).
+export function maoDo(p: Personagem): { x: number; y: number } {
+  if (!p.gesto) return peitoDo(p);
+  const ombro = ombroDe(p);
+  return { x: ombro.x + Math.cos(p.gesto.angulo) * GESTO.braco, y: ombro.y + Math.sin(p.gesto.angulo) * GESTO.braco };
 }
 
 // Foto do painel: a pose de frente cortada no começo do peito, na forma atual — o anjo com os
@@ -233,20 +311,29 @@ function avancarAnimacao(p: Personagem, dt: number): void {
   }
 }
 
+// O quadro que aparece: parado, ele olha para a tela; soltando um poder ou com uma arma na mão,
+// vira de lado (o primeiro quadro da caminhada) para o braço sair para o lado da mira.
+function quadroMostrado(p: Personagem): { animacao: NomeAnimacao; quadro: number } {
+  if ((p.gesto || p.arma) && p.animacao === 'parado') return { animacao: 'andando', quadro: 0 };
+  return { animacao: p.animacao, quadro: p.quadro };
+}
+
 function spriteAtual(p: Personagem): Sprite {
-  return ANIMACOES[formaDo(p)][p.animacao][p.quadro];
+  const { animacao, quadro } = quadroMostrado(p);
+  return ANIMACOES[formaDo(p)][animacao][quadro];
 }
 
 function poseDe(p: Personagem): Pose {
   const { imagem, eixo } = spriteAtual(p);
+  const { animacao, quadro } = quadroMostrado(p);
   return {
-    quadro: quadroPersonagem(p.animacao, p.quadro),
+    quadro: quadroPersonagem(animacao, quadro),
     imagem,
     eixo,
     x: Math.round(p.x),
     topo: Math.round(p.y) - imagem.height + AFUNDAR_NA_GRAMA,
     direcao: p.direcao,
-    deFrente: p.animacao === 'parado',
+    deFrente: animacao === 'parado',
   };
 }
 
@@ -279,18 +366,35 @@ export function comecarDash(p: Personagem, lado: 1 | -1): void {
   marcarDash(p.rastro, poseDe(p), formaDo(p), p.x, p.y, p.noChao);
 }
 
-export function atualizarPersonagem(p: Personagem, controles: Controles, dt: number, tempo: number): void {
-  // R alterna entre a forma base e a de anjo; durante a transformação o corpo não responde.
-  if (controles.transformar && !p.transformarSegurado) alternarForma(p.anjo);
+// Enfeitiçado, os botões não mandam: ele anda até quem o acertou e para perto dele.
+function controlesDoEncanto(p: Personagem, encanto: Encanto): Controles {
+  const dx = encanto.dono.x - p.x;
+  return { esquerda: dx < -PERTO_DO_DONO, direita: dx > PERTO_DO_DONO, pular: false, transformar: false };
+}
+
+export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: number, tempo: number): void {
+  if (p.encanto && (p.encanto.resta -= dt) <= 0) p.encanto = null;
+  const encanto = p.encanto;
+  const controles = encanto ? controlesDoEncanto(p, encanto) : recebidos;
+  if (p.gesto && (p.gesto.resta -= dt) <= 0) p.gesto = null;
+  // R alterna entre a forma base e a de anjo; durante a transformação o corpo não responde. Na
+  // forma base com a recarga do anjo correndo, não vira e avisa quanto falta.
+  if (controles.transformar && !p.transformarSegurado && !alternarForma(p.anjo) && p.anjo.recarga > 0) {
+    avisar(p.poderes, `ANJO EM RECARGA: ${Math.ceil(p.anjo.recarga)}S`);
+  }
   p.transformarSegurado = controles.transformar;
+  p.ferido = Math.max(0, p.ferido - dt);
+  atualizarRecargas(p.poderes, dt);
   const livre = personagemLivre(p);
 
   const esquerda = livre && controles.esquerda;
   const direita = livre && controles.direita;
   const pular = livre && controles.pular;
 
-  atualizarDash(p, esquerda && !p.esquerdaSegurada ? -1 : direita && !p.direitaSegurada ? 1 : 0, dt);
-  if (!livre) p.dash = 0;
+  // Enfeitiçado não dá dash: os passos dele até o dono não contam como toques.
+  const toque = encanto ? 0 : esquerda && !p.esquerdaSegurada ? -1 : direita && !p.direitaSegurada ? 1 : 0;
+  atualizarDash(p, toque, dt);
+  if (!livre || encanto) p.dash = 0;
   p.esquerdaSegurada = esquerda;
   p.direitaSegurada = direita;
 
@@ -299,12 +403,13 @@ export function atualizarPersonagem(p: Personagem, controles: Controles, dt: num
     // No dash o lado já está decidido: os botões só voltam a mandar quando ele acaba.
     p.vx = p.direcao * VELOCIDADE_DASH;
   } else {
+    const velocidade = encanto ? RAJADA.andarEncantado : VELOCIDADE;
     if (esquerda) {
-      p.vx = -VELOCIDADE;
+      p.vx = -velocidade;
       p.direcao = -1;
     }
     if (direita) {
-      p.vx = VELOCIDADE;
+      p.vx = velocidade;
       p.direcao = 1;
     }
   }
@@ -377,14 +482,61 @@ export function desenharPersonagem(ctx: CanvasRenderingContext2D, p: Personagem,
   desenharRastro(ctx, p.rastro);
   desenharAnjoAtras(ctx, p.anjo, tempo, pose);
 
-  ctx.save();
-  if (p.direcao === -1) {
-    ctx.translate(x + eixo, topo);
-    ctx.scale(-1, 1);
-    ctx.drawImage(imagem, 0, 0);
-  } else {
-    ctx.drawImage(imagem, x - eixo, topo);
-  }
-  ctx.restore();
+  // Caído (vida 0), fica meio apagado.
+  const alfa = p.vida > 0 ? 1 : 0.45;
+  const desenhar = (img: HTMLCanvasElement, a: number): void => {
+    ctx.save();
+    ctx.globalAlpha = a;
+    if (p.direcao === -1) {
+      ctx.translate(x + eixo, topo);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0);
+    } else {
+      ctx.drawImage(img, x - eixo, topo);
+    }
+    ctx.restore();
+  };
+  desenhar(imagem, alfa);
+  // Acabou de apanhar: o corpo pisca em branco-rosado, duas vezes.
+  if (p.ferido > 0 && Math.floor(p.ferido * 14) % 2 === 0) desenhar(tingido(imagem), 0.8 * alfa);
+  if (p.gesto) desenharBraco(ctx, p, p.gesto);
+  desenharArmaNaMao(ctx, p, tempo);
   desenharAnjoNaFrente(ctx, p.anjo, tempo, pose);
+  desenharEncanto(ctx, p, tempo);
+}
+
+// O braço do gesto (entidades/braco.ts): sai do ombro da frente na direção da mira, com a mão
+// mais clara e um brilho rosa. Estica rápido, fica e recolhe no fim.
+function desenharBraco(ctx: CanvasRenderingContext2D, p: Personagem, gesto: { resta: number; angulo: number }): void {
+  const t = 1 - gesto.resta / GESTO.duracao; // 0 → 1
+  const estica = t < 0.25 ? t / 0.25 : t > 0.75 ? (1 - t) / 0.25 : 1;
+  const comprimento = Math.round(GESTO.braco * estica);
+  if (comprimento < 2) return;
+  const mao = desenharBracoEsticado(ctx, ombroDe(p), gesto.angulo, comprimento, BRACO_ANJO);
+  const [mx, my] = [mao.x, mao.y];
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const brilho = ctx.createRadialGradient(mx, my, 0, mx, my, 6);
+  brilho.addColorStop(0, `rgba(255, 95, 162, ${0.7 * estica})`);
+  brilho.addColorStop(1, 'rgba(255, 95, 162, 0)');
+  ctx.fillStyle = brilho;
+  ctx.fillRect(mx - 6, my - 6, 12, 12);
+  ctx.restore();
+  desenharMao(ctx, mao, BRACO_ANJO);
+}
+
+const tingidos = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+
+function tingido(imagem: HTMLCanvasElement): HTMLCanvasElement {
+  let t = tingidos.get(imagem);
+  if (!t) {
+    t = novoCanvas(imagem.width, imagem.height);
+    const c = contexto2d(t);
+    c.drawImage(imagem, 0, 0);
+    c.globalCompositeOperation = 'source-in';
+    c.fillStyle = '#ffe3f1';
+    c.fillRect(0, 0, t.width, t.height);
+    tingidos.set(imagem, t);
+  }
+  return t;
 }

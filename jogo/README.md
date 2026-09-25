@@ -117,7 +117,7 @@ Tudo sob `/api`. Rotas com 🔒 pedem `Authorization: Bearer <token>`.
 | `GET /ranking/:categoria` · `POST /ranking` 🔒 | top 50 · enviar `{ categoria, valor }` |
 | `WS /tempo-real?token=…` | mundo aberto com conta: `bem-vindo`, `entrou`, `saiu`, `posicao` (ver `protocolo.ts`) |
 | `WS /partida?acao=criar&nome=…` | cria uma sala 1v1 e recebe `sala-criada` com o código (sem conta) |
-| `WS /partida?acao=entrar&codigo=…&nome=…` | entra na sala: `comecou` para os dois, depois `estado` de um para o outro e `fim` (ver `partida.ts`) |
+| `WS /partida?acao=entrar&codigo=…&nome=…` | entra na sala: `comecou` para os dois, depois `estado`, `poder` e `golpe` de um para o outro; as armas caem pelo servidor (`arma-caiu`, `arma-pega`, `arma-quebrou`: ele sorteia a queda e decide quem pega); `morri` (vida em 0) ou o tempo mandam `fim` para os dois, com o `vencedor` no fim por morte (ver `partida.ts`) |
 
 Criar conta e entrar aceitam 10 tentativas por minuto por endereço; criar ou entrar em sala, 30.
 

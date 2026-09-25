@@ -4,18 +4,33 @@
 
 import { MUNDO } from '@terna/compartilhado';
 import { atualizarAnimais, desenharAnimais, desenharAnimaisNoAr, prepararAnimais } from './entidades/animais';
+import { desenharArmasNaFrente, desenharArmasNoChao, desenharPreviaDoArco, prepararArmas } from './entidades/armas';
 import {
   acimaDaCabeca,
+  armaPronta,
   carregarAnimacoesPersonagem,
   desenharPersonagem,
   desenharSombraDoPersonagem,
+  formaDo,
+  peitoDo,
+  podeUsarPoderes,
   prepararPersonagens,
   type Controles,
 } from './entidades/personagem';
+import {
+  desenharBordaDoEncanto,
+  desenharEfeitosNaFrente,
+  desenharEfeitosNoChao,
+  desenharNumerosDeDano,
+  desenharPreviaDoPoder,
+  poderEscolhido,
+  prepararPoderes,
+} from './entidades/poderes';
 import { carregar, escolherModo, type Escolha } from './inicio/inicio';
 import { montarMenus } from './inicio/na-partida';
 import { desenharCronometro } from './interface/cronometro';
 import { desenharEtiquetas } from './interface/etiqueta';
+import { desenharMira } from './interface/mira';
 import { desenharPainel } from './interface/painel';
 import { contexto2d } from './motor/imagens';
 import { suavizar } from './motor/matematica';
@@ -30,7 +45,14 @@ import {
 } from './mundo/cenario';
 import { TILE, criarChao } from './mundo/chao';
 import { atualizarMinhocas, desenharMinhocas, prepararMinhocas } from './mundo/minhocas';
-import { atualizarPartida, criarPartida, encerrarPartida, type FimDaPartida, type Partida } from './partida';
+import {
+  atualizarPartida,
+  criarPartida,
+  encerrarPartida,
+  type AcoesMouse,
+  type FimDaPartida,
+  type Partida,
+} from './partida';
 
 const canvas = document.getElementById('jogo');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('faltou o <canvas id="jogo"> na página');
@@ -132,9 +154,65 @@ function lerTeclado(): Controles {
   };
 }
 
+// ---- Mouse ----
+// Na partida, o botão direito passa para o próximo poder e o esquerdo usa o escolhido (na forma
+// base, ataca com a arma da mão), mirando no ponto do mapa embaixo do cursor. Com a tela dividida, cada metade tem a sua câmera: o
+// ponto sai da câmera da metade clicada. O menu do botão direito do navegador não abre no jogo.
+// A seta do sistema some em cima do jogo: no lugar dela vai a mira desenhada (interface/mira.ts),
+// que segue o cursor enquanto ele está sobre o canvas.
+const mouse: AcoesMouse = { trocar: 0, usar: null };
+const cursor = { x: 0, y: 0, dentro: false }; // em pixels da tela do jogo
+
+function pontoNaTela(evento: PointerEvent): { x: number; y: number } {
+  const caixa = ctx.canvas.getBoundingClientRect();
+  return {
+    x: ((evento.clientX - caixa.left) / caixa.width) * LARGURA,
+    y: ((evento.clientY - caixa.top) / caixa.height) * ALTURA,
+  };
+}
+
+function telaParaMapa({ x, y }: { x: number; y: number }): { x: number; y: number } {
+  const { esquerda, direita, dividida } = camerasNaTela();
+  return { x: (dividida && x >= METADE ? direita : esquerda) + x, y };
+}
+
+canvas.addEventListener('contextmenu', (evento) => evento.preventDefault());
+canvas.addEventListener('pointerdown', (evento) => {
+  if (!partida || evento.pointerType === 'touch') return;
+  if (evento.button === 2) mouse.trocar++;
+  else if (evento.button === 0) mouse.usar = telaParaMapa(pontoNaTela(evento));
+});
+canvas.addEventListener('pointermove', (evento) => {
+  if (evento.pointerType === 'touch') return;
+  Object.assign(cursor, pontoNaTela(evento), { dentro: true });
+});
+canvas.addEventListener('pointerleave', () => {
+  cursor.dentro = false;
+});
+
+// A mira aparece na partida, com o cursor em cima do jogo e fora do menu.
+const mostrarMira = (p: Partida): boolean => cursor.dentro && !p.menuAberto && !p.acabou;
+
+// O clique sai agora? De anjo, o poder escolhido; na forma base, a arma da mão. (Pinta a mira de
+// verde e mostra a prévia.)
+function acaoPronta(p: Partida): boolean {
+  if (formaDo(p.jogador) === 'base') return armaPronta(p.jogador);
+  const { poderes } = p.jogador;
+  return podeUsarPoderes(p.jogador) && poderes.recarga[poderes.selecionado] <= 0;
+}
+
+// O que o mouse fez desde o último quadro, uma vez só.
+function lerMouse(): AcoesMouse {
+  const acoes = { ...mouse };
+  mouse.trocar = 0;
+  mouse.usar = null;
+  return acoes;
+}
+
 function atualizar(dt: number, tempo: number): void {
+  const acoes = lerMouse();
   if (partida) {
-    atualizarPartida(partida, lerTeclado(), dt, tempo);
+    atualizarPartida(partida, lerTeclado(), acoes, dt, tempo);
     atualizarCamera(partida, dt);
   }
   const { esquerda, direita } = camerasNaTela();
@@ -160,18 +238,31 @@ function desenharVista(tempo: number, luz: Luz, camX: number, x0: number, largur
   desenharAnimais(ctx, luz, tempo, camX, LARGURA);
 
   if (partida) {
-    // O outro atrás e você na frente, quando um passa pelo outro.
+    // As marcas dos poderes no chão, embaixo de todos; o outro atrás e você na frente, quando um
+    // passa pelo outro; os poderes voando e explodindo por cima dos dois.
+    desenharEfeitosNoChao(ctx, partida.efeitos, tempo);
+    desenharArmasNoChao(ctx, partida.arsenal, tempo);
     desenharSombraDoPersonagem(ctx, partida.outro, luz);
     desenharSombraDoPersonagem(ctx, partida.jogador, luz);
     desenharPersonagem(ctx, partida.outro, tempo);
     desenharPersonagem(ctx, partida.jogador, tempo);
+    desenharEfeitosNaFrente(ctx, partida.efeitos, tempo);
+    desenharArmasNaFrente(ctx, partida.arsenal);
+    if (mostrarMira(partida) && acaoPronta(partida)) {
+      const { jogador } = partida;
+      if (formaDo(jogador) === 'anjo') {
+        desenharPreviaDoPoder(ctx, poderEscolhido(jogador.poderes), peitoDo(jogador), telaParaMapa(cursor), tempo);
+      } else if (jogador.arma?.tipo === 'arco') {
+        desenharPreviaDoArco(ctx, jogador, telaParaMapa(cursor), tempo);
+      }
+    }
   }
   desenharAnimaisNoAr(ctx, luz, tempo, camX, LARGURA);
   ctx.restore();
 }
 
 // Os nomes em cima de cada um, na vista da câmera `camX` recortada como em desenharVista. O
-// do outro vem primeiro: juntos, o nome dele é o que sobe.
+// do outro vem primeiro: juntos, o nome dele é o que sobe. Os números de dano vêm por cima.
 function desenharNomes(p: Partida, camX: number, x0: number, largura: number): void {
   ctx.save();
   ctx.beginPath();
@@ -186,6 +277,7 @@ function desenharNomes(p: Partida, camX: number, x0: number, largura: number): v
     ],
     { x: camX + x0, largura },
   );
+  desenharNumerosDeDano(ctx, p.efeitos);
   ctx.restore();
 }
 
@@ -220,10 +312,13 @@ function desenhar(tempo: number): void {
     desenharNomes(p, esquerda, 0, LARGURA);
   }
   if (dividida) desenharDivisao(Math.min(1, Math.abs(direita - esquerda) / DIVISAO_APARECE));
+  // Enfeitiçado, a sua tela ganha a borda rosa (por baixo dos painéis).
+  if (p.jogador.encanto) desenharBordaDoEncanto(ctx, p.jogador.encanto, LARGURA, ALTURA, tempo);
   // Os painéis ficam sempre no mesmo canto: o seu à esquerda, o do outro à direita.
-  desenharPainel(ctx, p.jogador, p.eu, 'esquerda', LARGURA, tempo);
+  desenharPainel(ctx, p.jogador, p.eu, 'esquerda', LARGURA, tempo, true);
   desenharPainel(ctx, p.outro, p.ele, 'direita', LARGURA, tempo);
   desenharCronometro(ctx, p.restanteMs, LARGURA, tempo);
+  if (mostrarMira(p)) desenharMira(ctx, cursor.x, cursor.y, acaoPronta(p));
 }
 
 let ultimoTempo = 0;
@@ -236,11 +331,23 @@ function loop(tempoAtual: number): void {
   requestAnimationFrame(loop);
 }
 
-const TEXTO_DO_FIM: Record<FimDaPartida, (oponente: string) => string> = {
-  tempo: () => 'O tempo acabou.',
-  'oponente-saiu': (oponente) => `${oponente} saiu da partida.`,
-  conexao: () => 'A conexão com o servidor caiu.',
-};
+// Título e texto da tela de fim. `venceu` só vale no fim por morte.
+function textoDoFim(motivo: FimDaPartida, venceu: boolean | null, oponente: string): { titulo: string; texto: string } {
+  if (motivo === 'morte') {
+    return venceu
+      ? { titulo: 'Vitória', texto: `${oponente} caiu. Você venceu!` }
+      : { titulo: 'Derrota', texto: `${oponente} venceu.` };
+  }
+  const texto = {
+    tempo: 'O tempo acabou.',
+    'oponente-saiu': `${oponente} saiu da partida.`,
+    conexao: 'A conexão com o servidor caiu.',
+  }[motivo];
+  return { titulo: 'Fim de partida', texto };
+}
+
+// No fim por morte, a tela espera um pouco: dá para ver o último golpe e quem caiu.
+const ESPERA_FIM_MORTE = 1200; // ms
 
 // Uma partida inteira: começa, roda até o tempo acabar (ou alguém sair) e termina quando a
 // pessoa volta ao menu.
@@ -262,9 +369,12 @@ function jogar(escolha: Escolha): Promise<void> {
       },
       aoSair: sair,
     });
-    const nova = criarPartida(escolha, (motivo) => {
+    const nova = criarPartida(escolha, (motivo, venceu) => {
       const oponente = escolha.modo === 'online' ? escolha.oponente : 'A CPU';
-      void menus.mostrarFim('Fim de partida', TEXTO_DO_FIM[motivo](oponente)).then(sair);
+      const { titulo, texto } = textoDoFim(motivo, venceu, oponente);
+      const mostrar = (): void => void menus.mostrarFim(titulo, texto).then(sair);
+      if (motivo === 'morte') setTimeout(mostrar, ESPERA_FIM_MORTE);
+      else mostrar();
     });
     // Começa com a câmera já entre os dois (sem deslizar do meio do mapa).
     camera.esquerda = camera.direita = limitarCamera((nova.jogador.x + nova.outro.x) / 2 - METADE);
@@ -282,6 +392,8 @@ async function principal(): Promise<void> {
     carregarHerois: carregarAnimacoesPersonagem,
   });
   prepararPersonagens(herois, Y_CHAO);
+  prepararPoderes(Y_CHAO);
+  prepararArmas(Y_CHAO);
   folhaCenario = cenario;
   prepararAnimais(cenario, Y_CHAO);
   prepararMinhocas(Y_CHAO, ALTURA_CHAO);

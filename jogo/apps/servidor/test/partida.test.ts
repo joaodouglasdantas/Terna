@@ -32,7 +32,12 @@ const ESTADO = {
   direita: true,
   pular: false,
   transformar: false,
+  vida: 1000,
+  selecionado: 0,
+  encanto: 0,
 } as const;
+
+const RAJADA_USADA = { poder: 'rajada', x: 300, y: 180, alvoX: 420, alvoY: 170 } as const;
 
 describe('salas de partida', () => {
   afterEach(() => {
@@ -82,6 +87,33 @@ describe('salas de partida', () => {
     expect(a.ultima()).toEqual({ tipo: 'erro', erro: 'mensagem inválida' });
   });
 
+  it('repassa o poder usado só para o outro', () => {
+    const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    const anfitriao = salas.criar('Ana', a.conexao)!;
+    salas.entrar('K7P2Q', 'Bia', b.conexao);
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'poder', uso: RAJADA_USADA }));
+    expect(b.ultima()).toEqual({ tipo: 'poder', uso: RAJADA_USADA });
+    expect(a.ultima()?.tipo).toBe('comecou');
+
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'poder', uso: { ...RAJADA_USADA, poder: 'soco' } }));
+    expect(a.ultima()).toEqual({ tipo: 'erro', erro: 'mensagem inválida' });
+  });
+
+  it('quem morre perde: acaba para os dois com o outro de vencedor', () => {
+    const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    salas.criar('Ana', a.conexao);
+    const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+    salas.receber(convidado, JSON.stringify({ tipo: 'morri' }));
+    expect(a.ultima()).toEqual({ tipo: 'fim', motivo: 'morte', vencedor: 'anfitriao' });
+    expect(b.ultima()).toEqual({ tipo: 'fim', motivo: 'morte', vencedor: 'anfitriao' });
+    expect(a.conexao.fechada).not.toBeNull();
+    expect(salas.quantidade).toBe(0);
+  });
+
   it('acaba para os dois quando o tempo termina', () => {
     vi.useFakeTimers();
     const salas = new Salas({ duracaoMs: 1000, gerarCodigo: () => 'K7P2Q' });
@@ -107,6 +139,83 @@ describe('salas de partida', () => {
     expect(a.ultima()).toEqual({ tipo: 'fim', motivo: 'oponente-saiu' });
     expect(a.conexao.fechada).not.toBeNull();
     expect(salas.quantidade).toBe(0);
+  });
+
+  describe('armas', () => {
+    // Uma sala já começada, com a primeira queda em 1 s e o sorteio fixo: sempre a espada, na
+    // beirada esquerda, e 15 s entre uma tentativa e outra.
+    function salaComArmas() {
+      vi.useFakeTimers();
+      const salas = new Salas({ gerarCodigo: () => 'K7P2Q', primeiraArmaMs: 1000, aleatorio: () => 0 });
+      const a = conexaoFalsa();
+      const b = conexaoFalsa();
+      const anfitriao = salas.criar('Ana', a.conexao)!;
+      const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+      const caidas = (c: typeof a) => c.recebidas.filter((m) => m.tipo === 'arma-caiu');
+      // A mensagem vai como texto, como chega pela conexão.
+      const receber = (p: typeof anfitriao, m: object) => salas.receber(p, JSON.stringify(m));
+      return { a, b, anfitriao, convidado, caidas, receber };
+    }
+
+    it('caem do céu para os dois, no máximo duas esperando no chão', () => {
+      const { a, b, caidas } = salaComArmas();
+      vi.advanceTimersByTime(999);
+      expect(caidas(a)).toHaveLength(0);
+      vi.advanceTimersByTime(1);
+      expect(a.ultima()).toEqual({ tipo: 'arma-caiu', arma: { id: 1, tipo: 'espada', x: 60, durabilidade: 20 } });
+      expect(b.ultima()).toEqual(a.ultima());
+      vi.advanceTimersByTime(60_000); // várias tentativas: com duas no chão, não cai mais nenhuma
+      expect(caidas(a)).toHaveLength(2);
+    });
+
+    it('os dois encostando na mesma, só o primeiro leva', () => {
+      const { a, b, anfitriao, convidado, receber } = salaComArmas();
+      vi.advanceTimersByTime(1000);
+      receber(anfitriao, { tipo: 'pegar-arma', id: 1 });
+      receber(convidado, { tipo: 'pegar-arma', id: 1 });
+      const pegas = (c: typeof a) => c.recebidas.filter((m) => m.tipo === 'arma-pega');
+      expect(pegas(a)).toEqual([{ tipo: 'arma-pega', id: 1, lado: 'anfitriao' }]);
+      expect(pegas(b)).toEqual([{ tipo: 'arma-pega', id: 1, lado: 'anfitriao' }]);
+    });
+
+    it('com uma na mão de cada e duas no chão, não cai mais nenhuma', () => {
+      const { a, anfitriao, convidado, caidas, receber } = salaComArmas();
+      vi.advanceTimersByTime(1000);
+      receber(anfitriao, { tipo: 'pegar-arma', id: 1 });
+      vi.advanceTimersByTime(30_000);
+      receber(convidado, { tipo: 'pegar-arma', id: 2 });
+      vi.advanceTimersByTime(60_000);
+      expect(caidas(a)).toHaveLength(4);
+      vi.advanceTimersByTime(120_000);
+      expect(caidas(a)).toHaveLength(4);
+    });
+
+    it('largada ao virar anjo, volta para o chão com o tempo que tinha; quebrada, avisa o outro', () => {
+      const { a, b, anfitriao, convidado, receber } = salaComArmas();
+      vi.advanceTimersByTime(1000);
+      receber(anfitriao, { tipo: 'pegar-arma', id: 1 });
+      receber(anfitriao, { tipo: 'largar-arma', x: 500, durabilidade: 7.5 });
+      const largada = { tipo: 'arma-caiu', arma: { id: 2, tipo: 'espada', x: 500, durabilidade: 7.5, de: 'anfitriao' } };
+      expect(a.ultima()).toEqual(largada);
+      expect(b.ultima()).toEqual(largada);
+
+      receber(convidado, { tipo: 'pegar-arma', id: 2 });
+      receber(convidado, { tipo: 'arma-quebrou' });
+      expect(a.ultima()).toEqual({ tipo: 'arma-quebrou', lado: 'convidado' });
+      expect(b.ultima()).toEqual({ tipo: 'arma-pega', id: 2, lado: 'convidado' });
+      // Sem arma na mão, largar e quebrar não fazem nada.
+      receber(convidado, { tipo: 'largar-arma', x: 10, durabilidade: 3 });
+      expect(a.ultima()).toEqual({ tipo: 'arma-quebrou', lado: 'convidado' });
+    });
+
+    it('repassa o golpe só para o outro', () => {
+      const { a, b, anfitriao, receber } = salaComArmas();
+      const golpe = { arma: 'arco', x: 300, y: 184, alvoX: 420, alvoY: 170 };
+      receber(anfitriao, { tipo: 'golpe', uso: golpe });
+      expect(b.ultima()).toEqual({ tipo: 'golpe', uso: golpe });
+      expect(a.ultima()?.tipo).toBe('comecou');
+    });
+
   });
 
   it('fecha a sala que ninguém entrou a tempo', () => {

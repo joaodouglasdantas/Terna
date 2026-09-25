@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { ARMAS } from './conteudo/armas';
+import { PODERES, VIDA_MAXIMA } from './conteudo/poderes';
 import { MUNDO } from './mundo';
 
 // Partida: uma rodada com tempo marcado, sozinho (contra a CPU) ou 1v1 numa sala com código.
@@ -45,20 +47,70 @@ export const EstadoJogador = z.object({
   direita: z.boolean(),
   pular: z.boolean(),
   transformar: z.boolean(),
+  // Cada um decide o dano que leva (quem desviou na própria tela, desviou) e manda a vida.
+  vida: z.number().min(0).max(VIDA_MAXIMA),
+  selecionado: z.number().int().min(0).max(PODERES.length - 1), // o poder escolhido no painel
+  encanto: z.number().min(0).max(10), // segundos que ainda faltam do encanto da Rajada (0 = livre)
 });
 export type EstadoJogador = z.infer<typeof EstadoJogador>;
 
-export const MensagemPartidaDoCliente = z.discriminatedUnion('tipo', [
-  z.object({ tipo: z.literal('estado'), estado: EstadoJogador }),
-]);
-export type MensagemPartidaDoCliente = z.infer<typeof MensagemPartidaDoCliente>;
+// Um poder usado: de onde saiu (o peito do anjo) e para onde o cursor apontava. Quem recebe
+// lança o mesmo poder no corpo do outro e confere se ele acerta o seu personagem.
+export const PoderUsado = z.object({
+  poder: z.enum(PODERES),
+  x: z.number().min(0).max(MUNDO),
+  y: z.number().min(-1000).max(1000),
+  alvoX: z.number().min(-MUNDO).max(2 * MUNDO),
+  alvoY: z.number().min(-2000).max(2000),
+});
+export type PoderUsado = z.infer<typeof PoderUsado>;
+
+// Um ataque com a arma da mão (um golpe de espada ou uma flecha do arco), como o poder: de onde
+// saiu (a mão) e para onde o cursor apontava. Quem recebe faz o golpe no corpo do outro e confere
+// se ele acerta o seu personagem.
+export const AtaqueUsado = z.object({
+  arma: z.enum(ARMAS),
+  x: z.number().min(0).max(MUNDO),
+  y: z.number().min(-1000).max(1000),
+  alvoX: z.number().min(-MUNDO).max(2 * MUNDO),
+  alvoY: z.number().min(-2000).max(2000),
+});
+export type AtaqueUsado = z.infer<typeof AtaqueUsado>;
 
 // `anfitriao` começa no meio do mapa olhando para a direita; `convidado`, um pouco à direita,
 // olhando para ele.
 export const Lado = z.enum(['anfitriao', 'convidado']);
 export type Lado = z.infer<typeof Lado>;
 
-export const MotivoFim = z.enum(['tempo', 'oponente-saiu']);
+// Uma arma no chão (ou ainda caindo), com o número que o servidor deu a ela. `durabilidade`:
+// segundos que ela ainda dura na mão. `de`: quem a largou (virou anjo com ela na mão); sem isso,
+// ela caiu do céu.
+const DURABILIDADE = z.number().min(0).max(60);
+export const ArmaNoMapa = z.object({
+  id: z.number().int().nonnegative(),
+  tipo: z.enum(ARMAS),
+  x: z.number().min(0).max(MUNDO),
+  durabilidade: DURABILIDADE,
+  de: Lado.optional(),
+});
+export type ArmaNoMapa = z.infer<typeof ArmaNoMapa>;
+
+export const MensagemPartidaDoCliente = z.discriminatedUnion('tipo', [
+  z.object({ tipo: z.literal('estado'), estado: EstadoJogador }),
+  z.object({ tipo: z.literal('poder'), uso: PoderUsado }),
+  z.object({ tipo: z.literal('golpe'), uso: AtaqueUsado }),
+  // Encostou numa arma: quem decide se leva é o servidor (os dois juntos, só o primeiro leva).
+  z.object({ tipo: z.literal('pegar-arma'), id: z.number().int().nonnegative() }),
+  // Virou anjo com a arma na mão: ela cai no chão, em `x`, com o tempo que ainda tinha.
+  z.object({ tipo: z.literal('largar-arma'), x: z.number().min(0).max(MUNDO), durabilidade: DURABILIDADE }),
+  z.object({ tipo: z.literal('arma-quebrou') }),
+  // A vida de quem manda chegou a 0: a partida acaba e o outro vence.
+  z.object({ tipo: z.literal('morri') }),
+]);
+export type MensagemPartidaDoCliente = z.infer<typeof MensagemPartidaDoCliente>;
+
+// `morte`: a vida de alguém chegou a 0; o fim diz quem venceu.
+export const MotivoFim = z.enum(['tempo', 'oponente-saiu', 'morte']);
 export type MotivoFim = z.infer<typeof MotivoFim>;
 
 export const MensagemPartidaDoServidor = z.discriminatedUnion('tipo', [
@@ -67,7 +119,14 @@ export const MensagemPartidaDoServidor = z.discriminatedUnion('tipo', [
   // Os dois estão na sala: a partida começou e termina em `restanteMs`.
   z.object({ tipo: z.literal('comecou'), lado: Lado, oponente: z.string(), restanteMs: z.number() }),
   z.object({ tipo: z.literal('estado'), estado: EstadoJogador }),
-  z.object({ tipo: z.literal('fim'), motivo: MotivoFim }),
+  z.object({ tipo: z.literal('poder'), uso: PoderUsado }),
+  z.object({ tipo: z.literal('golpe'), uso: AtaqueUsado }),
+  // Para os dois: uma arma apareceu no mapa (do céu, ou largada por alguém), alguém pegou uma.
+  z.object({ tipo: z.literal('arma-caiu'), arma: ArmaNoMapa }),
+  z.object({ tipo: z.literal('arma-pega'), id: z.number().int().nonnegative(), lado: Lado }),
+  // Só para o outro: a arma de `lado` quebrou na mão.
+  z.object({ tipo: z.literal('arma-quebrou'), lado: Lado }),
+  z.object({ tipo: z.literal('fim'), motivo: MotivoFim, vencedor: Lado.optional() }),
   z.object({ tipo: z.literal('erro'), erro: z.string() }),
 ]);
 export type MensagemPartidaDoServidor = z.infer<typeof MensagemPartidaDoServidor>;

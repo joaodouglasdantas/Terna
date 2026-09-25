@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { Apelido, CodigoSala, CriarConta, DadosSave, MensagemDoCliente, MensagemDoServidor, MUNDO, PedidoPartida } from '../src';
+import {
+  Apelido,
+  CodigoSala,
+  CriarConta,
+  DadosSave,
+  MensagemDoCliente,
+  MensagemDoServidor,
+  MUNDO,
+  PedidoPartida,
+  QUEDA_DE_ARMAS,
+  cabeOutraArma,
+  sortearArma,
+} from '../src';
 
 describe('contas', () => {
   it('aceita um cadastro válido e recusa nome com espaço', () => {
@@ -41,5 +53,19 @@ describe('partida', () => {
   it('entrar numa sala pede o código', () => {
     expect(PedidoPartida.safeParse({ acao: 'criar', nome: 'ana' }).success).toBe(true);
     expect(PedidoPartida.safeParse({ acao: 'entrar', nome: 'ana' }).success).toBe(false);
+  });
+});
+
+describe('armas', () => {
+  it('cai mais uma só com pouca no chão e poucas no mapa', () => {
+    expect(cabeOutraArma(0, 0)).toBe(true);
+    expect(cabeOutraArma(1, 2)).toBe(true);
+    expect(cabeOutraArma(2, 0)).toBe(false); // duas esperando no chão já bastam
+    expect(cabeOutraArma(1, 3)).toBe(false); // quatro no mapa, contando as da mão
+  });
+
+  it('sorteia dentro do mapa, longe das beiradas', () => {
+    expect(sortearArma(() => 0)).toEqual({ tipo: 'espada', x: QUEDA_DE_ARMAS.margem });
+    expect(sortearArma(() => 0.9999)).toEqual({ tipo: 'arco', x: MUNDO - QUEDA_DE_ARMAS.margem });
   });
 });

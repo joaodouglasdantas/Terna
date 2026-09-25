@@ -1,5 +1,6 @@
-/* Telas de carregamento e inicial. As cores vêm do jogo: azul e vermelho dos dois jogadores,
-   roxo do meio da logo, fundo escuro de sempre. */
+/* Telas de carregamento e inicial. A interface é roxa e verde: verde na ação principal (jogar,
+   continuar, entrar) e no progresso, roxo no segundo modo e nas molduras. Azul e vermelho
+   continuam sendo só dos dois jogadores. */
 
 #inicio {
   --fundo: #1b1b24;
@@ -9,6 +10,9 @@
   --vermelho: #ff5a67;
   --roxo: #8a5cff;
   --verde: #7fd66b;
+  --verde-claro: #c8f5b0;
+  --verde-fundo: #2f7a3a; /* a sombra embaixo do botão verde */
+  --roxo-claro: #d8c8ff;
   position: fixed;
   inset: 0;
   z-index: 10;
@@ -49,7 +53,7 @@
   flex-shrink: 0;
 }
 
-/* Mesmas cores do botão: fundo escuro, borda clara, recheio roxo com um brilho em cima. */
+/* Moldura roxa, como as caixas, e recheio verde com um brilho em cima, como o botão principal. */
 .inicio-barra {
   width: min(420px, 100%);
   height: 18px;
@@ -63,7 +67,7 @@
 .inicio-barra-cheia {
   width: 0;
   height: 100%;
-  background: linear-gradient(to bottom, #b89cff 0 30%, var(--roxo) 30% 75%, #6a44d8 75%);
+  background: linear-gradient(to bottom, var(--verde-claro) 0 30%, var(--verde) 30% 75%, #4fa84a 75%);
 }
 
 .inicio-carregando[data-estado='falhou'] .inicio-barra-cheia {
@@ -139,6 +143,7 @@
 
 /* ---- botões ---- */
 
+/* O principal é verde, com o texto escuro para ler bem sobre o verde claro. */
 .inicio-botao {
   min-width: 9rem;
   min-height: 2.75rem; /* alvo de toque confortável */
@@ -148,29 +153,31 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--tinta);
-  background: var(--roxo);
-  border: 3px solid #d8c8ff;
-  box-shadow: 0 5px 0 #4a2fa0, 0 0 0 3px #0e0a18;
+  color: #10240f;
+  background: var(--verde);
+  border: 3px solid var(--verde-claro);
+  box-shadow: 0 5px 0 var(--verde-fundo), 0 0 0 3px #0e0a18;
   cursor: pointer;
   transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.15s ease;
 }
 
 .inicio-botao:hover {
-  background: #9d75ff;
+  background: #96e383;
 }
 
 .inicio-botao:active {
   transform: translateY(4px);
-  box-shadow: 0 1px 0 #4a2fa0, 0 0 0 3px #0e0a18;
+  box-shadow: 0 1px 0 var(--verde-fundo), 0 0 0 3px #0e0a18;
 }
 
 .inicio-botao:focus-visible {
-  outline: 3px solid var(--azul);
+  outline: 3px solid var(--roxo-claro);
   outline-offset: 4px;
 }
 
+/* Voltar, cancelar, sair: escuro e discreto. */
 .inicio-botao-claro {
+  color: var(--tinta);
   background: #3a3358;
   border-color: var(--suave);
   box-shadow: 0 5px 0 #1f1a33, 0 0 0 3px #0e0a18;
@@ -178,6 +185,10 @@
 
 .inicio-botao-claro:hover {
   background: #4a426c;
+}
+
+.inicio-botao-claro:active {
+  box-shadow: 0 1px 0 #1f1a33, 0 0 0 3px #0e0a18;
 }
 
 /* Os modos de jogo, um embaixo do outro, com a mesma largura. */
@@ -195,20 +206,31 @@
   animation: inicio-pulsa 1.6s ease-in-out infinite;
 }
 
-/* O segundo modo, com menos peso que o Singleplayer. */
+/* O segundo modo, em roxo: com menos peso que o Singleplayer, verde e pulsando. */
 .inicio-multiplayer {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
   min-height: 3rem;
-  background: #3a3358;
-  border-color: var(--suave);
-  box-shadow: 0 5px 0 #1f1a33, 0 0 0 3px #0e0a18;
+  color: #ffffff;
+  /* Um tom abaixo do --roxo: com o texto branco dá 5,6:1 (no --roxo ficava em 4,15:1). */
+  background: #7548e0;
+  border-color: var(--roxo-claro);
+  box-shadow: 0 5px 0 #4a2fa0, 0 0 0 3px #0e0a18;
 }
 
+/* O hover clareia só até onde o texto branco ainda fica em 4,5:1. */
 .inicio-multiplayer:hover {
-  background: #4a426c;
+  background: #7f52f5;
+}
+
+.inicio-multiplayer:active {
+  box-shadow: 0 1px 0 #4a2fa0, 0 0 0 3px #0e0a18;
+}
+
+.inicio-multiplayer:focus-visible {
+  outline-color: var(--verde);
 }
 
 /* Apagado: sem conexão com o servidor não dá para jogar com outras pessoas. */
@@ -258,7 +280,7 @@
 }
 
 .inicio-entrada:focus-visible {
-  border-color: var(--azul);
+  border-color: var(--verde);
 }
 
 .inicio-entrada[aria-invalid='true'] {
@@ -396,7 +418,7 @@
 }
 
 .hud-engrenagem:focus-visible {
-  outline: 2px solid #5fb2ff;
+  outline: 2px solid #7fd66b;
   outline-offset: 2px;
 }
 
@@ -446,7 +468,7 @@
 
 @keyframes inicio-pulsa {
   50% {
-    box-shadow: 0 5px 0 #4a2fa0, 0 0 0 3px #0e0a18, 0 0 24px 4px rgba(138, 92, 255, 0.7);
+    box-shadow: 0 5px 0 var(--verde-fundo), 0 0 0 3px #0e0a18, 0 0 24px 4px rgba(127, 214, 107, 0.65);
   }
 }
 

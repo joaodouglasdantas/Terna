@@ -13,6 +13,18 @@
       "runtimeArgs": ["--prefix", "jogo", "run", "dev"],
       "env": { "PORTA": "3001" },
       "port": 5173
+    },
+    {
+      "name": "jogo (5174)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "jogo/apps/cliente", "run", "dev", "--", "--port", "5174", "--strictPort"],
+      "port": 5174
+    },
+    {
+      "name": "jogo (5175)",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "jogo/apps/cliente", "run", "dev", "--", "--port", "5175", "--strictPort"],
+      "port": 5175
     }
   ]
 }

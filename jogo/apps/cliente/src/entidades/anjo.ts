@@ -4,6 +4,7 @@
 // corações na frente dos olhos e os corações pequenos que flutuam dos lados e seguem o
 // personagem. Tarja, olhos e asas saem das âncoras do quadro atual, então acompanham cada pose.
 
+import { RECARGA_ANJO } from '@terna/compartilhado';
 import { contexto2d, criarSprite, novoCanvas } from '../motor/imagens';
 import { suavizar } from '../motor/matematica';
 import type { Paleta } from '../motor/tipos';
@@ -38,7 +39,8 @@ const ACENDER: Record<Forma, number> = { anjo: 0.9, base: 0.55 };
 const APAGAR: Record<Forma, number> = { anjo: 0.6, base: 0.4 };
 const COR_LUZ = '255, 246, 222';
 // A forma de anjo dura um minuto: acabado o tempo, ele volta sozinho à forma base — mesmo no
-// ar, e aí despenca. O R desfaz antes, se quiser.
+// ar, e aí despenca. O R desfaz antes, se quiser. De volta à forma base, espera RECARGA_ANJO
+// para poder virar anjo de novo: os poderes são só do anjo, e sem a espera ninguém sairia dele.
 export const DURACAO_ANJO = 60; // segundos
 
 type Fase = 'parado' | 'acendendo' | 'apagando';
@@ -49,6 +51,7 @@ export interface Anjo {
   fase: Fase;
   tempoFase: number;
   restaAnjo: number; // segundos que ainda restam na forma de anjo
+  recarga: number; // segundos, na forma base, até poder virar anjo de novo
   batida: Batida;
   coracoes: Coracao[];
   faiscas: Faisca[];
@@ -63,6 +66,7 @@ export function criarAnjo(): Anjo {
     fase: 'parado',
     tempoFase: 0,
     restaAnjo: 0,
+    recarga: 0,
     batida: { fase: 0, centro: 48, amplitude: 7, periodo: 1.8 },
     coracoes: [],
     faiscas: [],
@@ -81,11 +85,20 @@ export function transformando(anjo: Anjo): boolean {
   return anjo.fase === 'acendendo';
 }
 
-export function alternarForma(anjo: Anjo): void {
-  if (anjo.fase !== 'parado') return;
+// Pode virar anjo agora (na forma base e com a recarga pronta)?
+export function anjoPronto(anjo: Anjo): boolean {
+  return anjo.forma === 'base' && anjo.fase === 'parado' && anjo.recarga <= 0;
+}
+
+// Devolve se a troca começou. Na forma base com a recarga correndo, não começa — a não ser com
+// `forcar`, para o outro jogador online, cuja forma vem da rede e manda mais que o relógio daqui.
+export function alternarForma(anjo: Anjo, forcar = false): boolean {
+  if (anjo.fase !== 'parado') return false;
+  if (anjo.forma === 'base' && anjo.recarga > 0 && !forcar) return false;
   anjo.fase = 'acendendo';
   anjo.tempoFase = 0;
   if (anjo.forma === 'anjo') soltarCoracoes(anjo);
+  return true;
 }
 
 function destino(anjo: Anjo): Forma {
@@ -95,7 +108,7 @@ function destino(anjo: Anjo): Forma {
 
 // A barra do tempo de anjo: quanto dela está cheio (0 a 1) e se está em uso. Virando anjo,
 // ela enche junto com a luz; de anjo, esvazia com o minuto; voltando, fica onde parou. Na
-// forma base fica cheia e apagada — pronta — e se refaz enquanto a luz da volta apaga.
+// forma base fica apagada e se refaz com a recarga: cheia, está pronta.
 export function barraDoAnjo(anjo: Anjo): { cheia: number; ativa: boolean; resta: number } {
   if (anjo.fase === 'acendendo') {
     const p = Math.min(1, anjo.tempoFase / ACENDER[destino(anjo)]);
@@ -103,8 +116,7 @@ export function barraDoAnjo(anjo: Anjo): { cheia: number; ativa: boolean; resta:
     return { cheia: anjo.restaAnjo / DURACAO_ANJO, ativa: true, resta: anjo.restaAnjo };
   }
   if (anjo.forma === 'anjo') return { cheia: anjo.restaAnjo / DURACAO_ANJO, ativa: true, resta: anjo.restaAnjo };
-  const refazendo = anjo.fase === 'apagando' ? suavizar(0, 1, anjo.tempoFase / APAGAR.base) : 1;
-  return { cheia: refazendo, ativa: false, resta: DURACAO_ANJO };
+  return { cheia: 1 - anjo.recarga / RECARGA_ANJO, ativa: false, resta: DURACAO_ANJO };
 }
 
 // Quanto a luz cobre o corpo (raio a partir do peito) e com que força.
@@ -551,6 +563,8 @@ export function atualizarAnjo(anjo: Anjo, dt: number, tempo: number, corpo: Corp
       if (anjo.forma === 'anjo') {
         anjo.restaAnjo = DURACAO_ANJO;
         soltarCoracoesDoPeito(anjo, corpo);
+      } else {
+        anjo.recarga = RECARGA_ANJO;
       }
     } else if (anjo.fase === 'apagando' && anjo.tempoFase >= APAGAR[anjo.forma]) {
       anjo.fase = 'parado';
@@ -561,6 +575,7 @@ export function atualizarAnjo(anjo: Anjo, dt: number, tempo: number, corpo: Corp
     anjo.restaAnjo = Math.max(0, anjo.restaAnjo - dt);
     if (anjo.restaAnjo === 0) alternarForma(anjo);
   }
+  if (anjo.forma === 'base' && anjo.fase !== 'acendendo') anjo.recarga = Math.max(0, anjo.recarga - dt);
   atualizarBatida(anjo.batida, dt, corpo);
   atualizarCoracoes(anjo, dt, tempo, corpo);
   atualizarFaiscas(anjo, dt, pose);
