@@ -42,8 +42,10 @@ jogo/
 ├── apps/
 │   ├── cliente/          o jogo (Vite + TypeScript + Canvas 2D)
 │   │   └── src/
-│   │       ├── main.ts       laço do jogo: entrada, física do personagem, câmera, desenho
-│   │       ├── inicio/       carregamento (confere arte, servidor e banco) e tela inicial
+│   │       ├── main.ts       laço do jogo e ciclo das telas: menu → partida → fim → menu
+│   │       ├── partida.ts    uma partida: tempo, a CPU ou o outro jogador (pela rede)
+│   │       ├── inicio/       telas em HTML: carregamento, tela inicial (nome e modos),
+│   │       │                 multiplayer (criar/entrar em sala), menu da engrenagem e fim
 │   │       ├── motor/        peças genéricas: carregar imagem, criar/reduzir sprite, sorteio
 │   │       ├── mundo/        céu, sol, nuvens, árvores, luz, chão e minhocas
 │   │       ├── entidades/    personagem e animais
@@ -54,7 +56,8 @@ jogo/
 │   └── servidor/         API + tempo real (Node + Fastify + Drizzle)
 │       ├── src/
 │       │   ├── rotas/        contas, sessões, saves, ranking
-│       │   ├── tempo-real/   WebSocket: quem está no mundo e onde
+│       │   ├── tempo-real/   WebSocket: quem está no mundo e onde (com conta)
+│       │   ├── partida/      salas 1v1 com código, sem conta: tempo marcado pelo servidor
 │       │   ├── auth/         hash de senha (scrypt) e sessões (token)
 │       │   └── banco/        schema, conexão (PGlite ou Postgres) e migrações
 │       └── drizzle/          migrações SQL (versionadas)
@@ -112,9 +115,26 @@ Tudo sob `/api`. Rotas com 🔒 pedem `Authorization: Bearer <token>`.
 | `GET /eu` 🔒 | dados da conta |
 | `GET /saves` 🔒 · `GET /saves/:slot` 🔒 · `PUT /saves/:slot` 🔒 | saves 1 a 3 |
 | `GET /ranking/:categoria` · `POST /ranking` 🔒 | top 50 · enviar `{ categoria, valor }` |
-| `WS /tempo-real?token=…` | multiplayer: `bem-vindo`, `entrou`, `saiu`, `posicao` (ver `protocolo.ts`) |
+| `WS /tempo-real?token=…` | mundo aberto com conta: `bem-vindo`, `entrou`, `saiu`, `posicao` (ver `protocolo.ts`) |
+| `WS /partida?acao=criar&nome=…` | cria uma sala 1v1 e recebe `sala-criada` com o código (sem conta) |
+| `WS /partida?acao=entrar&codigo=…&nome=…` | entra na sala: `comecou` para os dois, depois `estado` de um para o outro e `fim` (ver `partida.ts`) |
 
-Criar conta e entrar aceitam 10 tentativas por minuto por endereço.
+Criar conta e entrar aceitam 10 tentativas por minuto por endereço; criar ou entrar em sala, 30.
+
+## Partida
+
+Cada partida dura `DURACAO_PARTIDA_MS` (5 minutos, em `compartilhado/src/partida.ts`). O
+jogador escolhe um nome na tela inicial (2 a 12 caracteres, guardado no navegador) e ele aparece
+em cima da cabeça sem acento, porque a fonte de pixels não tem acentos.
+
+- **Singleplayer:** você contra a CPU (o sósia). O cronômetro é do cliente e a engrenagem (ou
+  Esc) pausa tudo.
+- **Multiplayer 1v1:** um cria a sala e passa o código de 5 caracteres; o outro entra com ele.
+  O servidor marca o tempo e avisa o fim aos dois ao mesmo tempo. Cada cliente simula o próprio
+  personagem e manda ~10 vezes por segundo os botões segurados e a posição; o outro lado move o
+  corpo com os mesmos botões e corrige a posição aos poucos. A engrenagem só abre o menu: a
+  partida continua, e o seu personagem fica parado enquanto isso. Sair da partida encerra para
+  os dois.
 
 ## Publicar
 
@@ -151,9 +171,11 @@ instalador bem maior.
 
 ## Pontos em aberto
 
-- O jogo ainda não chama a API: faltam tela de entrar/criar conta, quando salvar, e desenhar
-  os outros jogadores. As peças (`rede/api.ts`, `rede/tempo-real.ts`, `save/save.ts`) estão
-  prontas e testadas.
+- A partida ainda não tem objetivo nem vencedor: o tempo acaba e pronto. Quando entrar dano,
+  o servidor da sala é o lugar de decidir quem venceu.
+- Contas, saves e o mundo aberto (`rede/api.ts`, `rede/tempo-real.ts`, `save/save.ts`) estão
+  prontos e testados, mas o jogo ainda não os usa: faltam tela de entrar/criar conta e quando
+  salvar.
 - Ranking e posição vêm do cliente e só são validados por faixa. Antes de o ranking valer
   algo, o servidor tem de calcular a pontuação.
 - Recuperar senha por e-mail ainda não existe (o e-mail já é guardado).

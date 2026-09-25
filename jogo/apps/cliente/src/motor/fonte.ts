@@ -49,18 +49,20 @@ const GLIFOS: Record<string, readonly string[]> = {
   '.': ['...', '...', '...', '...', '.#.'],
   ':': ['...', '.#.', '...', '.#.', '...'],
   '!': ['.#.', '.#.', '.#.', '...', '.#.'],
+  _: ['...', '...', '...', '...', '###'],
 };
 
 const prontos = new Map<string, HTMLCanvasElement>();
 
 // O texto desenhado na cor pedida, numa imagem do tamanho exato dele. Minúsculas viram
-// maiúsculas; o que a fonte não tem vira espaço.
+// maiúsculas e as letras perdem o acento (João → JOAO); o que a fonte não tem vira espaço.
 export function textoEmPixels(texto: string, cor: string): HTMLCanvasElement {
   const chave = `${cor}|${texto}`;
   const pronto = prontos.get(chave);
   if (pronto) return pronto;
 
-  const glifos = [...texto.toUpperCase()].map((c) => GLIFOS[c] ?? GLIFOS[' ']);
+  const semAcento = texto.normalize('NFD').replace(/\p{M}/gu, '').toUpperCase();
+  const glifos = [...semAcento].map((c) => GLIFOS[c] ?? GLIFOS[' ']);
   const linhas = Array.from({ length: ALTURA_FONTE }, (_, y) => glifos.map((g) => g[y]).join('.'));
   const imagem = criarSprite(linhas, { '#': cor });
   prontos.set(chave, imagem);

@@ -1,12 +1,14 @@
 // Telas de antes do jogo: primeiro a de carregamento, uma barra de progresso que confere o
-// servidor, o banco e a arte (e deixa o servidor grátis acordar); depois a inicial, com a logo e
-// o botão de jogar. São páginas comuns por cima do canvas: a logo é uma imagem grande e o texto
-// precisa ficar nítido, o que o canvas de 480×270 ampliado não daria.
+// servidor, o banco e a arte (e deixa o servidor grátis acordar); depois a inicial, com a logo,
+// o nome e os modos de jogo. São páginas comuns por cima do canvas: a logo é uma imagem grande
+// e o texto precisa ficar nítido, o que o canvas de 480×270 ampliado não daria.
 
-import logoUrl from '../assets/logo.png';
+import { Apelido } from '@terna/compartilhado';
 import logoSimplesUrl from '../assets/logo-simples.webp';
 import { checarBanco, checarServidor } from '../rede/saude';
-import './inicio.css';
+import { guardarNome, lerNome } from '../save/nome';
+import { botao, digitandoEm, elemento, imagemDaLogo, palco, sairComEsmaecer } from './dom';
+import { telaMultiplayer, type EscolhaOnline } from './multiplayer';
 
 // Cada etapa da barra é uma checagem de verdade, com um nome do mundo do jogo no lugar do nome
 // técnico. A barra anda por elas em ordem, mas as checagens correm todas ao mesmo tempo.
@@ -25,32 +27,10 @@ const PAUSA_PRONTO = 450; // ms com a barra cheia antes de abrir a tela inicial
 interface Opcoes<C, H> {
   carregarCenario: () => Promise<C>;
   carregarHerois: () => Promise<H>;
-  // Chamado quando a tela inicial abre, com a arte já carregada: o cenário passa a rodar atrás
-  // dela. A promessa de `abrirInicio` só termina quando a pessoa aperta Jogar.
-  aoAbrirTitulo: (cenario: C, herois: H, online: boolean) => void;
 }
 
-function elemento<K extends keyof HTMLElementTagNameMap>(tag: K, classe: string, texto?: string): HTMLElementTagNameMap[K] {
-  const el = document.createElement(tag);
-  el.className = classe;
-  if (texto !== undefined) el.textContent = texto;
-  return el;
-}
-
-function botao(texto: string, classe: string, aoClicar: () => void): HTMLButtonElement {
-  const b = elemento('button', classe, texto);
-  b.type = 'button';
-  b.addEventListener('click', aoClicar);
-  return b;
-}
-
-function imagemDaLogo(classe: string): HTMLImageElement {
-  const logo = elemento('img', classe);
-  logo.src = logoUrl;
-  logo.alt = 'Terna';
-  logo.draggable = false;
-  return logo;
-}
+// O que a pessoa escolheu na tela inicial.
+export type Escolha = { modo: 'solo'; nome: string } | EscolhaOnline;
 
 // A logo simples (só as letras, em branco) do carregamento. A imagem tem margem vazia em volta
 // das letras: a moldura tem a proporção só das letras e corta o resto (ver inicio.css).
@@ -67,7 +47,7 @@ function logoSimples(): HTMLElement {
 const esperar = (ms: number): Promise<void> => new Promise((resolver) => setTimeout(resolver, ms));
 
 // Guarda o valor carregado e transforma o sucesso/erro em Resultado.
-function carregar<T>(carregador: () => Promise<T>, guardar: (valor: T) => void): Promise<Resultado> {
+function carregarArte<T>(carregador: () => Promise<T>, guardar: (valor: T) => void): Promise<Resultado> {
   return carregador().then(
     (valor): Resultado => {
       guardar(valor);
@@ -82,10 +62,7 @@ function carregar<T>(carregador: () => Promise<T>, guardar: (valor: T) => void):
 
 // A tela de carregamento. Devolve o que foi carregado e se dá para jogar online, quando a pessoa
 // pode seguir (sozinha, se tudo deu certo; com um clique, se algo falhou).
-function carregamento<C, H>(
-  palco: HTMLElement,
-  opcoes: Pick<Opcoes<C, H>, 'carregarCenario' | 'carregarHerois'>,
-): Promise<{ cenario: C; herois: H; online: boolean }> {
+export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; herois: H; online: boolean }> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-carregando');
     const barra = elemento('div', 'inicio-barra');
@@ -100,7 +77,7 @@ function carregamento<C, H>(
     const aviso = elemento('p', 'inicio-aviso');
     const acoes = elemento('div', 'inicio-acoes');
     tela.append(logoSimples(), barra, frase, aviso, acoes);
-    palco.replaceChildren(tela);
+    palco().replaceChildren(tela);
 
     let cenario: C | undefined;
     let herois: H | undefined;
@@ -112,8 +89,8 @@ function carregamento<C, H>(
 
       const servidor = checarServidor();
       const etapas: Etapa[] = [
-        { frase: 'Colocando grama no chão', resultado: carregar(opcoes.carregarCenario, (v) => (cenario = v)) },
-        { frase: 'Chamando os heróis', resultado: carregar(opcoes.carregarHerois, (v) => (herois = v)) },
+        { frase: 'Colocando grama no chão', resultado: carregarArte(opcoes.carregarCenario, (v) => (cenario = v)) },
+        { frase: 'Chamando os heróis', resultado: carregarArte(opcoes.carregarHerois, (v) => (herois = v)) },
         { frase: 'Afiando as armas', resultado: servidor.then((r) => (r.ok ? r : { ok: false, falha: 'rede' })) },
         {
           frase: 'Abrindo o baú de memórias',
@@ -188,50 +165,93 @@ function carregamento<C, H>(
   });
 }
 
-// A tela inicial: a logo e os modos de jogo. Termina quando a pessoa escolhe Singleplayer (você
-// e o sósia, o jogo de hoje); o Multiplayer aparece apagado, avisando que vem aí.
-function titulo(palco: HTMLElement, online: boolean): Promise<void> {
+// A tela inicial: a logo, o nome e os modos de jogo. Termina quando a pessoa escolhe um modo —
+// Singleplayer direto; Multiplayer depois de criar ou entrar numa sala (a tela dele volta para
+// cá se ela desistir). Sem conexão com o servidor, o Multiplayer fica apagado.
+export function escolherModo(online: boolean): Promise<Escolha> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-titulo-tela');
 
-    const jogar = botao('Singleplayer', 'inicio-botao inicio-jogar', () => {
-      window.removeEventListener('keydown', aoTeclar);
-      tela.classList.add('inicio-saindo');
-      // Dá tempo do esmaecer terminar antes de tirar a tela do lugar.
-      setTimeout(() => {
-        tela.remove();
-        resolver();
-      }, 350);
+    const campo = elemento('label', 'inicio-campo');
+    const rotulo = elemento('span', 'inicio-rotulo', 'Seu nome');
+    const entrada = elemento('input', 'inicio-entrada');
+    entrada.type = 'text';
+    entrada.maxLength = 12;
+    entrada.setAttribute('autocomplete', 'nickname');
+    entrada.spellcheck = false;
+    entrada.placeholder = 'Como te chamam?';
+    entrada.value = lerNome();
+    const erroNome = elemento('p', 'inicio-erro');
+    erroNome.id = 'inicio-erro-nome';
+    erroNome.setAttribute('aria-live', 'polite');
+    campo.append(rotulo, entrada);
+    entrada.addEventListener('input', () => {
+      erroNome.textContent = '';
+      entrada.removeAttribute('aria-invalid');
     });
+
+    // O nome vale para os dois modos: sem nome válido, avisa e volta para o campo.
+    const nomeValido = (): string | null => {
+      const nome = Apelido.safeParse(entrada.value);
+      if (nome.success) {
+        guardarNome(nome.data);
+        return nome.data;
+      }
+      const motivo = nome.error.issues[0]?.message ?? 'nome inválido';
+      erroNome.textContent = entrada.value.trim()
+        ? motivo.charAt(0).toUpperCase() + motivo.slice(1)
+        : 'Escreva seu nome para jogar';
+      entrada.setAttribute('aria-invalid', 'true');
+      entrada.setAttribute('aria-describedby', erroNome.id);
+      entrada.focus();
+      return null;
+    };
+
+    const terminar = (escolha: Escolha): void => {
+      window.removeEventListener('keydown', aoTeclar);
+      void sairComEsmaecer(tela).then(() => resolver(escolha));
+    };
+
+    const solo = botao('Singleplayer', 'inicio-botao inicio-jogar', () => {
+      const nome = nomeValido();
+      if (nome) terminar({ modo: 'solo', nome });
+    });
+
+    const multiplayer = botao('Multiplayer', 'inicio-botao inicio-multiplayer', () => {
+      const nome = nomeValido();
+      if (!nome) return;
+      window.removeEventListener('keydown', aoTeclar);
+      void telaMultiplayer(nome).then((escolha) => {
+        if (escolha) return resolver(escolha);
+        // Desistiu: a tela inicial volta como estava.
+        palco().replaceChildren(tela);
+        window.addEventListener('keydown', aoTeclar);
+        multiplayer.focus();
+      });
+    });
+    if (!online) {
+      multiplayer.disabled = true;
+      multiplayer.setAttribute('aria-label', 'Multiplayer, sem conexão com o servidor');
+      multiplayer.append(elemento('span', 'inicio-etiqueta', 'Offline'));
+    }
+
+    // Enter joga sozinho (também de dentro do campo de nome); Espaço só fora do campo.
     const aoTeclar = (evento: KeyboardEvent): void => {
-      if (evento.code === 'Enter' || evento.code === 'Space') {
+      if (evento.code === 'Enter' || (evento.code === 'Space' && !digitandoEm(evento))) {
+        if (evento.target instanceof HTMLButtonElement) return; // o próprio botão já responde
         evento.preventDefault();
-        jogar.click();
+        solo.click();
       }
     };
     window.addEventListener('keydown', aoTeclar);
 
-    // Desabilitado de verdade (não recebe foco nem clique); o "Em breve" faz parte do nome.
-    const multiplayer = elemento('button', 'inicio-botao inicio-multiplayer');
-    multiplayer.type = 'button';
-    multiplayer.disabled = true;
-    multiplayer.setAttribute('aria-label', 'Multiplayer, em breve');
-    multiplayer.append('Multiplayer', elemento('span', 'inicio-em-breve', 'Em breve'));
-
     const modos = elemento('div', 'inicio-modos');
-    modos.append(jogar, multiplayer);
+    modos.append(campo, erroNome, solo, multiplayer);
     const estado = elemento('p', 'inicio-conexao', online ? 'Online' : 'Offline');
     estado.dataset.online = String(online);
     tela.append(imagemDaLogo('inicio-logo'), modos, estado);
-    palco.replaceChildren(tela);
-    jogar.focus();
+    palco().replaceChildren(tela);
+    // Quem já tem nome vai direto para o botão; quem não tem, para o campo.
+    (entrada.value ? solo : entrada).focus();
   });
-}
-
-export async function abrirInicio<C, H>({ carregarCenario, carregarHerois, aoAbrirTitulo }: Opcoes<C, H>): Promise<void> {
-  const palco = document.getElementById('inicio');
-  if (!palco) throw new Error('faltou o <div id="inicio"> na página');
-  const { cenario, herois, online } = await carregamento(palco, { carregarCenario, carregarHerois });
-  aoAbrirTitulo(cenario, herois, online);
-  await titulo(palco, online);
 }

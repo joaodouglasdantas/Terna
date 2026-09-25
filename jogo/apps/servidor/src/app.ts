@@ -4,6 +4,7 @@ import websocket from '@fastify/websocket';
 import { sql } from 'drizzle-orm';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Banco } from './banco/conexao';
+import { rotaPartida } from './partida/rota';
 import { rotasContas } from './rotas/contas';
 import { rotasRanking } from './rotas/ranking';
 import { rotasSaves } from './rotas/saves';
@@ -72,6 +73,7 @@ export async function criarApp({
       rotasSaves(api, banco);
       rotasRanking(api, banco);
       rotaTempoReal(api, banco);
+      rotaPartida(api);
     },
     { prefix: '/api' },
   );

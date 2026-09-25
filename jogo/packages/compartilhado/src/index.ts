@@ -5,4 +5,5 @@ export * from './contas';
 export * from './saves';
 export * from './ranking';
 export * from './protocolo';
+export * from './partida';
 export * from './conteudo';

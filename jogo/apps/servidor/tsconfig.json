@@ -12,6 +12,7 @@
     "src/banco/migrar.ts",
     "test/api.test.ts",
     "test/tempo-real.test.ts",
+    "test/partida.test.ts",
     "test/banco-modelo.ts",
     "vitest.config.ts",
     "drizzle.config.ts",

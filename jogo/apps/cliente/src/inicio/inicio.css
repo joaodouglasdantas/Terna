@@ -195,22 +195,212 @@
   animation: inicio-pulsa 1.6s ease-in-out infinite;
 }
 
-/* Apagado: ainda não dá para jogar com outras pessoas. */
-.inicio-multiplayer,
-.inicio-multiplayer:hover {
+/* O segundo modo, com menos peso que o Singleplayer. */
+.inicio-multiplayer {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
   min-height: 3rem;
+  background: #3a3358;
+  border-color: var(--suave);
+  box-shadow: 0 5px 0 #1f1a33, 0 0 0 3px #0e0a18;
+}
+
+.inicio-multiplayer:hover {
+  background: #4a426c;
+}
+
+/* Apagado: sem conexão com o servidor não dá para jogar com outras pessoas. */
+.inicio-multiplayer:disabled,
+.inicio-multiplayer:disabled:hover {
   color: #8d86a8;
   background: #2a2540;
   border-color: #4a4466;
   box-shadow: 0 5px 0 #17132a, 0 0 0 3px #0e0a18;
   cursor: not-allowed;
+  transform: none;
 }
 
-.inicio-em-breve {
+/* ---- nome ---- */
+
+.inicio-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.inicio-rotulo {
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--tinta);
+  text-shadow: 0 0 4px #000, 0 1px 3px #000;
+}
+
+.inicio-entrada {
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  padding: 0.4rem 0.75rem;
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--tinta);
+  background: rgba(14, 10, 24, 0.88);
+  border: 3px solid var(--suave);
+  box-shadow: 0 0 0 3px #0e0a18;
+  outline: none;
+}
+
+.inicio-entrada::placeholder {
+  color: #7d7699;
+  font-weight: 400;
+}
+
+.inicio-entrada:focus-visible {
+  border-color: var(--azul);
+}
+
+.inicio-entrada[aria-invalid='true'] {
+  border-color: var(--vermelho);
+}
+
+.inicio-erro {
+  margin: -0.4rem 0 0;
+  min-height: 1.2em;
+  font-size: 0.85rem;
+  color: #ffb3ba;
+  text-shadow: 0 0 4px #000, 0 1px 3px #000;
+}
+
+.inicio-erro:empty {
+  min-height: 0;
+  margin: 0;
+}
+
+/* ---- caixas (multiplayer, menu da partida, fim) ---- */
+
+.inicio-multi-tela,
+.inicio-pausa {
+  background: rgba(16, 12, 28, 0.72);
+}
+
+.inicio-caixa {
+  width: min(24rem, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.9rem;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  text-align: center;
+  background: rgba(18, 14, 30, 0.94);
+  border: 3px solid var(--roxo);
+  box-shadow: 0 0 0 3px #0e0a18, 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.inicio-titulo {
+  margin: 0;
+  font-size: 1.3rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inicio-sub,
+.inicio-ou,
+.inicio-aguarde {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--suave);
+}
+
+.inicio-sub:empty {
+  display: none;
+}
+
+.inicio-ou {
+  margin-top: 0.3rem;
+}
+
+.inicio-aguarde {
+  color: var(--tinta);
+  animation: inicio-respira 1.6s ease-in-out infinite;
+}
+
+.inicio-linha-codigo {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.inicio-linha-codigo .inicio-botao {
+  min-width: 0;
+  padding: 0.5rem 1rem;
+}
+
+.inicio-entrada-codigo {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  letter-spacing: 0.15em; /* mais que isso, o "CÓDIGO" do campo vazio não cabe em 320 px */
+  text-transform: uppercase;
+}
+
+/* O código da sala, grande, para ler em voz alta ou copiar. */
+.inicio-codigo {
+  margin: 0;
+  padding: 0.5rem 0;
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  text-indent: 0.35em; /* compensa o espaço depois da última letra */
+  color: #ffd966;
+  background: #0e0a18;
+  border: 3px dashed #4a4466;
+  user-select: all;
+}
+
+.inicio-copiado {
+  min-height: 1.4em;
+}
+
+/* ---- dentro da partida ---- */
+
+/* A engrenagem fica à direita do cronômetro (desenhado no canvas: placa de 16 px de altura a
+   3 px do topo, centralizada), em proporção à tela do jogo de 480×270. Centralizada na altura
+   da placa (y 11 = 3 + 16/2): numa tela pequena o mínimo de 28 px a deixa maior que a placa,
+   e ela cresce igual para cima e para baixo. */
+.hud-engrenagem {
+  position: absolute;
+  left: calc(100% * 266 / 480);
+  top: calc(100% * 11 / 270);
+  transform: translateY(-50%);
+  width: max(28px, calc(100% * 16 / 480));
+  aspect-ratio: 1;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 10, 22, 0.78);
+  border: none;
+  cursor: pointer;
+}
+
+.hud-engrenagem svg {
+  width: 64%;
+  height: 64%;
+  fill: #fff4dc;
+}
+
+.hud-engrenagem:hover svg {
+  fill: #ffffff;
+}
+
+.hud-engrenagem:focus-visible {
+  outline: 2px solid #5fb2ff;
+  outline-offset: 2px;
+}
+
+.inicio-etiqueta {
   padding: 0.15rem 0.4rem;
   font-size: 0.7rem;
   letter-spacing: 0.08em;
@@ -248,6 +438,12 @@
   }
 }
 
+@keyframes inicio-respira {
+  50% {
+    opacity: 0.45;
+  }
+}
+
 @keyframes inicio-pulsa {
   50% {
     box-shadow: 0 5px 0 #4a2fa0, 0 0 0 3px #0e0a18, 0 0 24px 4px rgba(138, 92, 255, 0.7);
@@ -256,7 +452,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .inicio-logo,
-  .inicio-jogar {
+  .inicio-jogar,
+  .inicio-aguarde {
     animation: none;
   }
 }

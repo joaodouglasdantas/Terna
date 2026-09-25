@@ -1,22 +1,22 @@
 // Ponto de entrada do jogo: carrega as folhas de sprite, monta o mundo e roda o laço
-// principal (atualizar → desenhar) a cada quadro do navegador.
+// principal (atualizar → desenhar) a cada quadro do navegador. Por cima, o ciclo das telas:
+// carregamento → tela inicial → partida → fim → tela inicial de novo.
 
 import { MUNDO } from '@terna/compartilhado';
 import { atualizarAnimais, desenharAnimais, desenharAnimaisNoAr, prepararAnimais } from './entidades/animais';
 import {
   acimaDaCabeca,
-  atualizarPersonagem,
   carregarAnimacoesPersonagem,
-  criarPersonagem,
   desenharPersonagem,
   desenharSombraDoPersonagem,
   prepararPersonagens,
   type Controles,
-  type Personagem,
 } from './entidades/personagem';
-import { criarCerebroSosia, pensarSosia, type CerebroSosia } from './entidades/sosia';
-import { desenharEtiquetas, type Etiqueta } from './interface/etiqueta';
-import { desenharPainel, type CorDoJogador } from './interface/painel';
+import { carregar, escolherModo, type Escolha } from './inicio/inicio';
+import { montarMenus } from './inicio/na-partida';
+import { desenharCronometro } from './interface/cronometro';
+import { desenharEtiquetas } from './interface/etiqueta';
+import { desenharPainel } from './interface/painel';
 import { contexto2d } from './motor/imagens';
 import { suavizar } from './motor/matematica';
 import type { Luz, Vista } from './motor/tipos';
@@ -30,7 +30,7 @@ import {
 } from './mundo/cenario';
 import { TILE, criarChao } from './mundo/chao';
 import { atualizarMinhocas, desenharMinhocas, prepararMinhocas } from './mundo/minhocas';
-import { abrirInicio } from './inicio/inicio';
+import { atualizarPartida, criarPartida, encerrarPartida, type FimDaPartida, type Partida } from './partida';
 
 const canvas = document.getElementById('jogo');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('faltou o <canvas id="jogo"> na página');
@@ -46,18 +46,11 @@ const FOLGA_TUFOS = 4;
 const chao = criarChao(MUNDO, ALTURA_CHAO, FOLGA_TUFOS);
 
 const SEGUIR_CAMERA = 5; // quanto maior, mais rápido a câmera alcança o personagem
-// O sósia começa um pouco à direita, olhando para você, e anda em volta desse lugar.
-const CASA_SOSIA = MUNDO / 2 + 70;
-// Quem é quem, na cor de cada um — você em azul, o sósia em vermelho: o nome em cima da cabeça,
-// a borda do painel e o fundo da foto (a `clara`).
-const PLAYER_1: Etiqueta & CorDoJogador = { texto: 'PLAYER 1', cor: '#5fb2ff', clara: '#d3e9ff' };
-const PLAYER_2: Etiqueta & CorDoJogador = { texto: 'PLAYER 2', cor: '#ff5a67', clara: '#ffd8dc' };
 
 let folhaCenario: HTMLImageElement;
-// Você começa no meio do mapa, com espaço para andar para os dois lados.
-let jogador: Personagem;
-let sosia: Personagem;
-let cerebroSosia: CerebroSosia;
+// A partida em andamento. Sem ela (nas telas de menu), só o cenário roda ao fundo: sem
+// personagens, nomes, painéis nem cronômetro.
+let partida: Partida | null = null;
 
 // ---- Câmera e tela dividida ----
 // Cada metade da tela é uma janela sobre uma tela inteira com câmera própria: a da esquerda
@@ -78,12 +71,13 @@ const DIVISAO_APARECE = 12; // pixels de diferença entre as câmeras até a lin
 // `esquerda` e `direita`: borda esquerda da tela inteira de cada câmera, no mapa (0 a MUNDO - LARGURA).
 // `dividida` só liga com as câmeras a 1 px uma da outra e só desliga abaixo de meio pixel: com
 // menos que isso, o arredondamento fazia a tela piscar entre inteira e dividida.
-const camera = { esquerda: (MUNDO - LARGURA) / 2, direita: (MUNDO - LARGURA) / 2, dividida: false };
+const CAMERA_NO_MEIO = (MUNDO - LARGURA) / 2;
+const camera = { esquerda: CAMERA_NO_MEIO, direita: CAMERA_NO_MEIO, dividida: false };
 
 const limitarCamera = (x: number): number => Math.max(0, Math.min(MUNDO - LARGURA, x));
 
-function atualizarCamera(dt: number): void {
-  const [a, b] = jogador.x <= sosia.x ? [jogador.x, sosia.x] : [sosia.x, jogador.x];
+function atualizarCamera(p: Partida, dt: number): void {
+  const [a, b] = p.jogador.x <= p.outro.x ? [p.jogador.x, p.outro.x] : [p.outro.x, p.jogador.x];
   const juntos = (a + b) / 2 - METADE;
   const separar = suavizar(JUNTOS, JUNTOS + SEPARANDO, b - a);
   // Separados: `a` no meio da metade da esquerda (x = METADE / 2), `b` no meio da da direita.
@@ -122,10 +116,12 @@ window.addEventListener('keydown', (evento) => {
 window.addEventListener('keyup', (evento) => {
   teclas[evento.code] = false;
 });
+// Trocando de aba com uma tecla apertada, o keyup não chega: solta tudo.
+window.addEventListener('blur', soltarTeclas);
 
-// Enquanto as telas de antes do jogo estão abertas, só o cenário roda ao fundo: os dois
-// personagens, os nomes e os painéis só aparecem depois do Jogar.
-let jogando = false;
+function soltarTeclas(): void {
+  for (const tecla of Object.keys(teclas)) teclas[tecla] = false;
+}
 
 function lerTeclado(): Controles {
   return {
@@ -137,14 +133,13 @@ function lerTeclado(): Controles {
 }
 
 function atualizar(dt: number, tempo: number): void {
-  if (jogando) {
-    atualizarPersonagem(jogador, lerTeclado(), dt, tempo);
-    atualizarPersonagem(sosia, pensarSosia(cerebroSosia, sosia, dt), dt, tempo);
-    atualizarCamera(dt);
+  if (partida) {
+    atualizarPartida(partida, lerTeclado(), dt, tempo);
+    atualizarCamera(partida, dt);
   }
   const { esquerda, direita } = camerasNaTela();
   atualizarPassaros(dt, LARGURA, esquerda, direita);
-  atualizarAnimais(dt, jogando ? [jogador, sosia] : [], vistas());
+  atualizarAnimais(dt, partida ? [partida.jogador, partida.outro] : [], vistas());
   atualizarMinhocas(dt);
 }
 
@@ -164,20 +159,20 @@ function desenharVista(tempo: number, luz: Luz, camX: number, x0: number, largur
   desenharVegetacao(ctx, folhaCenario, tempo, luz, Y_CHAO, camX, LARGURA);
   desenharAnimais(ctx, luz, tempo, camX, LARGURA);
 
-  if (jogando) {
-    // O sósia atrás e você na frente, quando um passa pelo outro.
-    desenharSombraDoPersonagem(ctx, sosia, luz);
-    desenharSombraDoPersonagem(ctx, jogador, luz);
-    desenharPersonagem(ctx, sosia, tempo);
-    desenharPersonagem(ctx, jogador, tempo);
+  if (partida) {
+    // O outro atrás e você na frente, quando um passa pelo outro.
+    desenharSombraDoPersonagem(ctx, partida.outro, luz);
+    desenharSombraDoPersonagem(ctx, partida.jogador, luz);
+    desenharPersonagem(ctx, partida.outro, tempo);
+    desenharPersonagem(ctx, partida.jogador, tempo);
   }
   desenharAnimaisNoAr(ctx, luz, tempo, camX, LARGURA);
   ctx.restore();
 }
 
 // Os nomes em cima de cada um, na vista da câmera `camX` recortada como em desenharVista. O
-// sósia vem primeiro: juntos, o nome dele é o que sobe.
-function desenharNomes(camX: number, x0: number, largura: number): void {
+// do outro vem primeiro: juntos, o nome dele é o que sobe.
+function desenharNomes(p: Partida, camX: number, x0: number, largura: number): void {
   ctx.save();
   ctx.beginPath();
   ctx.rect(x0, 0, largura, ALTURA);
@@ -186,8 +181,8 @@ function desenharNomes(camX: number, x0: number, largura: number): void {
   desenharEtiquetas(
     ctx,
     [
-      { etiqueta: PLAYER_2, x: sosia.x, y: sosia.y, acima: acimaDaCabeca(sosia) },
-      { etiqueta: PLAYER_1, x: jogador.x, y: jogador.y, acima: acimaDaCabeca(jogador) },
+      { etiqueta: p.ele, x: p.outro.x, y: p.outro.y, acima: acimaDaCabeca(p.outro) },
+      { etiqueta: p.eu, x: p.jogador.x, y: p.jogador.y, acima: acimaDaCabeca(p.jogador) },
     ],
     { x: camX + x0, largura },
   );
@@ -215,18 +210,20 @@ function desenhar(tempo: number): void {
     desenharVista(tempo, luz, esquerda, 0, LARGURA);
   }
   desenharLuz(ctx, luz, LARGURA, ALTURA);
-  if (!jogando) return;
+  const p = partida;
+  if (!p) return;
   // Os nomes vêm depois da luz, para o sol não tingir o azul e o vermelho.
   if (dividida) {
-    desenharNomes(esquerda, 0, METADE);
-    desenharNomes(direita, METADE, METADE);
+    desenharNomes(p, esquerda, 0, METADE);
+    desenharNomes(p, direita, METADE, METADE);
   } else {
-    desenharNomes(esquerda, 0, LARGURA);
+    desenharNomes(p, esquerda, 0, LARGURA);
   }
   if (dividida) desenharDivisao(Math.min(1, Math.abs(direita - esquerda) / DIVISAO_APARECE));
-  // Os painéis ficam sempre no mesmo canto: o seu à esquerda, o do sósia à direita.
-  desenharPainel(ctx, jogador, PLAYER_1, 'esquerda', LARGURA, tempo);
-  desenharPainel(ctx, sosia, PLAYER_2, 'direita', LARGURA, tempo);
+  // Os painéis ficam sempre no mesmo canto: o seu à esquerda, o do outro à direita.
+  desenharPainel(ctx, p.jogador, p.eu, 'esquerda', LARGURA, tempo);
+  desenharPainel(ctx, p.outro, p.ele, 'direita', LARGURA, tempo);
+  desenharCronometro(ctx, p.restanteMs, LARGURA, tempo);
 }
 
 let ultimoTempo = 0;
@@ -239,23 +236,58 @@ function loop(tempoAtual: number): void {
   requestAnimationFrame(loop);
 }
 
-// Carregamento e tela inicial primeiro (elas conferem o servidor e o banco); o cenário começa a
-// rodar atrás da tela inicial e os personagens só entram depois do Jogar.
-void abrirInicio({
-  carregarCenario: carregarFolhaCenario,
-  carregarHerois: carregarAnimacoesPersonagem,
-  aoAbrirTitulo: (folha, animacoes) => {
-    prepararPersonagens(animacoes, Y_CHAO);
-    jogador = criarPersonagem(MUNDO / 2);
-    sosia = criarPersonagem(CASA_SOSIA, -1);
-    cerebroSosia = criarCerebroSosia(CASA_SOSIA);
-    folhaCenario = folha;
-    prepararAnimais(folha, Y_CHAO);
-    prepararMinhocas(Y_CHAO, ALTURA_CHAO);
-    requestAnimationFrame(loop);
-  },
-}).then(() => {
-  // Teclas apertadas durante a tela inicial (o Enter do botão) não valem no jogo.
-  for (const tecla of Object.keys(teclas)) teclas[tecla] = false;
-  jogando = true;
-});
+const TEXTO_DO_FIM: Record<FimDaPartida, (oponente: string) => string> = {
+  tempo: () => 'O tempo acabou.',
+  'oponente-saiu': (oponente) => `${oponente} saiu da partida.`,
+  conexao: () => 'A conexão com o servidor caiu.',
+};
+
+// Uma partida inteira: começa, roda até o tempo acabar (ou alguém sair) e termina quando a
+// pessoa volta ao menu.
+function jogar(escolha: Escolha): Promise<void> {
+  return new Promise((resolver) => {
+    const sair = (): void => {
+      if (!partida) return;
+      encerrarPartida(partida);
+      partida = null;
+      camera.esquerda = camera.direita = CAMERA_NO_MEIO;
+      camera.dividida = false;
+      resolver();
+    };
+    const menus = montarMenus({
+      online: escolha.modo === 'online',
+      aoMudarMenu: (aberto) => {
+        if (partida) partida.menuAberto = aberto;
+        if (aberto) soltarTeclas();
+      },
+      aoSair: sair,
+    });
+    const nova = criarPartida(escolha, (motivo) => {
+      const oponente = escolha.modo === 'online' ? escolha.oponente : 'A CPU';
+      void menus.mostrarFim('Fim de partida', TEXTO_DO_FIM[motivo](oponente)).then(sair);
+    });
+    // Começa com a câmera já entre os dois (sem deslizar do meio do mapa).
+    camera.esquerda = camera.direita = limitarCamera((nova.jogador.x + nova.outro.x) / 2 - METADE);
+    // Teclas apertadas nas telas (o Enter do botão) não valem no jogo.
+    soltarTeclas();
+    partida = nova;
+  });
+}
+
+// Carregamento primeiro (confere a arte, o servidor e o banco); depois o cenário começa a rodar
+// atrás da tela inicial e, a cada partida que acaba, a tela inicial volta.
+async function principal(): Promise<void> {
+  const { cenario, herois, online } = await carregar({
+    carregarCenario: carregarFolhaCenario,
+    carregarHerois: carregarAnimacoesPersonagem,
+  });
+  prepararPersonagens(herois, Y_CHAO);
+  folhaCenario = cenario;
+  prepararAnimais(cenario, Y_CHAO);
+  prepararMinhocas(Y_CHAO, ALTURA_CHAO);
+  requestAnimationFrame(loop);
+
+  for (;;) await jogar(await escolherModo(online));
+}
+
+void principal();

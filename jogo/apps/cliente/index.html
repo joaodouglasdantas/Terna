@@ -7,17 +7,28 @@
   <style>
     html, body { margin: 0; height: 100%; background: #1b1b24; }
     body { display: flex; align-items: center; justify-content: center; overflow: hidden; }
-    canvas {
-      display: block;
+    /* A tela do jogo: o canvas e, por cima, o que é HTML dentro da partida (a engrenagem). */
+    #tela {
+      position: relative;
       width: 100vw;
       max-width: calc(100vh * 16 / 9);
       aspect-ratio: 16 / 9;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
       image-rendering: pixelated;
     }
+    #hud { position: absolute; inset: 0; pointer-events: none; }
+    #hud > * { pointer-events: auto; }
   </style>
 </head>
 <body>
-  <canvas id="jogo" width="480" height="270"></canvas>
+  <div id="tela">
+    <canvas id="jogo" width="480" height="270"></canvas>
+    <div id="hud"></div>
+  </div>
   <div id="inicio"></div>
   <script type="module" src="/src/main.ts"></script>
 </body>
