@@ -6,7 +6,15 @@
 
 import { DURACAO_PARTIDA_MS, MUNDO, type EstadoJogador, type MotivoFim } from '@terna/compartilhado';
 import { alternarForma, transformando } from './entidades/anjo';
-import { atualizarPersonagem, criarPersonagem, formaDo, type Controles, type Personagem } from './entidades/personagem';
+import {
+  VELOCIDADE_DASH,
+  atualizarPersonagem,
+  comecarDash,
+  criarPersonagem,
+  formaDo,
+  type Controles,
+  type Personagem,
+} from './entidades/personagem';
 import { criarCerebroSosia, pensarSosia, type CerebroSosia } from './entidades/sosia';
 import type { Escolha } from './inicio/inicio';
 import type { Etiqueta } from './interface/etiqueta';
@@ -99,6 +107,9 @@ export function criarPartida(escolha: Escolha, aoFim: (motivo: FimDaPartida) => 
           remoto.controles = { esquerda, direita, pular, transformar };
           remoto.alvo = m.estado;
           remoto.idadeAlvo = 0;
+          // Os dois toques de um dash podem ser rápidos demais para chegar como botões; a
+          // velocidade dele chega, e aí o dash (com o rastro) começa aqui também.
+          if (Math.abs(m.estado.vx) >= VELOCIDADE_DASH) comecarDash(p.outro, m.estado.vx > 0 ? 1 : -1);
         }
         if (m.tipo === 'fim') terminar(p, m.motivo);
       },
