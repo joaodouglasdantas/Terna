@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ARMAS } from './conteudo/armas';
-import { PODERES, VIDA_MAXIMA } from './conteudo/poderes';
+import { ENERGIA_PIXY, PODERES, VIDA_MAXIMA } from './conteudo/poderes';
 import { MUNDO } from './mundo';
 
 // Partida: uma rodada com tempo marcado, sozinho (contra a CPU) ou 1v1 numa sala com código.
@@ -51,6 +51,7 @@ export const EstadoJogador = z.object({
   vida: z.number().min(0).max(VIDA_MAXIMA),
   selecionado: z.number().int().min(0).max(PODERES.length - 1), // o poder escolhido no painel
   encanto: z.number().min(0).max(10), // segundos que ainda faltam do encanto da Rajada (0 = livre)
+  energia: z.number().min(0).max(ENERGIA_PIXY.maxima), // a energia pixy, para o painel dele aqui
 });
 export type EstadoJogador = z.infer<typeof EstadoJogador>;
 
@@ -104,6 +105,8 @@ export const MensagemPartidaDoCliente = z.discriminatedUnion('tipo', [
   // Virou anjo com a arma na mão: ela cai no chão, em `x`, com o tempo que ainda tinha.
   z.object({ tipo: z.literal('largar-arma'), x: z.number().min(0).max(MUNDO), durabilidade: DURABILIDADE }),
   z.object({ tipo: z.literal('arma-quebrou') }),
+  // Apertou E: jogou fora a arma da mão, que some (ninguém mais pega).
+  z.object({ tipo: z.literal('descartar-arma') }),
   // A vida de quem manda chegou a 0: a partida acaba e o outro vence.
   z.object({ tipo: z.literal('morri') }),
 ]);
@@ -126,6 +129,8 @@ export const MensagemPartidaDoServidor = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('arma-pega'), id: z.number().int().nonnegative(), lado: Lado }),
   // Só para o outro: a arma de `lado` quebrou na mão.
   z.object({ tipo: z.literal('arma-quebrou'), lado: Lado }),
+  // Só para o outro: `lado` jogou fora a arma da mão.
+  z.object({ tipo: z.literal('arma-descartada'), lado: Lado }),
   z.object({ tipo: z.literal('fim'), motivo: MotivoFim, vencedor: Lado.optional() }),
   z.object({ tipo: z.literal('erro'), erro: z.string() }),
 ]);

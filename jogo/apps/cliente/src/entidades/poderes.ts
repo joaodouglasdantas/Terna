@@ -16,8 +16,9 @@ import {
   RECARGA_PODER,
   type IdPoder,
   type PoderUsado,
+  type ZonaDoCorpo,
 } from '@terna/compartilhado';
-import { textoEmPixels } from '../motor/fonte';
+import { ALTURA_FONTE, textoEmPixels } from '../motor/fonte';
 import { criarSprite } from '../motor/imagens';
 
 // ---- O que cada personagem tem ----
@@ -158,17 +159,22 @@ interface Numero {
   x: number;
   y: number;
   imagem: HTMLCanvasElement;
+  sombra: HTMLCanvasElement; // o mesmo texto, escuro, um pixel abaixo: lê em cima de qualquer fundo
   vida: number;
+  escala: number; // o crítico sai em dobro
 }
 
 export interface Efeitos {
   lista: Efeito[];
   particulas: Particula[];
   numeros: Numero[];
+  // Online, a arma acertou o outro aqui, mas a vida dele chega depois, pela rede: onde pegou
+  // (e por quantos segundos ainda vale), para o número sair do jeito certo quando ela chegar.
+  zonas: Map<CorpoAlvo, { zona: ZonaDoCorpo; resta: number }>;
 }
 
 export function criarEfeitos(): Efeitos {
-  return { lista: [], particulas: [], numeros: [] };
+  return { lista: [], particulas: [], numeros: [], zonas: new Map() };
 }
 
 let yChao = 0;
@@ -269,28 +275,41 @@ function faisca(e: Efeitos, x: number, y: number, forca: number, gravidade: numb
 // Tira a vida, faz piscar e solta o número. Também usado de fora para o outro jogador online,
 // quando a vida dele cai pela rede (aí `dano` é quanto caiu e a vida já veio certa).
 let ladoDoNumero: 1 | -1 = 1;
+// O número pela parte do corpo que a arma pegou: o crítico (cabeça) em dourado, em dobro e com o
+// aviso em cima; nos pés, apagado. Sem zona (os poderes), o de sempre.
+const COR_DO_NUMERO: Record<ZonaDoCorpo, string> = { cabeca: '#ffd966', corpo: ROSA.branco, pes: '#c9a9b8' };
+const ZONA_VALE = 1; // segundos: a vida do outro chegou até isto depois do acerto, é dele
 
-export function mostrarDano(e: Efeitos, alvo: CorpoAlvo, dano: number): void {
+export function mostrarDano(e: Efeitos, alvo: CorpoAlvo, dano: number, zona?: ZonaDoCorpo): void {
   alvo.ferido = PISCAR;
+  const pendente = e.zonas.get(alvo);
+  e.zonas.delete(alvo);
+  const onde = zona ?? pendente?.zona ?? 'corpo';
   // Sai de um lado da cabeça, um de cada vez: dois acertos seguidos (os dois corações) não se
   // empilham, e nenhum nasce em cima do nome.
   ladoDoNumero = ladoDoNumero === 1 ? -1 : 1;
-  const lado = ladoDoNumero;
-  e.numeros.push({
-    x: alvo.x + lado * 20,
-    y: alvo.y - CORPO.altura + 2,
-    imagem: textoEmPixels(`-${Math.round(dano)}`, ROSA.branco),
-    vida: 0.9,
+  const x = alvo.x + ladoDoNumero * 20;
+  const y = alvo.y - CORPO.altura + 2;
+  const cor = COR_DO_NUMERO[onde];
+  const critico = onde === 'cabeca';
+  const texto = (t: string): Pick<Numero, 'imagem' | 'sombra'> => ({
+    imagem: textoEmPixels(t, cor),
+    sombra: textoEmPixels(t, ROSA.vinho),
   });
+  e.numeros.push({ x, y, ...texto(`-${Math.round(dano)}`), vida: critico ? 1.1 : 0.9, escala: critico ? 2 : 1 });
+  // O aviso fica logo acima do número em dobro (que cresce para cima), com um pixel entre os dois.
+  if (critico) e.numeros.push({ x, y: y - 2 * ALTURA_FONTE - 2, ...texto('CRÍTICO!'), vida: 1.1, escala: 1 });
 }
 
-// Também usado pelas armas (entidades/armas.ts): o golpe e a flecha ferem do mesmo jeito.
-export function ferirAlvo(e: Efeitos, alvo: Alvo, dano: number): void {
+// Também usado pelas armas (entidades/armas.ts): o golpe e a flecha ferem do mesmo jeito, com a
+// parte do corpo que pegaram (`zona`).
+export function ferirAlvo(e: Efeitos, alvo: Alvo, dano: number, zona?: ZonaDoCorpo): void {
   if (alvo.ferir) {
     alvo.corpo.vida = Math.max(0, alvo.corpo.vida - dano);
-    mostrarDano(e, alvo.corpo, dano);
+    mostrarDano(e, alvo.corpo, dano, zona);
   } else {
     alvo.corpo.ferido = PISCAR;
+    if (zona) e.zonas.set(alvo.corpo, { zona, resta: ZONA_VALE });
   }
 }
 
@@ -408,6 +427,7 @@ export function atualizarEfeitos(e: Efeitos, dt: number, alvos: readonly Alvo[])
     n.y -= 18 * dt;
   }
   e.numeros = e.numeros.filter((n) => n.vida > 0);
+  for (const [corpo, pendente] of e.zonas) if ((pendente.resta -= dt) <= 0) e.zonas.delete(corpo);
 }
 
 // O que a CPU enxerga para desviar: as marcas no chão que ainda não estouraram e os corações
@@ -725,13 +745,19 @@ export function desenharBordaDoEncanto(
 // da luz, para não se esconderem atrás das placas.
 export function desenharNumerosDeDano(ctx: CanvasRenderingContext2D, e: Efeitos): void {
   for (const n of e.numeros) {
-    const x = Math.round(n.x - n.imagem.width / 2);
-    const y = Math.round(n.y);
+    const largura = n.imagem.width * n.escala;
+    const altura = n.imagem.height * n.escala;
+    const x = Math.round(n.x - largura / 2);
+    // O crítico cresce para cima, sem cobrir o aviso.
+    const y = Math.round(n.y) - (altura - n.imagem.height);
+    // Sem placa: só o texto, com a sombra meio transparente embaixo, e um pouco translúcido.
+    const alfa = 0.9 * Math.min(1, n.vida / 0.3);
     ctx.save();
-    ctx.globalAlpha = Math.min(1, n.vida / 0.3);
-    ctx.fillStyle = ROSA.vinho;
-    ctx.fillRect(x - 1, y - 1, n.imagem.width + 2, n.imagem.height + 2);
-    ctx.drawImage(n.imagem, x, y);
+    ctx.imageSmoothingEnabled = false; // o crítico em dobro, com os pixels nítidos
+    ctx.globalAlpha = 0.55 * alfa;
+    ctx.drawImage(n.sombra, x, y + n.escala, largura, altura);
+    ctx.globalAlpha = alfa;
+    ctx.drawImage(n.imagem, x, y, largura, altura);
     ctx.restore();
   }
 }

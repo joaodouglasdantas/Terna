@@ -18,12 +18,27 @@ export interface MenusDaPartida {
   remover(): void;
 }
 
-// Engrenagem em pixels (9×9), no mesmo estilo da arte do jogo.
-const ENGRENAGEM = ['...#.#...', '.#.###.#.', '..#####..', '####.####', '.##...##.', '####.####', '..#####..', '.#.###.#.', '...#.#...'];
+// Engrenagem em pixels (13×13), no mesmo estilo da arte do jogo: o corpo redondo com o furo no
+// meio e oito dentes quadrados, quatro nas pontas e quatro nas diagonais.
+const ENGRENAGEM = [
+  '.....###.....',
+  '.##..###..##.',
+  '.###########.',
+  '..#########..',
+  '..###...###..',
+  '####.....####',
+  '####.....####',
+  '####.....####',
+  '..###...###..',
+  '..#########..',
+  '.###########.',
+  '.##..###..##.',
+  '.....###.....',
+];
 
 function iconeEngrenagem(): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 9 9');
+  svg.setAttribute('viewBox', `0 0 ${ENGRENAGEM.length} ${ENGRENAGEM.length}`);
   svg.setAttribute('shape-rendering', 'crispEdges');
   svg.setAttribute('aria-hidden', 'true');
   ENGRENAGEM.forEach((linha, y) =>

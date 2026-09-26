@@ -30,7 +30,7 @@ import { carregar, escolherModo, type Escolha } from './inicio/inicio';
 import { montarMenus } from './inicio/na-partida';
 import { desenharCronometro } from './interface/cronometro';
 import { desenharEtiquetas } from './interface/etiqueta';
-import { desenharMira } from './interface/mira';
+import { aplicarMira } from './interface/mira';
 import { desenharPainel } from './interface/painel';
 import { contexto2d } from './motor/imagens';
 import { suavizar } from './motor/matematica';
@@ -134,6 +134,8 @@ function vistas(): Vista[] {
 const teclas: Record<string, boolean> = {};
 window.addEventListener('keydown', (evento) => {
   teclas[evento.code] = true;
+  // E joga fora a arma da mão: uma vez por toque (segurar não repete).
+  if (evento.code === 'KeyE' && !evento.repeat && partida) mouse.descartar = true;
 });
 window.addEventListener('keyup', (evento) => {
   teclas[evento.code] = false;
@@ -158,9 +160,9 @@ function lerTeclado(): Controles {
 // Na partida, o botão direito passa para o próximo poder e o esquerdo usa o escolhido (na forma
 // base, ataca com a arma da mão), mirando no ponto do mapa embaixo do cursor. Com a tela dividida, cada metade tem a sua câmera: o
 // ponto sai da câmera da metade clicada. O menu do botão direito do navegador não abre no jogo.
-// A seta do sistema some em cima do jogo: no lugar dela vai a mira desenhada (interface/mira.ts),
-// que segue o cursor enquanto ele está sobre o canvas.
-const mouse: AcoesMouse = { trocar: 0, usar: null };
+// Em cima do jogo, no lugar da seta do sistema, o cursor vira a mira (interface/mira.ts). A
+// posição guardada aqui serve às prévias do poder e do arco.
+const mouse: AcoesMouse = { trocar: 0, usar: null, descartar: false };
 const cursor = { x: 0, y: 0, dentro: false }; // em pixels da tela do jogo
 
 function pontoNaTela(evento: PointerEvent): { x: number; y: number } {
@@ -201,11 +203,12 @@ function acaoPronta(p: Partida): boolean {
   return podeUsarPoderes(p.jogador) && poderes.recarga[poderes.selecionado] <= 0;
 }
 
-// O que o mouse fez desde o último quadro, uma vez só.
+// O que o mouse (e a tecla E) fez desde o último quadro, uma vez só.
 function lerMouse(): AcoesMouse {
   const acoes = { ...mouse };
   mouse.trocar = 0;
   mouse.usar = null;
+  mouse.descartar = false;
   return acoes;
 }
 
@@ -318,7 +321,12 @@ function desenhar(tempo: number): void {
   desenharPainel(ctx, p.jogador, p.eu, 'esquerda', LARGURA, tempo, true);
   desenharPainel(ctx, p.outro, p.ele, 'direita', LARGURA, tempo);
   desenharCronometro(ctx, p.restanteMs, LARGURA, tempo);
-  if (mostrarMira(p)) desenharMira(ctx, cursor.x, cursor.y, acaoPronta(p));
+}
+
+// A mira é o cursor do sistema (interface/mira.ts): na partida, fora do menu e antes do fim.
+function atualizarMira(): void {
+  const p = partida;
+  aplicarMira(ctx.canvas, p &&!p.menuAberto && !p.acabou ? (acaoPronta(p) ? 'pronta' : 'apagada') : null);
 }
 
 let ultimoTempo = 0;
@@ -328,6 +336,7 @@ function loop(tempoAtual: number): void {
 
   atualizar(dt, tempoAtual / 1000);
   desenhar(tempoAtual / 1000);
+  atualizarMira();
   requestAnimationFrame(loop);
 }
 

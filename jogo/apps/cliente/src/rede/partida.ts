@@ -25,6 +25,8 @@ export interface ConexaoPartida {
   // Virou anjo com ela na mão: cai no chão em `x` (o servidor avisa os dois com `arma-caiu`).
   largarArma(x: number, durabilidade: number): void;
   avisarArmaQuebrou(): void;
+  // Jogou fora a arma da mão (tecla E): o servidor avisa o outro com `arma-descartada`.
+  descartarArma(): void;
   // A vida chegou a 0: o servidor encerra a partida para os dois, com o outro de vencedor.
   enviarMorte(): void;
   fechar(): void;
@@ -83,6 +85,9 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
     },
     avisarArmaQuebrou() {
       mandar({ tipo: 'arma-quebrou' });
+    },
+    descartarArma() {
+      mandar({ tipo: 'descartar-arma' });
     },
     enviarMorte() {
       mandar({ tipo: 'morri' });

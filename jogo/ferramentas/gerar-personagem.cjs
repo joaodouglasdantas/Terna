@@ -37,6 +37,11 @@ const ANIMACOES = {
   },
   subindo: { alturaRef: 98, ancora: 'cabeca', pontos: [[322, 430], [410, 420]] },
   caindo: { alturaRef: 98, ancora: 'cabeca', pontos: [[530, 570], [626, 570]] },
+  // Fileira IDLE da folha: de lado e em pé, com as pernas juntas. Parado atacando (ou soltando um
+  // poder), o corpo vira para o lado da mira sem a passada da corrida; o braço que ataca o jogo
+  // desenha por cima. Fica fora da conta da paleta (`foraDaPaleta`): as cores dos outros quadros
+  // continuam as mesmas, e este usa as mais próximas delas.
+  atacando: { alturaRef: 98, ancora: 'cabeca', foraDaPaleta: true, pontos: [[160, 80]] },
   // Deitado: o personagem não deita mais, então nenhum quadro vai para o jogo (`quadros: 0`);
   // a fileira continua só na conta da paleta, para as cores dos outros quadros não mudarem.
   deitado: { alturaRef: 98, ancora: 'caixa', quadros: 0, pontos: [[468, 985], [575, 985]] },
@@ -189,12 +194,19 @@ for (const [nome, anim] of Object.entries(ANIMACOES)) {
   const escala = ALTURA_EM_PE / anim.alturaRef;
   anim.pontos.forEach(([x, y], i) => {
     const red = reduzir(img, recortarQuadro(img, x, y), escala);
-    reduzidos.push({ nome, red, ancora: anim.ancora, soPaleta: i >= (anim.quadros ?? Infinity) });
+    reduzidos.push({
+      nome,
+      red,
+      ancora: anim.ancora,
+      soPaleta: i >= (anim.quadros ?? Infinity),
+      foraDaPaleta: Boolean(anim.foraDaPaleta),
+    });
   });
 }
 
 const amostras = [];
-for (const { red } of reduzidos) {
+for (const { red, foraDaPaleta } of reduzidos) {
+  if (foraDaPaleta) continue;
   for (let i = 0; i < red.lw * red.lh; i++) {
     if (red.px[i * 4 + 3]) amostras.push([red.px[i * 4], red.px[i * 4 + 1], red.px[i * 4 + 2]]);
   }

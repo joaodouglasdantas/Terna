@@ -5,7 +5,7 @@
 // O corpo (física, animação e desenho) é o mesmo para você e para o sósia: cada um recebe os
 // seus `Controles` a cada quadro — os seus vêm do teclado, os do sósia do cérebro dele.
 
-import { MUNDO, RAJADA, VIDA_MAXIMA } from '@terna/compartilhado';
+import { ENERGIA_PIXY, MUNDO, RAJADA, VIDA_MAXIMA } from '@terna/compartilhado';
 import urlPersonagem from '../assets/personagem.png';
 import urlPersonagemAnjo from '../assets/personagem-anjo.png';
 import { QUADROS_PERSONAGEM } from '../gerado/personagem-quadros';
@@ -15,11 +15,13 @@ import { desenharSombra } from '../mundo/cenario';
 import {
   ALTURA_AUREOLA,
   alternarForma,
+  anjoPronto,
   alturaDaAureola,
   atualizarAnjo,
   criarAnjo,
   desenharAnjoAtras,
   desenharAnjoNaFrente,
+  desenharAsasDoRetrato,
   enfeitarRetratoDeAnjo,
   formaAtual,
   transformando,
@@ -77,6 +79,7 @@ const DURACAO_QUADRO: Record<NomeAnimacao, number> = {
   andando: 0.11,
   subindo: 0.2,
   caindo: 0.2,
+  atacando: 1, // um quadro só: não é animação do estado, só a pose de atacar parado
 };
 
 const VELOCIDADE = 90; // pixels por segundo
@@ -91,6 +94,9 @@ const JANELA_TOQUE_DUPLO = 0.25; // segundos entre o primeiro toque e o segundo
 export const VELOCIDADE_DASH = 300; // pixels por segundo
 const DURACAO_DASH = 0.14; // segundos — anda ~42px, contra ~13px andando no mesmo tempo
 const RECARGA_DASH = 0.45; // segundos depois de um dash até o próximo
+// Soltou o lado correndo: segue para lá por este tempo. Cobre o vão de um toque rápido (soltar e
+// apertar de novo para o dash) sem o corpo frear; parando de verdade, escorrega só ~9px.
+const EMBALO = 0.1; // segundos
 // Voo do anjo: o pulo vai um pouco mais alto que o longo e, segurando o botão na descida, ele
 // desce planando devagar, batendo as asas. Soltou, volta a gravidade inteira e ele despenca.
 const FORCA_PULO_ANJO = 330; // pixels por segundo — segurando o botão, sobe ~85px
@@ -107,6 +113,9 @@ const ALTURA_DO_PEITO = 18;
 const PERTO_DO_DONO = 14;
 // O gesto de soltar um poder: o braço sai do ombro na direção da mira, fica um instante e volta.
 const GESTO = { duracao: 0.34, braco: 10 }; // segundos e pixels
+// De frente (o quadro "parado"), a mão da frente do próprio sprite: 5 px para o lado do eixo e na
+// linha 23 do quadro. Parado com uma arma, ela fica nessa mão, sem o braço esticado.
+const MAO_DE_FRENTE = { lado: 5, linha: 23 };
 
 // Os botões de um quadro: segurados ou não.
 export interface Controles {
@@ -132,6 +141,7 @@ export interface Personagem {
   direitaSegurada: boolean;
   ultimoToque: -1 | 0 | 1; // lado do último toque que ainda pode virar dash (0 = nenhum)
   janelaToque: number; // segundos que ainda faltam para o segundo toque valer
+  embalo: number; // soltou o lado correndo: segundos que ainda segue para lá (o toque rápido de novo)
   dash: number; // segundos de dash que ainda faltam (0 = sem dash)
   recargaDash: number; // segundos até poder dar outro dash
   animacao: NomeAnimacao;
@@ -144,6 +154,8 @@ export interface Personagem {
   poderes: Poderes;
   arma: ArmaNaMao | null; // a espada ou o arco na mão (só a forma base)
   ataque: Ataque | null; // o golpe ou a flechada em curso
+  energia: number; // energia pixy, de 0 a ENERGIA_PIXY.maxima: vem do dano dado, enche a barra do anjo
+  daRede: boolean; // o outro jogador online: a forma e a energia dele vêm da rede
   anjo: Anjo;
   rastro: Rastro; // os efeitos do dash e do pulo duplo
 }
@@ -172,6 +184,7 @@ export function criarPersonagem(x: number, direcao: 1 | -1 = 1): Personagem {
     direitaSegurada: false,
     ultimoToque: 0,
     janelaToque: 0,
+    embalo: 0,
     dash: 0,
     recargaDash: 0,
     animacao: 'parado',
@@ -184,6 +197,8 @@ export function criarPersonagem(x: number, direcao: 1 | -1 = 1): Personagem {
     poderes: criarPoderes(),
     arma: null,
     ataque: null,
+    energia: 0,
+    daRede: false,
     anjo: criarAnjo(),
     rastro: criarRastro(),
   };
@@ -250,10 +265,12 @@ export function maoDo(p: Personagem): { x: number; y: number } {
   return { x: ombro.x + Math.cos(p.gesto.angulo) * GESTO.braco, y: ombro.y + Math.sin(p.gesto.angulo) * GESTO.braco };
 }
 
-// Foto do painel: a pose de frente cortada no começo do peito, na forma atual — o anjo com os
-// olhos de coração e a auréola. Em cima sobra o lugar da auréola nas duas formas, para a
-// cabeça ficar no mesmo ponto da foto quando ele se transforma. Uma por forma, feita uma vez.
+// Foto do painel: a pose de frente cortada no começo do peito, na forma atual — o anjo com as
+// asas abertas atrás dos ombros, os olhos de coração e a auréola. Em cima sobra o lugar da
+// auréola nas duas formas, para a cabeça ficar no mesmo ponto da foto quando ele se transforma;
+// dos lados, o das asas. Uma por forma, feita uma vez.
 const RETRATO_ATE = 21; // linhas do quadro de frente: do alto do cabelo ao começo do peito
+export const LARGURA_RETRATO = 26; // a foto por dentro da moldura: sobra dos lados para as asas
 const retratos = new Map<Forma, HTMLCanvasElement>();
 
 export function retratoDo(p: Personagem): HTMLCanvasElement {
@@ -262,10 +279,13 @@ export function retratoDo(p: Personagem): HTMLCanvasElement {
   if (pronto) return pronto;
 
   const { imagem, eixo } = ANIMACOES[forma].parado[0];
-  const retrato = novoCanvas(imagem.width, ALTURA_AUREOLA + RETRATO_ATE);
+  const retrato = novoCanvas(LARGURA_RETRATO, ALTURA_AUREOLA + RETRATO_ATE);
   const ctx = contexto2d(retrato);
-  ctx.drawImage(imagem, 0, 0, imagem.width, RETRATO_ATE, 0, ALTURA_AUREOLA, imagem.width, RETRATO_ATE);
-  if (forma === 'anjo') enfeitarRetratoDeAnjo(ctx, quadroPersonagem('parado', 0), eixo, 0, ALTURA_AUREOLA);
+  const x = (LARGURA_RETRATO - imagem.width) >> 1;
+  const quadro = quadroPersonagem('parado', 0);
+  if (forma === 'anjo') desenharAsasDoRetrato(ctx, quadro, x, ALTURA_AUREOLA);
+  ctx.drawImage(imagem, 0, 0, imagem.width, RETRATO_ATE, x, ALTURA_AUREOLA, imagem.width, RETRATO_ATE);
+  if (forma === 'anjo') enfeitarRetratoDeAnjo(ctx, quadro, eixo, x, ALTURA_AUREOLA);
   retratos.set(forma, retrato);
   return retrato;
 }
@@ -311,10 +331,11 @@ function avancarAnimacao(p: Personagem, dt: number): void {
   }
 }
 
-// O quadro que aparece: parado, ele olha para a tela; soltando um poder ou com uma arma na mão,
-// vira de lado (o primeiro quadro da caminhada) para o braço sair para o lado da mira.
+// O quadro que aparece: parado, ele olha para a tela (com a arma, se tiver, na mão do sprite);
+// soltando um poder ou atacando com a arma, vira de lado, em pé e com as pernas juntas, para o
+// braço sair para o lado da mira. Correndo ou no ar, o ataque vai por cima do quadro de sempre.
 function quadroMostrado(p: Personagem): { animacao: NomeAnimacao; quadro: number } {
-  if ((p.gesto || p.arma) && p.animacao === 'parado') return { animacao: 'andando', quadro: 0 };
+  if ((p.gesto || p.ataque) && p.animacao === 'parado') return { animacao: 'atacando', quadro: 0 };
   return { animacao: p.animacao, quadro: p.quadro };
 }
 
@@ -337,12 +358,23 @@ function poseDe(p: Personagem): Pose {
   };
 }
 
-// `toque`: o lado que acabou de ser apertado neste quadro (0 = nenhum). O segundo toque no mesmo
-// lado dentro da janela dispara o dash; um toque no outro lado recomeça a contagem.
-function atualizarDash(p: Personagem, toque: -1 | 0 | 1, dt: number): void {
+// `toque`: o lado que acabou de ser apertado neste quadro (0 = nenhum); `solto`: o lado que acabou
+// de ser solto, sem o outro apertado. O segundo toque no mesmo lado dentro da janela dispara o
+// dash; um toque no outro lado recomeça a contagem. Soltar também abre a janela, como o pulo
+// duplo: correndo, basta soltar e apertar de novo rápido, sem parar antes. E, nesse meio-tempo,
+// o corpo segue no embalo em vez de frear.
+function atualizarDash(p: Personagem, toque: -1 | 0 | 1, solto: -1 | 0 | 1, dt: number): void {
   p.dash = Math.max(0, p.dash - dt);
   p.recargaDash = Math.max(0, p.recargaDash - dt);
   p.janelaToque = Math.max(0, p.janelaToque - dt);
+  p.embalo = Math.max(0, p.embalo - dt);
+  if (solto !== 0 && p.recargaDash <= 0) {
+    // Com a janela do aperto ainda aberta foi só um toque, não uma corrida: sem embalo.
+    p.embalo = p.janelaToque > 0 ? 0 : EMBALO;
+    p.ultimoToque = solto;
+    p.janelaToque = JANELA_TOQUE_DUPLO;
+    return;
+  }
   if (toque === 0) return;
 
   if (toque === p.ultimoToque && p.janelaToque > 0) {
@@ -363,6 +395,7 @@ export function comecarDash(p: Personagem, lado: 1 | -1): void {
   // Um terceiro toque logo em seguida não emenda outro dash: precisa de dois toques novos.
   p.ultimoToque = 0;
   p.janelaToque = 0;
+  p.embalo = 0;
   marcarDash(p.rastro, poseDe(p), formaDo(p), p.x, p.y, p.noChao);
 }
 
@@ -372,16 +405,38 @@ function controlesDoEncanto(p: Personagem, encanto: Encanto): Controles {
   return { esquerda: dx < -PERTO_DO_DONO, direita: dx > PERTO_DO_DONO, pular: false, transformar: false };
 }
 
+// Apertou R. Na forma base, só vira anjo com a barra de energia pixy cheia e a recarga pronta
+// (senão avisa o que falta) e a transformação gasta a energia. O outro online vira quando ele
+// virou lá: a energia dele vem da rede e já chega gasta.
+function apertouTransformar(p: Personagem): void {
+  const base = formaDo(p) === 'base' && !transformando(p.anjo);
+  if (base && !p.daRede) {
+    if (p.anjo.recarga > 0) return avisar(p.poderes, `ANJO EM RECARGA: ${Math.ceil(p.anjo.recarga)}S`);
+    if (p.energia < ENERGIA_PIXY.custoAnjo) {
+      return avisar(p.poderes, `ENERGIA PIXY: ${Math.floor(p.energia)} DE ${ENERGIA_PIXY.custoAnjo}`);
+    }
+  }
+  if (alternarForma(p.anjo, p.daRede) && base && !p.daRede) p.energia -= ENERGIA_PIXY.custoAnjo;
+}
+
+// Pode virar anjo agora (para a CPU decidir): na forma base, com a recarga pronta e a energia.
+export function podeVirarAnjo(p: Personagem): boolean {
+  return anjoPronto(p.anjo) && p.energia >= ENERGIA_PIXY.custoAnjo;
+}
+
+// `p` tirou `dano` de vida do adversário: na forma base, carrega a energia pixy (de anjo, não).
+export function ganharEnergia(p: Personagem, dano: number): void {
+  if (dano <= 0 || formaDo(p) !== 'base' || transformando(p.anjo)) return;
+  p.energia = Math.min(ENERGIA_PIXY.maxima, p.energia + dano * ENERGIA_PIXY.porDano);
+}
+
 export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: number, tempo: number): void {
   if (p.encanto && (p.encanto.resta -= dt) <= 0) p.encanto = null;
   const encanto = p.encanto;
   const controles = encanto ? controlesDoEncanto(p, encanto) : recebidos;
   if (p.gesto && (p.gesto.resta -= dt) <= 0) p.gesto = null;
-  // R alterna entre a forma base e a de anjo; durante a transformação o corpo não responde. Na
-  // forma base com a recarga do anjo correndo, não vira e avisa quanto falta.
-  if (controles.transformar && !p.transformarSegurado && !alternarForma(p.anjo) && p.anjo.recarga > 0) {
-    avisar(p.poderes, `ANJO EM RECARGA: ${Math.ceil(p.anjo.recarga)}S`);
-  }
+  // R alterna entre a forma base e a de anjo; durante a transformação o corpo não responde.
+  if (controles.transformar && !p.transformarSegurado) apertouTransformar(p);
   p.transformarSegurado = controles.transformar;
   p.ferido = Math.max(0, p.ferido - dt);
   atualizarRecargas(p.poderes, dt);
@@ -393,7 +448,9 @@ export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: num
 
   // Enfeitiçado não dá dash: os passos dele até o dono não contam como toques.
   const toque = encanto ? 0 : esquerda && !p.esquerdaSegurada ? -1 : direita && !p.direitaSegurada ? 1 : 0;
-  atualizarDash(p, toque, dt);
+  const nenhum = !esquerda && !direita;
+  const solto = encanto || !nenhum ? 0 : p.esquerdaSegurada ? -1 : p.direitaSegurada ? 1 : 0;
+  atualizarDash(p, toque, solto, dt);
   if (!livre || encanto) p.dash = 0;
   p.esquerdaSegurada = esquerda;
   p.direitaSegurada = direita;
@@ -412,6 +469,7 @@ export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: num
       p.vx = velocidade;
       p.direcao = 1;
     }
+    if (nenhum && p.embalo > 0 && p.ultimoToque !== 0) p.vx = p.ultimoToque * velocidade;
   }
   const anjo = formaDo(p) === 'anjo';
   // Só pula ao apertar de novo: segurar o botão no pouso não emenda outro pulo. No ar, a forma
@@ -500,7 +558,10 @@ export function desenharPersonagem(ctx: CanvasRenderingContext2D, p: Personagem,
   // Acabou de apanhar: o corpo pisca em branco-rosado, duas vezes.
   if (p.ferido > 0 && Math.floor(p.ferido * 14) % 2 === 0) desenhar(tingido(imagem), 0.8 * alfa);
   if (p.gesto) desenharBraco(ctx, p, p.gesto);
-  desenharArmaNaMao(ctx, p, tempo);
+  const maoDeFrente = pose.deFrente
+    ? { x: x + p.direcao * MAO_DE_FRENTE.lado, y: topo + MAO_DE_FRENTE.linha }
+    : undefined;
+  desenharArmaNaMao(ctx, p, tempo, maoDeFrente);
   desenharAnjoNaFrente(ctx, p.anjo, tempo, pose);
   desenharEncanto(ctx, p, tempo);
 }

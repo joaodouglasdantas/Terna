@@ -4,7 +4,7 @@
 // corações na frente dos olhos e os corações pequenos que flutuam dos lados e seguem o
 // personagem. Tarja, olhos e asas saem das âncoras do quadro atual, então acompanham cada pose.
 
-import { RECARGA_ANJO } from '@terna/compartilhado';
+import { DURACAO_ANJO, ENERGIA_PIXY, RECARGA_ANJO } from '@terna/compartilhado';
 import { contexto2d, criarSprite, novoCanvas } from '../motor/imagens';
 import { suavizar } from '../motor/matematica';
 import type { Paleta } from '../motor/tipos';
@@ -38,10 +38,10 @@ export interface Pose {
 const ACENDER: Record<Forma, number> = { anjo: 0.9, base: 0.55 };
 const APAGAR: Record<Forma, number> = { anjo: 0.6, base: 0.4 };
 const COR_LUZ = '255, 246, 222';
-// A forma de anjo dura um minuto: acabado o tempo, ele volta sozinho à forma base — mesmo no
-// ar, e aí despenca. O R desfaz antes, se quiser. De volta à forma base, espera RECARGA_ANJO
-// para poder virar anjo de novo: os poderes são só do anjo, e sem a espera ninguém sairia dele.
-export const DURACAO_ANJO = 60; // segundos
+// A forma de anjo dura DURACAO_ANJO (em compartilhado/conteudo/poderes.ts, com a recarga e a
+// energia pixy): acabado o tempo, ele volta sozinho à forma base — mesmo no ar, e aí despenca. O
+// R desfaz antes, se quiser. De volta à forma base, espera RECARGA_ANJO e precisa da barra de
+// energia cheia de novo para virar anjo.
 
 type Fase = 'parado' | 'acendendo' | 'apagando';
 
@@ -106,17 +106,24 @@ function destino(anjo: Anjo): Forma {
   return anjo.forma;
 }
 
-// A barra do tempo de anjo: quanto dela está cheio (0 a 1) e se está em uso. Virando anjo,
-// ela enche junto com a luz; de anjo, esvazia com o minuto; voltando, fica onde parou. Na
-// forma base fica apagada e se refaz com a recarga: cheia, está pronta.
-export function barraDoAnjo(anjo: Anjo): { cheia: number; ativa: boolean; resta: number } {
+// A barra de transformação: quanto dela está cheio (0 a 1), se está em uso (de anjo) e, na forma
+// base, se dá para virar agora. Virando anjo, ela enche junto com a luz; de anjo, esvazia com o
+// tempo; voltando, fica onde parou. Na forma base ela é a energia pixy (`energia`): cheia e com a
+// recarga pronta, a transformação está disponível.
+export function barraDoAnjo(
+  anjo: Anjo,
+  energia: number,
+): { cheia: number; ativa: boolean; resta: number; disponivel: boolean } {
   if (anjo.fase === 'acendendo') {
     const p = Math.min(1, anjo.tempoFase / ACENDER[destino(anjo)]);
-    if (destino(anjo) === 'anjo') return { cheia: p, ativa: true, resta: DURACAO_ANJO };
-    return { cheia: anjo.restaAnjo / DURACAO_ANJO, ativa: true, resta: anjo.restaAnjo };
+    if (destino(anjo) === 'anjo') return { cheia: p, ativa: true, resta: DURACAO_ANJO, disponivel: false };
+    return { cheia: anjo.restaAnjo / DURACAO_ANJO, ativa: true, resta: anjo.restaAnjo, disponivel: false };
   }
-  if (anjo.forma === 'anjo') return { cheia: anjo.restaAnjo / DURACAO_ANJO, ativa: true, resta: anjo.restaAnjo };
-  return { cheia: 1 - anjo.recarga / RECARGA_ANJO, ativa: false, resta: DURACAO_ANJO };
+  if (anjo.forma === 'anjo') {
+    return { cheia: anjo.restaAnjo / DURACAO_ANJO, ativa: true, resta: anjo.restaAnjo, disponivel: false };
+  }
+  const cheia = Math.min(1, energia / ENERGIA_PIXY.custoAnjo);
+  return { cheia, ativa: false, resta: DURACAO_ANJO, disponivel: cheia >= 1 && anjoPronto(anjo) };
 }
 
 // Quanto a luz cobre o corpo (raio a partir do peito) e com que força.
@@ -239,17 +246,23 @@ function atualizarBatida(batida: Batida, dt: number, corpo: CorpoAnjo): void {
   batida.fase += (dt * Math.PI * 2) / batida.periodo;
 }
 
-function desenharAsas(ctx: CanvasRenderingContext2D, pose: Pose, abertura: number, batida: Batida): void {
-  const [ox, oy] = pose.quadro.ombro;
-  const comprimento = COMPRIMENTO_ASA * abertura;
-  const angulo = batida.centro + batida.amplitude * Math.sin(batida.fase);
-  if (pose.deFrente) {
+// As duas asas, em pixels do quadro (o `ctx` já no canto de cima dele), com `comprimento` px e
+// a borda de ataque no `angulo` (graus, para cima).
+function desenharAsas(
+  ctx: CanvasRenderingContext2D,
+  quadro: QuadroPersonagem,
+  deFrente: boolean,
+  comprimento: number,
+  angulo: number,
+): void {
+  const [ox, oy] = quadro.ombro;
+  if (deFrente) {
     // Raízes um pouco para dentro dos ombros, para as asas saírem de trás das costas; a direita
     // é o espelho da esquerda no eixo do corpo (`meio`).
     const { imagem, raiz } = asa(comprimento, angulo - 14, 'perto');
     ctx.drawImage(imagem, ox + 2 - raiz, oy - raiz);
     ctx.save();
-    ctx.translate((pose.quadro.meio ?? pose.quadro.w - 1) - (ox + 2) + raiz + 1, 0);
+    ctx.translate((quadro.meio ?? quadro.w - 1) - (ox + 2) + raiz + 1, 0);
     ctx.scale(-1, 1);
     ctx.drawImage(imagem, 0, oy - raiz);
     ctx.restore();
@@ -497,6 +510,18 @@ export function alturaDaAureola(anjo: Anjo): number {
 // Espaço que a auréola ocupa em cima da cabeça, parada (sem flutuar).
 export const ALTURA_AUREOLA = ACIMA_DA_CABECA + AUREOLA.height;
 
+// Para a foto do painel, antes do corpo: as duas asas abertas e paradas atrás dos ombros do
+// quadro de frente que vai ser desenhado com o canto de cima em (x, y). Mais curtas que no jogo
+// e mais levantadas, para as pontas aparecerem dos lados da cabeça dentro da foto.
+export const ASAS_DO_RETRATO = { comprimento: 15, angulo: 74 };
+
+export function desenharAsasDoRetrato(ctx: CanvasRenderingContext2D, quadro: QuadroPersonagem, x: number, y: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  desenharAsas(ctx, quadro, true, ASAS_DO_RETRATO.comprimento, ASAS_DO_RETRATO.angulo);
+  ctx.restore();
+}
+
 // Para a foto do painel: olhos de coração e auréola parados sobre um quadro já desenhado com o
 // canto de cima em (x, y) e o eixo do corpo na coluna `eixo`.
 export function enfeitarRetratoDeAnjo(
@@ -612,7 +637,9 @@ export function desenharAnjoAtras(ctx: CanvasRenderingContext2D, anjo: Anjo, tem
   if (abertura > 0.05) {
     ctx.save();
     noQuadro(ctx, pose);
-    desenharAsas(ctx, pose, abertura, anjo.batida);
+    const { batida } = anjo;
+    const angulo = batida.centro + batida.amplitude * Math.sin(batida.fase);
+    desenharAsas(ctx, pose.quadro, pose.deFrente, COMPRIMENTO_ASA * abertura, angulo);
     ctx.restore();
   }
   desenharPlumas(ctx, anjo.plumas);

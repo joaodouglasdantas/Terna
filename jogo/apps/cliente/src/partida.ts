@@ -11,14 +11,15 @@
 //
 // As armas: na forma base o clique esquerdo ataca com a arma da mão (se tiver). Encostou numa
 // arma no chão, pega — sozinho na hora; online pedindo ao servidor, que decide quem leva. Virando
-// anjo com ela, ela cai no chão; o tempo dela acabando, quebra. Sozinho as quedas saem daqui;
-// online, do servidor.
+// anjo com ela, ela cai no chão; o tempo dela acabando, quebra; a tecla E joga fora e ela some.
+// Sozinho as quedas saem daqui; online, do servidor.
 
 import { DURACAO_PARTIDA_MS, MUNDO, type EstadoJogador, type Lado, type MotivoFim } from '@terna/compartilhado';
 import { alternarForma, transformando } from './entidades/anjo';
 import {
   armaAoAlcance,
   armasNoChao,
+  descartarArma,
   atualizarArsenal,
   atualizarQuedas,
   criarArsenal,
@@ -39,6 +40,7 @@ import {
   comecarDash,
   criarPersonagem,
   formaDo,
+  ganharEnergia,
   gesticular,
   maoDo,
   peitoDo,
@@ -88,13 +90,14 @@ const PARADO: Controles = { esquerda: false, direita: false, pular: false, trans
 export type FimDaPartida = MotivoFim | 'conexao';
 
 // O que o mouse fez desde o último quadro: quantas vezes o botão direito trocou o poder e, se o
-// esquerdo foi clicado, onde (no mapa).
+// esquerdo foi clicado, onde (no mapa). E se a tecla E foi apertada (jogar a arma fora).
 export interface AcoesMouse {
   trocar: number;
   usar: { x: number; y: number } | null;
+  descartar: boolean;
 }
 
-export const SEM_ACOES: AcoesMouse = { trocar: 0, usar: null };
+export const SEM_ACOES: AcoesMouse = { trocar: 0, usar: null, descartar: false };
 
 interface Remoto {
   conexao: ConexaoPartida;
@@ -155,6 +158,7 @@ export function criarPartida(
   };
 
   if (escolha.modo === 'online') {
+    p.outro.daRede = true;
     const remoto: Remoto = {
       conexao: escolha.conexao,
       controles: { ...PARADO },
@@ -179,9 +183,15 @@ export function criarPartida(
           // Os dois toques de um dash podem ser rápidos demais para chegar como botões; a
           // velocidade dele chega, e aí o dash (com o rastro) começa aqui também.
           if (Math.abs(m.estado.vx) >= VELOCIDADE_DASH) comecarDash(p.outro, m.estado.vx > 0 ? 1 : -1);
-          // A vida dele é ele quem decide: caiu, mostra o dano aqui.
-          if (m.estado.vida < p.outro.vida) mostrarDano(p.efeitos, p.outro, p.outro.vida - m.estado.vida);
+          // A vida dele é ele quem decide: caiu, mostra o dano aqui — e o dano é seu (só você
+          // bate nele), então é daqui que sai a sua energia pixy. A dele vem pronta.
+          if (m.estado.vida < p.outro.vida) {
+            const dano = p.outro.vida - m.estado.vida;
+            mostrarDano(p.efeitos, p.outro, dano);
+            ganharEnergia(p.jogador, dano);
+          }
           p.outro.vida = m.estado.vida;
+          p.outro.energia = m.estado.energia;
           p.outro.poderes.selecionado = m.estado.selecionado;
           // O encanto dele também é ele quem decide; enfeitiçado, só pode ter sido por você.
           p.outro.encanto = m.estado.encanto > 0 ? { resta: m.estado.encanto, dono: p.jogador } : null;
@@ -203,6 +213,7 @@ export function criarPartida(
           if (meu) remoto.pediuArma = REPEDIR_ARMA;
         }
         if (m.tipo === 'arma-quebrou' && m.lado !== remoto.lado) quebrarArma(p.arsenal, p.outro);
+        if (m.tipo === 'arma-descartada' && m.lado !== remoto.lado) descartarArma(p.arsenal, p.outro);
         if (m.tipo === 'fim') terminar(p, m.motivo, m.vencedor ? m.vencedor === remoto.lado : null);
       },
       // Caiu sem o servidor dizer que acabou: a rede de alguém caiu.
@@ -278,10 +289,13 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
   // Sozinho com o menu aberto: tudo parado, inclusive o tempo.
   if (!p.online && p.menuAberto) return;
 
+  // A vida dos dois no começo do quadro: sozinho, o que cada um perdeu é energia pixy do outro.
+  const vidas = [p.jogador.vida, p.outro.vida];
   const livre = !p.menuAberto && !p.acabou && p.jogador.vida > 0;
   if (livre) {
     for (let i = 0; i < mouse.trocar; i++) trocarPoder(p.jogador.poderes);
     if (mouse.usar) usarAcao(p, p.jogador, mouse.usar);
+    if (mouse.descartar && descartarArma(p.arsenal, p.jogador)) p.remoto?.conexao.descartarArma();
   }
   atualizarPersonagem(p.jogador, livre ? teclado : PARADO, dt, tempo);
   if (p.cpu) {
@@ -317,6 +331,11 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
       ];
   atualizarEfeitos(p.efeitos, dt, alvos);
   atualizarArsenal(p.arsenal, p.efeitos, dt, [p.jogador, p.outro], alvos);
+  // Online, a energia do outro vem da rede e a sua sai da vida dele que chega (acima).
+  if (!p.online) {
+    ganharEnergia(p.outro, vidas[0] - p.jogador.vida);
+    ganharEnergia(p.jogador, vidas[1] - p.outro.vida);
+  }
 
   if (p.acabou) return;
   if (p.remoto) {
@@ -397,5 +416,6 @@ function enviarEstado(r: Remoto, corpo: Personagem, segurados: Controles, agora 
     vida: corpo.vida,
     selecionado: corpo.poderes.selecionado,
     encanto: Math.min(10, corpo.encanto?.resta ?? 0),
+    energia: corpo.energia,
   });
 }

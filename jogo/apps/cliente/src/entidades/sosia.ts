@@ -10,12 +10,12 @@
 
 import { ARCO, IMPACTO, JULGAMENTO, MUNDO, PODERES, RAJADA, type IdPoder, type Intervalo } from '@terna/compartilhado';
 import { sortear } from '../motor/matematica';
-import { anjoPronto } from './anjo';
 import {
   armaPronta,
   formaDo,
   personagemLivre,
   podePegarArma,
+  podeVirarAnjo,
   podeUsarPoderes,
   type Controles,
   type Forma,
@@ -32,9 +32,10 @@ const SOSIA = {
   // até o chão, leva ~3,3 s: segurando menos que isso ele solta no meio do voo e despenca.
   pulo: { base: [2.5, 7], anjo: [1.5, 4] } as Record<Forma, Intervalo>,
   segurar: { base: [0.05, 0.4], anjo: [0.9, 4.5] } as Record<Forma, Intervalo>,
-  // Segundos em cada forma. Na base, conta depois de a recarga do anjo acabar; de anjo, às vezes
-  // passa do minuto (DURACAO_ANJO) e o tempo acaba antes: ele volta sozinho.
-  forma: { base: [1, 6], anjo: [40, 75] } as Record<Forma, Intervalo>,
+  // Segundos em cada forma. Na base, conta depois de a barra de energia encher (e a recarga do
+  // anjo acabar); de anjo, às vezes passa da duração (DURACAO_ANJO) e o tempo acaba antes: ele
+  // volta sozinho.
+  forma: { base: [1, 6], anjo: [15, 32] } as Record<Forma, Intervalo>,
   // A casa segue você: fica a esta distância, do lado em que ele está.
   distancia: { base: 120, anjo: 140 } as Record<Forma, number>,
   entreAtaques: [0.6, 1.6] as Intervalo, // segundos entre uma tentativa de ataque e outra
@@ -212,10 +213,10 @@ export function pensarSosia(
   const lado = corpo.x >= oponente.x ? 1 : -1;
   c.casa = noMapa(oponente.x + lado * SOSIA.distancia[forma]);
 
-  // Troca de forma só com os pés no chão, sem pulo em curso e, para virar anjo, com a recarga
-  // pronta. Aperta R por um quadro só: no seguinte o corpo já está transformando e o cérebro
+  // Troca de forma só com os pés no chão, sem pulo em curso e, para virar anjo, com a energia e a
+  // recarga prontas. Aperta R por um quadro só: no seguinte o corpo já está transformando e o cérebro
   // espera (e, se o aperto não pegou, solta o botão antes de apertar de novo).
-  if (forma === 'anjo' || anjoPronto(corpo.anjo)) c.ateTrocar -= dt;
+  if (forma === 'anjo' || podeVirarAnjo(corpo)) c.ateTrocar -= dt;
   const guardando = corpo.arma !== null && corpo.arma.durabilidade > SOSIA.guardarArma;
   if (c.ateTrocar <= 0 && !guardando && corpo.noChao && c.segurando <= 0 && !corpo.transformarSegurado) {
     controles.transformar = true;

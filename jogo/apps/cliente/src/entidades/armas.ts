@@ -1,7 +1,8 @@
 // As armas (números em compartilhado/conteudo/armas.ts): a espada e o arco que caem do céu de vez
 // em quando, com uma coluna de luz dourada marcando onde vão cair e um brilho em volta enquanto
 // esperam no chão; a arma na mão da forma base, com o braço segurando; o golpe da espada, que varre
-// de cima para a frente, e a flecha do arco; e a arma quebrando quando o tempo dela acaba.
+// de cima para a frente, e a flecha do arco; a arma quebrando quando o tempo dela acaba, e a
+// jogada fora (tecla E), que cai e some.
 //
 // Sozinho, o próprio jogo sorteia as quedas; online, elas chegam do servidor, que também decide
 // quem pega. Como nos poderes, cada um confere só o que acerta o próprio personagem.
@@ -13,11 +14,14 @@ import {
   MUNDO,
   QUEDA_DE_ARMAS,
   cabeOutraArma,
+  danoNaZona,
   sortearArma,
   sortearIntervaloDeArma,
+  zonaDoAcerto,
   type ArmaNoMapa,
   type AtaqueUsado,
   type TipoArma,
+  type ZonaDoCorpo,
 } from '@terna/compartilhado';
 import {
   BRACO_BASE,
@@ -144,9 +148,21 @@ interface Particula {
   somar: boolean; // luz (soma) ou pedaço (por cima)
 }
 
+// Jogada fora (tecla E): sai da mão girando, cai e some num sopro quando bate no chão.
+interface Descartada {
+  tipo: TipoArma;
+  x: number; // a mão, na arma
+  y: number;
+  vx: number;
+  vy: number;
+  angulo: number; // para onde a arma aponta, no mapa
+  giro: number; // rad/s
+}
+
 export interface Arsenal {
   chao: ArmaNoChao[];
   flechas: Flecha[];
+  descartadas: Descartada[];
   particulas: Particula[];
   proximoId: number;
   ateCair: number | null; // sozinho: segundos até a próxima tentativa de queda (online: null)
@@ -154,7 +170,14 @@ export interface Arsenal {
 
 // `sozinho`: o jogo sorteia as quedas; senão elas chegam do servidor.
 export function criarArsenal(sozinho: boolean): Arsenal {
-  return { chao: [], flechas: [], particulas: [], proximoId: 1, ateCair: sozinho ? QUEDA_DE_ARMAS.primeira : null };
+  return {
+    chao: [],
+    flechas: [],
+    descartadas: [],
+    particulas: [],
+    proximoId: 1,
+    ateCair: sozinho ? QUEDA_DE_ARMAS.primeira : null,
+  };
 }
 
 let yChao = 0;
@@ -216,6 +239,50 @@ export function tirarDaMao(c: CorpoArmado): { tipo: TipoArma; x: number; durabil
   c.arma = null;
   c.ataque = null;
   return largada;
+}
+
+// Tecla E: joga fora a arma da mão, para um pouco à frente; ela cai e some (ninguém mais pega).
+// Volta se tinha uma para jogar.
+export function descartarArma(a: Arsenal, c: CorpoArmado): boolean {
+  if (!c.arma) return false;
+  const ombro = ombroDe(c);
+  a.descartadas.push({
+    tipo: c.arma.tipo,
+    x: ombro.x + c.direcao * 4,
+    y: ombro.y + 4,
+    vx: c.direcao * 35,
+    vy: -70,
+    angulo: anguloNoMapa(c.arma.tipo === 'espada' ? POSE.espadaEmPe : 0, c.direcao),
+    giro: c.direcao * 9,
+  });
+  c.arma = null;
+  c.ataque = null;
+  return true;
+}
+
+function atualizarDescartada(a: Arsenal, d: Descartada, dt: number): boolean {
+  d.vy += 420 * dt;
+  d.x += d.vx * dt;
+  d.y += d.vy * dt;
+  d.angulo += d.giro * dt;
+  if (d.y < yChao - 3) return true;
+  // Bateu no chão: some num sopro de pó e de brilho.
+  for (let k = 0; k < 14; k++) {
+    const lado = k % 2 ? 1 : -1;
+    const total = 0.35 + Math.random() * 0.3;
+    a.particulas.push({
+      x: d.x + lado * Math.random() * 5,
+      y: yChao - 2,
+      vx: lado * (15 + Math.random() * 40),
+      vy: -15 - Math.random() * 30,
+      gravidade: 80,
+      vida: total,
+      total,
+      cor: k % 3 ? cores.laminaEscura : cores.ponta,
+      somar: false,
+    });
+  }
+  return false;
 }
 
 // A arma acabou: some da mão em pedaços.
@@ -286,6 +353,14 @@ function faisca(a: Arsenal, x: number, y: number, forca: number, subir: number, 
 const vivos = (alvos: readonly Alvo[], dono: CorpoAlvo): Alvo[] =>
   alvos.filter((alvo) => alvo.corpo !== dono && alvo.corpo.vida > 0);
 
+// A parte do corpo que o golpe pega: onde a linha da mira passa no eixo do alvo. (A lâmina vem
+// de cima e sempre encosta primeiro na cabeça; o que vale é para onde o golpe foi mirado.)
+function zonaDoGolpe(c: CorpoArmado, ataque: Ataque, alvo: CorpoAlvo): ZonaDoCorpo {
+  const ombro = ombroDe(c);
+  const dx = Math.max(0, (alvo.x - ombro.x) * c.direcao);
+  return zonaDoAcerto(alvo.y - (ombro.y + Math.tan(ataque.mira) * dx));
+}
+
 // A lâmina durante o golpe: confere os pontos dela nos corpos, cada um uma vez por golpe.
 function golpear(e: Efeitos, a: Arsenal, c: CorpoArmado, ataque: Ataque, alvos: readonly Alvo[]): void {
   const t = ataque.idade / ESPADA.golpe;
@@ -301,7 +376,8 @@ function golpear(e: Efeitos, a: Arsenal, c: CorpoArmado, ataque: Ataque, alvos: 
       const y = ombro.y + sin * (POSE.bracoGolpe + k);
       if (!acertaCorpo(alvo.corpo, x, y, 2)) continue;
       ataque.atingidos.push(alvo.corpo);
-      ferirAlvo(e, alvo, ESPADA.dano);
+      const zona = zonaDoGolpe(c, ataque, alvo.corpo);
+      ferirAlvo(e, alvo, danoNaZona(ESPADA.dano, zona), zona);
       for (let n = 0; n < 12; n++) faisca(a, x, y, 70, 0, n % 3 ? cores.lamina : cores.ponta);
       break;
     }
@@ -320,7 +396,8 @@ function atualizarFlecha(e: Efeitos, a: Arsenal, f: Flecha, dt: number, alvos: r
     f.percorrido += Math.hypot(f.vx, f.vy) * passo;
     for (const alvo of vivos(alvos, f.dono)) {
       if (!acertaCorpo(alvo.corpo, f.x, f.y, 1)) continue;
-      ferirAlvo(e, alvo, ARCO.dano);
+      const zona = zonaDoAcerto(alvo.corpo.y - f.y);
+      ferirAlvo(e, alvo, danoNaZona(ARCO.dano, zona), zona);
       for (let n = 0; n < 10; n++) faisca(a, f.x, f.y, 60, 0, n % 2 ? cores.haste : cores.ponta);
       return false;
     }
@@ -398,6 +475,7 @@ export function atualizarArsenal(
     if (ataque.idade >= DURACAO_ATAQUE[ataque.tipo]) c.ataque = null;
   }
   a.flechas = a.flechas.filter((f) => atualizarFlecha(e, a, f, dt, alvos));
+  a.descartadas = a.descartadas.filter((d) => atualizarDescartada(a, d, dt));
   for (const p of a.particulas) {
     p.vida -= dt;
     p.vy += p.gravidade * dt;
@@ -520,8 +598,13 @@ export function desenharArmasNoChao(ctx: CanvasRenderingContext2D, a: Arsenal, t
   }
 }
 
-// Depois dos personagens: as flechas e as partículas.
+// Depois dos personagens: as armas jogadas fora, as flechas e as partículas.
 export function desenharArmasNaFrente(ctx: CanvasRenderingContext2D, a: Arsenal): void {
+  for (const d of a.descartadas) {
+    const mao = { x: d.x, y: d.y };
+    if (d.tipo === 'espada') desenharEspada(ctx, mao, d.angulo);
+    else desenharArco(ctx, mao, d.angulo, 0);
+  }
   for (const f of a.flechas) {
     ctx.save();
     if (f.presa >= 0) ctx.globalAlpha = Math.min(1, (0.9 - f.presa) / 0.3);
@@ -538,17 +621,28 @@ export function desenharArmasNaFrente(ctx: CanvasRenderingContext2D, a: Arsenal)
   }
 }
 
-// A arma na mão, por cima do sprite: o braço saindo do ombro da frente e a arma na mão. Parado,
-// a pose de segurar; atacando, a espada varrendo (com o risco de luz da ponta) ou o arco esticado
-// na direção da mira, com a corda voltando depois de soltar a flecha. Acabando, pisca.
-export function desenharArmaNaMao(ctx: CanvasRenderingContext2D, c: CorpoArmado, tempo: number): void {
+// A arma na mão, por cima do sprite. De frente e sem atacar (`maoDeFrente`: a mão do próprio
+// sprite), só a arma nessa mão: a espada de pé e o arco ao lado do corpo. De lado, o braço saindo
+// do ombro da frente com a arma na mão; atacando, a espada varrendo (com o risco de luz da ponta)
+// ou o arco esticado na direção da mira, com a corda voltando depois de soltar a flecha. Acabando,
+// pisca.
+export function desenharArmaNaMao(
+  ctx: CanvasRenderingContext2D,
+  c: CorpoArmado,
+  tempo: number,
+  maoDeFrente?: Ponto,
+): void {
   const arma = c.arma;
   if (!arma) return;
   const ombro = ombroDe(c);
   const ataque = c.ataque?.tipo === arma.tipo ? c.ataque : null;
   ctx.save();
   if (arma.durabilidade < ACABANDO && Math.floor(tempo * 8) % 2 === 0) ctx.globalAlpha = 0.45;
-  if (arma.tipo === 'espada') {
+  if (maoDeFrente && !ataque) {
+    if (arma.tipo === 'espada') desenharEspada(ctx, maoDeFrente, anguloNoMapa(POSE.espadaEmPe, c.direcao));
+    else desenharArco(ctx, maoDeFrente, anguloNoMapa(0, c.direcao), 0);
+    desenharMao(ctx, maoDeFrente, BRACO_BASE);
+  } else if (arma.tipo === 'espada') {
     if (ataque) {
       const t = ataque.idade / ESPADA.golpe;
       desenharRisco(ctx, c, ombro, ataque.mira, Math.min(1, t));
@@ -627,10 +721,35 @@ export function desenharPreviaDoArco(ctx: CanvasRenderingContext2D, c: CorpoArma
   ctx.restore();
 }
 
-// Os ícones do painel (9×8), um por arma: a espada na diagonal e o arco com a flecha.
+// Os ícones do painel (11×11, com a última linha livre para a barrinha do tempo), um por arma: a
+// espada na diagonal e o arco com a flecha.
 export const DESENHO_ICONE: Record<TipoArma, readonly string[]> = {
-  espada: ['.......wl', '......wld', '.....wld.', '.g..wld..', '..gwld...', '..cg.....', '.c..g....', 'c........'],
-  arco: ['..mM.....', '.m..s....', 'm...s....', 'm.hhhhhhw', 'm...s....', '.m..s....', '..mM.....', '.........'],
+  espada: [
+    '.........wl',
+    '........wld',
+    '.......wld.',
+    '......wld..',
+    '.....wld...',
+    '.g..wld....',
+    '..gwld.....',
+    '..cg.......',
+    '.c..g......',
+    'c..........',
+    '...........',
+  ],
+  arco: [
+    '...........',
+    '..mM.......',
+    '.m..s......',
+    'm...s......',
+    'm...s......',
+    'm.hhhhhhhhw',
+    'm...s......',
+    'm...s......',
+    '.m..s......',
+    '..mM.......',
+    '...........',
+  ],
 };
 export const PALETA_ICONE = {
   w: cores.ponta,

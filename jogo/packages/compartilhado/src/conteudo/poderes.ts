@@ -16,8 +16,19 @@
 
 export const VIDA_MAXIMA = 1000;
 
-// Depois de voltar à forma base, quanto espera até poder virar anjo de novo.
-export const RECARGA_ANJO = 20;
+// A forma de anjo: dura DURACAO_ANJO (acabou, volta sozinho) e, de volta à base, espera
+// RECARGA_ANJO até poder virar de novo. Para virar, a barra de energia pixy tem que estar cheia:
+// a energia vem do dano que o personagem dá no adversário na forma base (de anjo não carrega,
+// para uma forma de anjo não emendar na outra), e virar anjo gasta `custoAnjo`. Com 0,3 por
+// ponto de dano, enche com ~333 de dano dado — um terço da vida do outro, uns 10 golpes de
+// espada. A energia é do personagem e vai servir para outras coisas depois.
+export const DURACAO_ANJO = 25;
+export const RECARGA_ANJO = 10;
+export const ENERGIA_PIXY = {
+  maxima: 100,
+  porDano: 0.3, // por ponto de dano dado no adversário, na forma base
+  custoAnjo: 100,
+};
 
 export const PODERES = ['impacto', 'rajada', 'julgamento'] as const;
 export type IdPoder = (typeof PODERES)[number];
@@ -46,7 +57,7 @@ export const RAJADA = {
   velocidade: 300, // o longo chega aos 220 px em ~0,7 s
   ondulacao: 4, // pixels para cada lado da linha: o coração flutua enquanto voa
   raio: 3, // do coração, para o acerto
-  encanto: 2, // segundos de encanto por coração que acerta (os dois: 4 s)
+  encanto: 1.5, // segundos de encanto por coração que acerta (os dois: 3 s)
   andarEncantado: 35, // px/s do enfeitiçado andando até quem o acertou (o normal é 90)
 };
 

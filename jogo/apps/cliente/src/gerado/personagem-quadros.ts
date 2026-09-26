@@ -304,5 +304,31 @@ export const QUADROS_PERSONAGEM = {
         4
       ]
     }
+  ],
+  "atacando": [
+    {
+      "x": 259,
+      "y": 0,
+      "w": 14,
+      "h": 32,
+      "ax": 7,
+      "axAnjo": 7,
+      "olhos": [
+        [
+          7,
+          8
+        ]
+      ],
+      "ombro": [
+        4,
+        13
+      ],
+      "tarja": [
+        4,
+        21,
+        6,
+        4
+      ]
+    }
   ]
 };

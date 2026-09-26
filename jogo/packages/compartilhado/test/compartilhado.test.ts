@@ -4,13 +4,16 @@ import {
   CodigoSala,
   CriarConta,
   DadosSave,
+  ESPADA,
   MensagemDoCliente,
   MensagemDoServidor,
   MUNDO,
   PedidoPartida,
   QUEDA_DE_ARMAS,
   cabeOutraArma,
+  danoNaZona,
   sortearArma,
+  zonaDoAcerto,
 } from '../src';
 
 describe('contas', () => {
@@ -59,9 +62,21 @@ describe('partida', () => {
 describe('armas', () => {
   it('cai mais uma só com pouca no chão e poucas no mapa', () => {
     expect(cabeOutraArma(0, 0)).toBe(true);
-    expect(cabeOutraArma(1, 2)).toBe(true);
-    expect(cabeOutraArma(2, 0)).toBe(false); // duas esperando no chão já bastam
-    expect(cabeOutraArma(1, 3)).toBe(false); // quatro no mapa, contando as da mão
+    expect(cabeOutraArma(3, 2)).toBe(true);
+    expect(cabeOutraArma(4, 0)).toBe(false); // quatro esperando no chão já bastam
+    expect(cabeOutraArma(3, 3)).toBe(false); // seis no mapa, contando as da mão
+  });
+
+  it('na cabeça é crítico, no corpo é normal e nos pés é menos', () => {
+    expect(zonaDoAcerto(30)).toBe('cabeca');
+    expect(zonaDoAcerto(18)).toBe('cabeca');
+    expect(zonaDoAcerto(17)).toBe('corpo');
+    expect(zonaDoAcerto(8)).toBe('corpo');
+    expect(zonaDoAcerto(7)).toBe('pes');
+    expect(zonaDoAcerto(0)).toBe('pes');
+    expect(danoNaZona(ESPADA.dano, 'corpo')).toBe(ESPADA.dano);
+    expect(danoNaZona(ESPADA.dano, 'cabeca')).toBeGreaterThan(ESPADA.dano);
+    expect(danoNaZona(ESPADA.dano, 'pes')).toBeLessThan(ESPADA.dano);
   });
 
   it('sorteia dentro do mapa, longe das beiradas', () => {

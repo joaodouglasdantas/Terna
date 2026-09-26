@@ -176,6 +176,10 @@ export class Salas {
         if (!armas.mao[lado]) return;
         armas.mao[lado] = null;
         return this.mandar(outro.conexao, { tipo: 'arma-quebrou', lado });
+      case 'descartar-arma':
+        if (!armas.mao[lado]) return;
+        armas.mao[lado] = null;
+        return this.mandar(outro.conexao, { tipo: 'arma-descartada', lado });
       case 'morri':
         return this.encerrar(sala, 'morte', undefined, outro === sala.anfitriao ? 'anfitriao' : 'convidado');
     }

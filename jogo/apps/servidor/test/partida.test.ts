@@ -35,6 +35,7 @@ const ESTADO = {
   vida: 1000,
   selecionado: 0,
   encanto: 0,
+  energia: 40,
 } as const;
 
 const RAJADA_USADA = { poder: 'rajada', x: 300, y: 180, alvoX: 420, alvoY: 170 } as const;
@@ -143,7 +144,7 @@ describe('salas de partida', () => {
 
   describe('armas', () => {
     // Uma sala já começada, com a primeira queda em 1 s e o sorteio fixo: sempre a espada, na
-    // beirada esquerda, e 15 s entre uma tentativa e outra.
+    // beirada esquerda, e 6 s entre uma tentativa e outra.
     function salaComArmas() {
       vi.useFakeTimers();
       const salas = new Salas({ gerarCodigo: () => 'K7P2Q', primeiraArmaMs: 1000, aleatorio: () => 0 });
@@ -157,15 +158,15 @@ describe('salas de partida', () => {
       return { a, b, anfitriao, convidado, caidas, receber };
     }
 
-    it('caem do céu para os dois, no máximo duas esperando no chão', () => {
+    it('caem do céu para os dois, no máximo quatro esperando no chão', () => {
       const { a, b, caidas } = salaComArmas();
       vi.advanceTimersByTime(999);
       expect(caidas(a)).toHaveLength(0);
       vi.advanceTimersByTime(1);
-      expect(a.ultima()).toEqual({ tipo: 'arma-caiu', arma: { id: 1, tipo: 'espada', x: 60, durabilidade: 20 } });
+      expect(a.ultima()).toEqual({ tipo: 'arma-caiu', arma: { id: 1, tipo: 'espada', x: 60, durabilidade: 30 } });
       expect(b.ultima()).toEqual(a.ultima());
-      vi.advanceTimersByTime(60_000); // várias tentativas: com duas no chão, não cai mais nenhuma
-      expect(caidas(a)).toHaveLength(2);
+      vi.advanceTimersByTime(60_000); // várias tentativas: com quatro no chão, não cai mais nenhuma
+      expect(caidas(a)).toHaveLength(4);
     });
 
     it('os dois encostando na mesma, só o primeiro leva', () => {
@@ -178,16 +179,16 @@ describe('salas de partida', () => {
       expect(pegas(b)).toEqual([{ tipo: 'arma-pega', id: 1, lado: 'anfitriao' }]);
     });
 
-    it('com uma na mão de cada e duas no chão, não cai mais nenhuma', () => {
+    it('com uma na mão de cada e quatro no chão, não cai mais nenhuma', () => {
       const { a, anfitriao, convidado, caidas, receber } = salaComArmas();
       vi.advanceTimersByTime(1000);
       receber(anfitriao, { tipo: 'pegar-arma', id: 1 });
       vi.advanceTimersByTime(30_000);
       receber(convidado, { tipo: 'pegar-arma', id: 2 });
       vi.advanceTimersByTime(60_000);
-      expect(caidas(a)).toHaveLength(4);
+      expect(caidas(a)).toHaveLength(6);
       vi.advanceTimersByTime(120_000);
-      expect(caidas(a)).toHaveLength(4);
+      expect(caidas(a)).toHaveLength(6);
     });
 
     it('largada ao virar anjo, volta para o chão com o tempo que tinha; quebrada, avisa o outro', () => {
@@ -206,6 +207,20 @@ describe('salas de partida', () => {
       // Sem arma na mão, largar e quebrar não fazem nada.
       receber(convidado, { tipo: 'largar-arma', x: 10, durabilidade: 3 });
       expect(a.ultima()).toEqual({ tipo: 'arma-quebrou', lado: 'convidado' });
+    });
+
+    it('descartada, avisa o outro e some: a mão fica livre e não volta para o chão', () => {
+      const { a, b, anfitriao, caidas, receber } = salaComArmas();
+      vi.advanceTimersByTime(1000);
+      receber(anfitriao, { tipo: 'pegar-arma', id: 1 });
+      receber(anfitriao, { tipo: 'descartar-arma' });
+      expect(b.ultima()).toEqual({ tipo: 'arma-descartada', lado: 'anfitriao' });
+      expect(a.recebidas.some((m) => m.tipo === 'arma-descartada')).toBe(false);
+      expect(caidas(a)).toHaveLength(1);
+      // Sem arma na mão, descartar não faz nada.
+      const antes = b.recebidas.length;
+      receber(anfitriao, { tipo: 'descartar-arma' });
+      expect(b.recebidas).toHaveLength(antes);
     });
 
     it('repassa o golpe só para o outro', () => {
