@@ -31,6 +31,7 @@ import {
 import { desenharArmaNaMao, type ArmaNaMao, type Ataque } from './armas';
 import { BRACO_ANJO, desenharBracoEsticado, desenharMao, ombroDe } from './braco';
 import { atualizarRecargas, avisar, criarPoderes, desenharEncanto, type Encanto, type Poderes } from './poderes';
+import { PAIRAR_NO_AR, criarVoo, decolar, voarNoAr, type Voo } from './voo-anjo';
 import { atualizarRastro, criarRastro, desenharRastro, marcarDash, marcarPuloDuplo, type Rastro } from './rastro';
 
 export type NomeAnimacao = keyof typeof QUADROS_PERSONAGEM;
@@ -97,8 +98,10 @@ const RECARGA_DASH = 0.45; // segundos depois de um dash até o próximo
 // Soltou o lado correndo: segue para lá por este tempo. Cobre o vão de um toque rápido (soltar e
 // apertar de novo para o dash) sem o corpo frear; parando de verdade, escorrega só ~9px.
 const EMBALO = 0.1; // segundos
-// Voo do anjo: o pulo vai um pouco mais alto que o longo e, segurando o botão na descida, ele
-// desce planando devagar, batendo as asas. Soltou, volta a gravidade inteira e ele despenca.
+// Voo do anjo: o pulo vai um pouco mais alto que o longo. No alto, o voo com pairada
+// (voo-anjo.ts, ligado em PAIRAR_NO_AR) para um instante e desce planando sozinho. Desligado,
+// vale o voo antigo: segurando o botão na descida, ele desce planando devagar, batendo as asas;
+// soltou, volta a gravidade inteira e ele despenca (QUEDA_PLANANDO e FREIO_ASAS são desse).
 const FORCA_PULO_ANJO = 330; // pixels por segundo — segurando o botão, sobe ~85px
 const QUEDA_PLANANDO = 30; // pixels por segundo — a descida lenta, planando
 const FREIO_ASAS = 1200; // pixels por segundo² — apertou de novo caindo: as asas freiam a queda
@@ -156,6 +159,7 @@ export interface Personagem {
   ataque: Ataque | null; // o golpe ou a flechada em curso
   energia: number; // energia pixy, de 0 a ENERGIA_PIXY.maxima: vem do dano dado, enche a barra do anjo
   daRede: boolean; // o outro jogador online: a forma e a energia dele vêm da rede
+  voo: Voo; // o voo com pairada do anjo (voo-anjo.ts)
   anjo: Anjo;
   rastro: Rastro; // os efeitos do dash e do pulo duplo
 }
@@ -199,6 +203,7 @@ export function criarPersonagem(x: number, direcao: 1 | -1 = 1): Personagem {
     ataque: null,
     energia: 0,
     daRede: false,
+    voo: criarVoo(),
     anjo: criarAnjo(),
     rastro: criarRastro(),
   };
@@ -472,6 +477,7 @@ export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: num
     if (nenhum && p.embalo > 0 && p.ultimoToque !== 0) p.vx = p.ultimoToque * velocidade;
   }
   const anjo = formaDo(p) === 'anjo';
+  const apertouNoAr = pular && !p.pularSegurado && !p.noChao;
   // Só pula ao apertar de novo: segurar o botão no pouso não emenda outro pulo. No ar, a forma
   // base ainda tem o pulo duplo; o anjo não — apertar de novo caindo é o freio das asas.
   if (pular && !p.pularSegurado) {
@@ -479,6 +485,7 @@ export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: num
       p.vy = -(anjo ? FORCA_PULO_ANJO : FORCA_PULO);
       p.noChao = false;
       p.puloDuplo = !anjo;
+      if (anjo && PAIRAR_NO_AR) decolar(p.voo); // voo com pairada (voo-anjo.ts)
     } else if (p.puloDuplo && !anjo) {
       p.vy = -FORCA_PULO_DUPLO;
       p.puloDuplo = false;
@@ -492,16 +499,24 @@ export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: num
   }
   p.pularSegurado = pular;
 
-  // Anjo descendo com o botão segurado: plana. Do alto do pulo a gravidade leva à queda lenta
-  // sem tranco; vindo de uma queda rápida (soltou e apertou de novo), as asas a freiam.
-  p.planando = anjo && pular && !p.noChao && p.vy > 0;
-  if (p.planando) {
-    p.vy =
-      p.vy < QUEDA_PLANANDO
-        ? Math.min(QUEDA_PLANANDO, p.vy + GRAVIDADE * dt)
-        : Math.max(QUEDA_PLANANDO, p.vy - FREIO_ASAS * dt);
+  if (anjo && PAIRAR_NO_AR && !p.noChao) {
+    // Voo com pairada (voo-anjo.ts): para no alto e desce planando sozinho.
+    const voo = voarNoAr(p.voo, p.vy, apertouNoAr, GRAVIDADE, dt);
+    p.vy = voo.vy;
+    p.planando = voo.planando;
   } else {
-    p.vy += GRAVIDADE * dt;
+    // Voo antigo — anjo descendo com o botão segurado: plana. Do alto do pulo a gravidade leva
+    // à queda lenta sem tranco; vindo de uma queda rápida (soltou e apertou de novo), as asas a
+    // freiam.
+    p.planando = anjo && pular && !p.noChao && p.vy > 0;
+    if (p.planando) {
+      p.vy =
+        p.vy < QUEDA_PLANANDO
+          ? Math.min(QUEDA_PLANANDO, p.vy + GRAVIDADE * dt)
+          : Math.max(QUEDA_PLANANDO, p.vy - FREIO_ASAS * dt);
+    } else {
+      p.vy += GRAVIDADE * dt;
+    }
   }
   p.x += p.vx * dt;
   p.y += p.vy * dt;
