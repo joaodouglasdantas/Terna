@@ -7,7 +7,9 @@ import { Apelido } from '@terna/compartilhado';
 import logoSimplesUrl from '../assets/logo-simples.webp';
 import { checarBanco, checarServidor } from '../rede/saude';
 import { guardarNome, lerNome } from '../save/nome';
-import { botao, digitandoEm, elemento, imagemDaLogo, palco, sairComEsmaecer } from './dom';
+import { anexarCena } from './cena';
+import { botao, digitandoEm, elemento, palco, sairComEsmaecer } from './dom';
+import { logoViva } from './logo-viva';
 import { telaMultiplayer, type EscolhaOnline } from './multiplayer';
 
 // Cada etapa da barra é uma checagem de verdade, com um nome do mundo do jogo no lugar do nome
@@ -165,9 +167,10 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
   });
 }
 
-// A tela inicial: a logo, o nome e os modos de jogo. Termina quando a pessoa escolhe um modo —
-// Singleplayer direto; Multiplayer depois de criar ou entrar numa sala (a tela dele volta para
-// cá se ela desistir). Sem conexão com o servidor, o Multiplayer fica apagado.
+// A tela inicial: a logo (viva, com partículas), o nome e os modos de jogo, com as árvores da
+// frente subindo nas beiradas. Termina quando a pessoa escolhe um modo — Singleplayer direto;
+// Multiplayer depois de criar ou entrar numa sala (a tela dele volta para cá se ela desistir).
+// Sem conexão com o servidor, o Multiplayer fica apagado.
 export function escolherModo(online: boolean): Promise<Escolha> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-titulo-tela');
@@ -224,7 +227,9 @@ export function escolherModo(online: boolean): Promise<Escolha> {
       void telaMultiplayer(nome).then((escolha) => {
         if (escolha) return resolver(escolha);
         // Desistiu: a tela inicial volta como estava.
+        anexarCena(tela);
         palco().replaceChildren(tela);
+        logo.ligar();
         window.addEventListener('keydown', aoTeclar);
         multiplayer.focus();
       });
@@ -247,10 +252,11 @@ export function escolherModo(online: boolean): Promise<Escolha> {
 
     const modos = elemento('div', 'inicio-modos');
     modos.append(campo, erroNome, solo, multiplayer);
-    const estado = elemento('p', 'inicio-conexao', online ? 'Online' : 'Offline');
-    estado.dataset.online = String(online);
-    tela.append(imagemDaLogo('inicio-logo'), modos, estado);
+    const logo = logoViva();
+    tela.append(logo.palco, modos);
+    anexarCena(tela, true);
     palco().replaceChildren(tela);
+    logo.ligar();
     // Quem já tem nome vai direto para o botão; quem não tem, para o campo.
     (entrada.value ? solo : entrada).focus();
   });

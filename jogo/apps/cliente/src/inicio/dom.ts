@@ -1,5 +1,6 @@
 // Peças de DOM das telas por cima do jogo (carregamento, menus, multiplayer, pausa, fim).
 
+import '@fontsource/tiny5/400.css';
 import logoUrl from '../assets/logo.png';
 import './inicio.css';
 

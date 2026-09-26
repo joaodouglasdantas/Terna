@@ -4,6 +4,7 @@
 
 import { CodigoSala, TAMANHO_CODIGO, type Lado, type PedidoPartida } from '@terna/compartilhado';
 import { conectarPartida, type ConexaoPartida } from '../rede/partida';
+import { anexarCena } from './cena';
 import { botao, elemento, palco, sairComEsmaecer } from './dom';
 
 export interface EscolhaOnline {
@@ -109,6 +110,8 @@ export function telaMultiplayer(nome: string): Promise<EscolhaOnline | null> {
       mensagem.setAttribute('aria-live', 'polite');
       const voltarBotao = botao('Voltar', 'inicio-botao inicio-botao-claro', () => voltar());
       caixa.replaceChildren(titulo, sub, criar, ou, linha, mensagem, voltarBotao);
+      // As árvores da tela inicial passam para cá (e voltam com ela).
+      anexarCena(tela);
       palco().replaceChildren(tela);
       (codigoDigitado ? campo : criar).focus();
     };

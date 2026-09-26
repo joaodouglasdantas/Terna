@@ -26,6 +26,7 @@ import {
   poderEscolhido,
   prepararPoderes,
 } from './entidades/poderes';
+import { prepararCena } from './inicio/cena';
 import { carregar, escolherModo, type Escolha } from './inicio/inicio';
 import { montarMenus } from './inicio/na-partida';
 import { desenharCronometro } from './interface/cronometro';
@@ -406,6 +407,7 @@ async function principal(): Promise<void> {
   folhaCenario = cenario;
   prepararAnimais(cenario, Y_CHAO);
   prepararMinhocas(Y_CHAO, ALTURA_CHAO);
+  prepararCena(cenario);
   requestAnimationFrame(loop);
 
   for (;;) await jogar(await escolherModo(online));

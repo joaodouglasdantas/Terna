@@ -1,6 +1,10 @@
 /* Telas de carregamento e inicial. A interface é roxa e verde: verde na ação principal (jogar,
    continuar, entrar) e no progresso, roxo no segundo modo e nas molduras. Azul e vermelho
-   continuam sendo só dos dois jogadores. */
+   continuam sendo só dos dois jogadores.
+   A letra é a Tiny5: pixelada como a logo e como a fonte 3×5 do HUD, com acentos, e com 5/S,
+   2/Z e C/O bem distintos (o código da sala mistura letras e números). Ela só tem um peso: o
+   negrito falso borraria os pixels, então o destaque vem do tamanho e de uma sombra dura, como
+   o contorno escuro das letras da logo. */
 
 #inicio {
   --fundo: #1b1b24;
@@ -16,7 +20,8 @@
   position: fixed;
   inset: 0;
   z-index: 10;
-  font-family: 'Courier New', ui-monospace, monospace;
+  font-family: 'Tiny5', ui-monospace, monospace;
+  font-synthesis: none;
   color: var(--tinta);
 }
 
@@ -35,6 +40,7 @@
   gap: 1.25rem;
   padding: 16px;
   box-sizing: border-box;
+  isolation: isolate; /* a cena da frente (z-index -1) fica sobre o fundo da tela e sob o conteúdo */
   transition: opacity 0.35s ease;
 }
 
@@ -77,14 +83,14 @@
 .inicio-frase {
   margin: 0;
   min-height: 1.5em; /* a troca de frase não empurra o resto */
-  font-size: 1.05rem;
+  font-size: 1.3rem;
   letter-spacing: 0.04em;
   text-align: center;
 }
 
 .inicio-aviso {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 1.05rem;
   line-height: 1.4;
   color: var(--suave);
   text-align: center;
@@ -132,42 +138,142 @@
   gap: 1rem;
 }
 
+/* A logo com os efeitos (logo-viva.ts). O palco tem a proporção exata da imagem (2:1), para
+   as partículas e o reflexo caírem nos pontos certos da arte. */
+.inicio-logo-palco {
+  position: relative;
+  flex-shrink: 0;
+  width: min(680px, 88vw, 92vh);
+  aspect-ratio: 1774 / 887;
+  animation: inicio-flutua 4s ease-in-out infinite;
+}
+
 .inicio-logo {
-  width: min(680px, 88vw);
-  max-height: 46vh;
-  object-fit: contain;
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
   user-select: none;
   filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.6));
-  animation: inicio-flutua 4s ease-in-out infinite;
+}
+
+/* Luz roxa atrás do pico e do cristal, respirando. */
+.inicio-logo-aura {
+  position: absolute;
+  inset: 0 22% 5%;
+  background: radial-gradient(closest-side, rgba(138, 92, 255, 0.5), rgba(138, 92, 255, 0));
+  animation: inicio-aura 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Um reflexo claro atravessa a arte a cada 6 s; a máscara é a própria logo. */
+.inicio-logo-reluz {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  -webkit-mask: var(--logo) center / 100% 100% no-repeat;
+  mask: var(--logo) center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+
+.inicio-logo-reluz::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 30%;
+  background: linear-gradient(100deg, rgba(255, 250, 235, 0) 0%, rgba(255, 250, 235, 0.45) 50%, rgba(255, 250, 235, 0) 100%);
+  transform: translateX(-110%);
+  animation: inicio-reluz 6s ease-in-out 1.2s infinite;
+}
+
+/* O canvas das partículas passa da logo: igual a SOBRA em logo-viva.ts. */
+.inicio-logo-particulas {
+  position: absolute;
+  top: -25%;
+  left: -10%;
+  width: 120%;
+  height: 140%;
+  pointer-events: none;
+}
+
+/* ---- cena da frente (cena.ts) ---- */
+
+/* Árvores do jogo, grandes, nas beiradas: por cima do cenário escurecido e por baixo do resto.
+   Posição e tamanho de cada planta vêm do cena.ts, pela janela. */
+.inicio-cena {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.inicio-planta,
+.inicio-cena-folhas {
+  position: absolute;
+  image-rendering: pixelated;
+}
+
+.inicio-cena-folhas {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Na frente, quase na luz do cenário; atrás, mais escuras, para dar profundidade. */
+.inicio-planta {
+  filter: brightness(0.85) drop-shadow(0 0 18px rgba(8, 6, 16, 0.55));
+}
+
+.inicio-planta-atras {
+  filter: brightness(0.55) saturate(0.85);
+}
+
+.inicio-cena-escondida .inicio-planta {
+  transform: translateY(105%);
+}
+
+.inicio-cena-entrando .inicio-planta {
+  animation: inicio-sobe 1.1s cubic-bezier(0.2, 0.9, 0.3, 1.08) var(--atraso) both;
 }
 
 /* ---- botões ---- */
 
-/* O principal é verde, com o texto escuro para ler bem sobre o verde claro. */
+/* Todos os botões são a mesma peça em pixel: moldura clara, luz em cima e sombra embaixo por
+   dentro, o degrau escuro que afunda no clique e o contorno escuro por fora. Cada cor só troca
+   as variáveis. O principal é verde, com o texto escuro para ler bem sobre o verde. */
 .inicio-botao {
+  --b-fundo: var(--verde);
+  --b-hover: #96e383;
+  --b-borda: var(--verde-claro);
+  --b-degrau: var(--verde-fundo);
+  --b-brilho: rgba(127, 214, 107, 0.65);
+  --b-tinta: #10240f;
+  --b-tinta-sombra: rgba(255, 255, 255, 0.35);
+  --b-relevo: inset 0 3px 0 rgba(255, 255, 255, 0.28), inset 0 -3px 0 rgba(0, 0, 0, 0.16);
   min-width: 9rem;
   min-height: 2.75rem; /* alvo de toque confortável */
   padding: 0.5rem 1.5rem;
   font: inherit;
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  font-size: 1.2rem;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #10240f;
-  background: var(--verde);
-  border: 3px solid var(--verde-claro);
-  box-shadow: 0 5px 0 var(--verde-fundo), 0 0 0 3px #0e0a18;
+  color: var(--b-tinta);
+  text-shadow: 0 2px 0 var(--b-tinta-sombra);
+  background: var(--b-fundo);
+  border: 3px solid var(--b-borda);
+  box-shadow: var(--b-relevo), 0 5px 0 var(--b-degrau), 0 0 0 3px #0e0a18;
   cursor: pointer;
   transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.15s ease;
 }
 
 .inicio-botao:hover {
-  background: #96e383;
+  background: var(--b-hover);
 }
 
 .inicio-botao:active {
   transform: translateY(4px);
-  box-shadow: 0 1px 0 var(--verde-fundo), 0 0 0 3px #0e0a18;
+  box-shadow: var(--b-relevo), 0 1px 0 var(--b-degrau), 0 0 0 3px #0e0a18;
 }
 
 .inicio-botao:focus-visible {
@@ -177,18 +283,12 @@
 
 /* Voltar, cancelar, sair: escuro e discreto. */
 .inicio-botao-claro {
-  color: var(--tinta);
-  background: #3a3358;
-  border-color: var(--suave);
-  box-shadow: 0 5px 0 #1f1a33, 0 0 0 3px #0e0a18;
-}
-
-.inicio-botao-claro:hover {
-  background: #4a426c;
-}
-
-.inicio-botao-claro:active {
-  box-shadow: 0 1px 0 #1f1a33, 0 0 0 3px #0e0a18;
+  --b-fundo: #3a3358;
+  --b-hover: #4a426c;
+  --b-borda: var(--suave);
+  --b-degrau: #1f1a33;
+  --b-tinta: var(--tinta);
+  --b-tinta-sombra: #1f1a33;
 }
 
 /* Os modos de jogo, um embaixo do outro, com a mesma largura. */
@@ -200,33 +300,29 @@
   width: min(18rem, 100%);
 }
 
-.inicio-jogar {
-  min-height: 3.5rem;
-  font-size: 1.35rem;
-  animation: inicio-pulsa 1.6s ease-in-out infinite;
-}
-
-/* O segundo modo, em roxo: com menos peso que o Singleplayer, verde e pulsando. */
+/* Os dois modos são o mesmo botão, grande e pulsando com o brilho da própria cor: o
+   Singleplayer verde, o Multiplayer roxo. */
+.inicio-jogar,
 .inicio-multiplayer {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  min-height: 3rem;
-  color: #ffffff;
-  /* Um tom abaixo do --roxo: com o texto branco dá 5,6:1 (no --roxo ficava em 4,15:1). */
-  background: #7548e0;
-  border-color: var(--roxo-claro);
-  box-shadow: 0 5px 0 #4a2fa0, 0 0 0 3px #0e0a18;
+  min-height: 3.5rem;
+  font-size: 1.6rem;
+  animation: inicio-pulsa 1.6s ease-in-out infinite;
 }
 
-/* O hover clareia só até onde o texto branco ainda fica em 4,5:1. */
-.inicio-multiplayer:hover {
-  background: #7f52f5;
-}
-
-.inicio-multiplayer:active {
-  box-shadow: 0 1px 0 #4a2fa0, 0 0 0 3px #0e0a18;
+.inicio-multiplayer {
+  /* Um tom abaixo do --roxo: com o texto branco dá 5,6:1 (no --roxo ficava em 4,15:1). O
+     hover clareia só até onde o branco ainda fica em 4,5:1. */
+  --b-fundo: #7548e0;
+  --b-hover: #7f52f5;
+  --b-borda: var(--roxo-claro);
+  --b-degrau: #4a2fa0;
+  --b-brilho: rgba(150, 110, 255, 0.75);
+  --b-tinta: #ffffff;
+  --b-tinta-sombra: #3a2380;
 }
 
 .inicio-multiplayer:focus-visible {
@@ -236,12 +332,16 @@
 /* Apagado: sem conexão com o servidor não dá para jogar com outras pessoas. */
 .inicio-multiplayer:disabled,
 .inicio-multiplayer:disabled:hover {
-  color: #8d86a8;
-  background: #2a2540;
-  border-color: #4a4466;
-  box-shadow: 0 5px 0 #17132a, 0 0 0 3px #0e0a18;
+  --b-fundo: #2a2540;
+  --b-borda: #4a4466;
+  --b-degrau: #17132a;
+  --b-tinta: #8d86a8;
+  --b-tinta-sombra: #17132a;
+  --b-relevo: inset 0 0 0 transparent;
+  background: var(--b-fundo);
   cursor: not-allowed;
   transform: none;
+  animation: none;
 }
 
 /* ---- nome ---- */
@@ -253,7 +353,7 @@
 }
 
 .inicio-rotulo {
-  font-size: 0.8rem;
+  font-size: 1rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--tinta);
@@ -265,8 +365,7 @@
   box-sizing: border-box;
   padding: 0.4rem 0.75rem;
   font: inherit;
-  font-size: 1.1rem;
-  font-weight: 700;
+  font-size: 1.3rem;
   color: var(--tinta);
   background: rgba(14, 10, 24, 0.88);
   border: 3px solid var(--suave);
@@ -290,7 +389,7 @@
 .inicio-erro {
   margin: -0.4rem 0 0;
   min-height: 1.2em;
-  font-size: 0.85rem;
+  font-size: 1.05rem;
   color: #ffb3ba;
   text-shadow: 0 0 4px #000, 0 1px 3px #000;
 }
@@ -302,7 +401,12 @@
 
 /* ---- caixas (multiplayer, menu da partida, fim) ---- */
 
-.inicio-multi-tela,
+/* O multiplayer tem o fundo da tela inicial (o cenário e as árvores continuam à vista); a
+   pausa escurece mais, porque a partida está atrás. */
+.inicio-multi-tela {
+  background: radial-gradient(ellipse at 50% 50%, rgba(16, 12, 28, 0.45) 0%, rgba(16, 12, 28, 0.8) 100%);
+}
+
 .inicio-pausa {
   background: rgba(16, 12, 28, 0.72);
 }
@@ -318,21 +422,22 @@
   text-align: center;
   background: rgba(18, 14, 30, 0.94);
   border: 3px solid var(--roxo);
-  box-shadow: 0 0 0 3px #0e0a18, 0 12px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 3px #0e0a18, 0 0 28px rgba(138, 92, 255, 0.35), 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
 .inicio-titulo {
   margin: 0;
-  font-size: 1.3rem;
+  font-size: 2rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  text-shadow: 0 3px 0 #4a2fa0;
 }
 
 .inicio-sub,
 .inicio-ou,
 .inicio-aguarde {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 1.1rem;
   line-height: 1.4;
   color: var(--suave);
 }
@@ -363,8 +468,10 @@
 .inicio-entrada-codigo {
   flex: 1;
   min-width: 0;
+  padding-inline: 0.4rem;
   text-align: center;
-  letter-spacing: 0.15em; /* mais que isso, o "CÓDIGO" do campo vazio não cabe em 320 px */
+  /* Com a folga menor dos lados e esse espaçamento, o "CÓDIGO" do campo vazio cabe em 320 px. */
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -373,10 +480,10 @@
   margin: 0;
   padding: 0.5rem 0;
   font-size: 2.4rem;
-  font-weight: 700;
   letter-spacing: 0.35em;
   text-indent: 0.35em; /* compensa o espaço depois da última letra */
   color: #ffd966;
+  text-shadow: 0 3px 0 #6b4a10;
   background: #0e0a18;
   border: 3px dashed #4a4466;
   user-select: all;
@@ -424,35 +531,12 @@
 
 .inicio-etiqueta {
   padding: 0.15rem 0.4rem;
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   letter-spacing: 0.08em;
   color: #1b1b24;
+  text-shadow: none;
   background: #ffd966;
 }
-
-.inicio-conexao {
-  margin: 0;
-  font-size: 0.9rem;
-  letter-spacing: 0.12em;
-  text-shadow: 0 0 4px #000, 0 1px 3px #000;
-  text-transform: uppercase;
-  color: var(--verde);
-}
-
-.inicio-conexao::before {
-  content: '';
-  display: inline-block;
-  width: 0.55rem;
-  height: 0.55rem;
-  margin-right: 0.5rem;
-  background: currentColor;
-  border-radius: 50%;
-}
-
-.inicio-conexao[data-online='false'] {
-  color: #ffb36b;
-}
-
 
 @keyframes inicio-flutua {
   50% {
@@ -468,21 +552,48 @@
 
 @keyframes inicio-pulsa {
   50% {
-    box-shadow: 0 5px 0 var(--verde-fundo), 0 0 0 3px #0e0a18, 0 0 24px 4px rgba(127, 214, 107, 0.65);
+    box-shadow: var(--b-relevo), 0 5px 0 var(--b-degrau), 0 0 0 3px #0e0a18, 0 0 24px 4px var(--b-brilho);
+  }
+}
+
+@keyframes inicio-aura {
+  50% {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+}
+
+/* O reflexo atravessa no começo do ciclo e espera o resto dele. */
+@keyframes inicio-reluz {
+  0% {
+    transform: translateX(-110%);
+  }
+  30%,
+  100% {
+    transform: translateX(340%);
+  }
+}
+
+@keyframes inicio-sobe {
+  from {
+    transform: translateY(105%);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .inicio-logo,
+  .inicio-logo-palco,
+  .inicio-logo-aura,
+  .inicio-logo-reluz::before,
   .inicio-jogar,
+  .inicio-multiplayer,
   .inicio-aguarde {
     animation: none;
   }
 }
 
 @media (max-height: 480px) {
-  .inicio-logo {
-    max-height: 38vh;
+  .inicio-logo-palco {
+    width: min(680px, 88vw, 64vh);
   }
   .inicio-titulo-tela {
     gap: 0.6rem;
