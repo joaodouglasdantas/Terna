@@ -108,16 +108,16 @@
   background: #93e57d;
 }
 
-/* A versão do jogo, discreta, no canto de baixo da tela inicial. */
+/* A versão do jogo, no canto de baixo da tela inicial: pequena, mas legível. */
 .inicio-versao {
   position: absolute;
-  right: 12px;
-  bottom: 8px;
+  right: 14px;
+  bottom: 10px;
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 1.1rem;
   letter-spacing: 0.08em;
   color: var(--suave);
-  opacity: 0.8;
+  opacity: 0.95;
   text-shadow: 0 2px 0 var(--contorno);
   pointer-events: none;
 }
@@ -309,7 +309,7 @@
   position: relative;
   flex-shrink: 0;
   /* Cabe com o nome e os dois botões embaixo (uns 290 px) na altura do quadro. */
-  width: min(680px, 88cqw, max(200px, (100cqh - 290px) * 2));
+  width: min(760px, 88cqw, max(200px, (100cqh - 290px) * 2));
   aspect-ratio: 1774 / 887;
   animation: inicio-flutua 4s ease-in-out infinite;
 }
