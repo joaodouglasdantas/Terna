@@ -68,7 +68,7 @@ export const RAIZES = {
 
 export const FURIA = {
   nome: 'Fúria da Floresta',
-  dano: 130,
+  dano: 180,
   recarga: 3, // curta: quem segura o especial é a barra de energia
   alcance: 260,
   aviso: 1, // a terra tremendo antes das trepadeiras: andando, dá para sair ~90 px

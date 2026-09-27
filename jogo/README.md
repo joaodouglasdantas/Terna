@@ -48,7 +48,7 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 - **Grow**, o metamorfo: de gente é como a Leslie (arma ou poderes na **R**), mas os poderes dele
   quase não tiram vida — servem para afastar: a Revoada de Águias (três águias levam o outro bem alto
   e para longe, e o largam) e o Vendaval (segurando o botão, o vento empurra para longe). Os dois quase não gastam
-  energia, e a barra dele enche um pouco mais rápido que a da Leslie. Com a barra cheia, o terceiro vira **golem de pedra** por 22 s: Salto Esmagador,
+  energia, e a barra dele enche um pouco mais rápido que a da Leslie. Com a barra cheia, o terceiro vira **golem de pedra** por 30 s: Salto Esmagador,
   Investida e Pedra, que batem forte e não gastam energia (a barra só desce com o tempo). O golem
   é pesado e tem **defesa**: 40% do dano que leva é absorvido e aparece em cima do número ("DEF").
   A **R** desfaz o golem antes do tempo. Números em `conteudo/grow.ts`; o código em

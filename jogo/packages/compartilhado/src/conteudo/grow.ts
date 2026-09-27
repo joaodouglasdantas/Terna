@@ -35,7 +35,7 @@ export const PODERES_GOLEM = ['salto', 'investida', 'pedra'] as const;
 
 // A forma de golem: dura DURACAO_GOLEM (acabou, volta sozinho; o R desfaz antes) e, de volta,
 // espera RECARGA_GOLEM até poder virar de novo (e a barra precisa encher outra vez).
-export const DURACAO_GOLEM = 22;
+export const DURACAO_GOLEM = 30;
 export const RECARGA_GOLEM = 10;
 export const DEFESA_GOLEM = 0.4; // parte do dano que a pele de pedra absorve
 
