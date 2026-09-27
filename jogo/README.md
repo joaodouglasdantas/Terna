@@ -48,7 +48,7 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 - **Grow**, o metamorfo: de gente é como a Leslie (arma ou poderes na **R**), mas os poderes dele
   quase não tiram vida — servem para afastar: a Revoada de Águias (três águias levam o outro bem alto
   e para longe, e o largam) e o Vendaval (segurando o botão, o vento empurra para longe). Os dois gastam um pouquinho
-  de energia. Com a barra cheia, o terceiro vira **golem de pedra** por 20 s: Salto Esmagador,
+  de energia. Com a barra cheia, o terceiro vira **golem de pedra** por 25 s: Salto Esmagador,
   Investida e Pedra, que batem forte e não gastam energia (a barra só desce com o tempo). O golem
   é pesado e tem **defesa**: 40% do dano que leva é absorvido e aparece em cima do número ("DEF").
   A **R** desfaz o golem antes do tempo. Números em `conteudo/grow.ts`; o código em
@@ -74,6 +74,9 @@ pegar e largar arma, poderes, energia pixy, transformações e os poderes do seu
 
 O jogo é feito para notebook ou computador (teclado e mouse): no celular e no tablet ele não
 carrega e aparece só um aviso para abrir no computador (`apps/cliente/src/inicio/aparelho.ts`).
+No computador, com a janela menor que **960 × 540** (o zoom do navegador conta), um aviso cobre
+tudo pedindo uma janela maior, até ela crescer de novo; na partida, ele abre o menu (sozinho, o
+jogo pausa). O mínimo fica em `apps/cliente/src/inicio/janela.ts`.
 
 ## Como está organizado
 

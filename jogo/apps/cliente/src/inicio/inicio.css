@@ -161,6 +161,64 @@
   text-align: center;
 }
 
+/* O aviso da janela pequena demais (janela.ts): fora do quadro do jogo, cobre a janela inteira
+   por cima de tudo, com a caixa de madeira no meio. Na janela bem pequena, o que não cabe rola. */
+#janela-pequena {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: safe center;
+  justify-content: safe center;
+  overflow: auto;
+  padding: 16px;
+  box-sizing: border-box;
+  background: radial-gradient(ellipse at 50% 45%, #33271a 0%, #1a140e 70%);
+  font-family: 'Tiny5', ui-monospace, monospace;
+  font-synthesis: none;
+  cursor: default;
+}
+
+#janela-pequena[hidden] {
+  display: none;
+}
+
+.janela-pequena-caixa {
+  width: min(30rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding: 1.25rem 1.5rem;
+  box-sizing: border-box;
+  text-align: center;
+  color: #c9b89c;
+  background: rgba(26, 18, 10, 0.94);
+  border: 3px solid #9a6a3a;
+  box-shadow: 0 0 0 3px #120c06, 0 0 28px rgba(222, 160, 86, 0.28), 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.janela-pequena-caixa p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.janela-pequena-titulo {
+  margin: 0 0 0.2rem;
+  font-size: 1.5rem;
+  font-weight: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fbf3e4;
+  text-shadow: 0 3px 0 #4e3016;
+}
+
+.janela-pequena-caixa .janela-pequena-medidas {
+  margin-top: 0.3rem;
+  font-size: 0.85rem;
+  color: #7fd66b;
+}
+
 /* Em tela baixa o flexbox espremia a barra até sumir o recheio: sem encolher, o que não couber rola. */
 .inicio-carregando > * {
   flex-shrink: 0;

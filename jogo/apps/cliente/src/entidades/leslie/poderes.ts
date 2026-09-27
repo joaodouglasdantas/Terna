@@ -19,6 +19,7 @@ import {
   dentroDaFaixa,
   acertaCorpo,
   chao,
+  CORPO,
   elipse,
   envenenar,
   faisca,
@@ -543,22 +544,32 @@ export function desenharLeslieNaFrente(ctx: CanvasRenderingContext2D, ef: Efeito
   else if (ef.estourou) desenharForaDaTerra(ctx, ef, tempo);
 }
 
-// Raízes enroladas nos pés de quem está preso, afrouxando no fim.
+// Raízes enroladas nos pés de quem está preso, afrouxando no fim. No corpo largo (o golem), mais
+// raízes, mais altas e grossas, contornadas de escuro: as de gente caberiam entre as pernas de
+// pedra e sumiriam na cor dela.
 export function desenharPreso(ctx: CanvasRenderingContext2D, c: CorpoAlvo, tempo: number): void {
   if (c.preso <= 0) return;
   const forca = Math.min(1, c.preso / 0.3);
+  const grande = c.medida.meiaLargura > CORPO.meiaLargura;
   const x = Math.round(c.x);
   const y = Math.round(c.y);
   ctx.save();
   ctx.globalAlpha = forca;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < (grande ? 6 : 4); i++) {
     const lado = i % 2 === 0 ? -1 : 1;
     const base = x + lado * (2 + (i >> 1) * 3);
-    const altura = 6 + (i % 3) * 2;
+    const altura = (grande ? 10 : 6) + (i % 3) * 2;
     for (let k = 0; k < altura; k++) {
       const dx = Math.round(Math.sin(k * 0.8 + i + tempo * 2) * 2) - lado * Math.round(k / 3);
+      const px = base + dx;
+      if (grande) {
+        ctx.fillStyle = MADEIRA.funda;
+        ctx.fillRect(px - 1, y - k, 4, 1);
+        ctx.fillStyle = k % 2 ? MADEIRA.media : MADEIRA.clara;
+        ctx.fillRect(px + 1, y - k, 1, 1);
+      }
       ctx.fillStyle = k % 4 === 3 ? ESPINHO : k % 2 ? MADEIRA.clara : MADEIRA.media;
-      ctx.fillRect(base + dx, y - k, 1, 1);
+      ctx.fillRect(px, y - k, 1, 1);
     }
   }
   ctx.restore();

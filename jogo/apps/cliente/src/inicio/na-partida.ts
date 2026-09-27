@@ -21,6 +21,8 @@ export interface MenusDaPartida {
   // termina quando a pessoa aperta "Voltar ao menu" ('menu') ou jogar de novo ('revanche'):
   // `'sozinho'`, contra a CPU, na hora; com uma `Revanche` (online), quando os dois pediram.
   mostrarFim(titulo: string, texto: string, revanche?: Revanche | 'sozinho'): Promise<'menu' | 'revanche'>;
+  // Abre o menu, como o Esc, se nada estiver aberto (a janela ficou pequena demais: janela.ts).
+  abrirMenu(): void;
   // Tira tudo da tela (saiu da partida).
   remover(): void;
 }
@@ -208,6 +210,7 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
         voltar.focus();
       });
     },
+    abrirMenu,
     remover,
   };
 }

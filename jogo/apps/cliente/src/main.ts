@@ -35,7 +35,8 @@ import { carregar, escolherModo, type Escolha } from './inicio/inicio';
 import { ouvirRevanche } from './inicio/revanche';
 import { telaSelecao, type SalaNaSelecao } from './inicio/selecao';
 import { telaTemporada } from './inicio/temporada';
-import { montarMenus } from './inicio/na-partida';
+import { vigiarJanela } from './inicio/janela';
+import { montarMenus, type MenusDaPartida } from './inicio/na-partida';
 import { criarBordas, desenharBordas, sentirBordas } from './interface/bordas';
 import { desenharContagem } from './interface/contagem';
 import { desenharCronometro } from './interface/cronometro';
@@ -83,6 +84,8 @@ let folhaCenario: HTMLImageElement;
 // A partida em andamento. Sem ela (nas telas de menu), só o cenário roda ao fundo: sem
 // personagens, nomes, painéis nem cronômetro.
 let partida: Partida | null = null;
+// Os menus por cima dela (a engrenagem, o Esc): a janela ficando pequena demais abre o menu.
+let menusDaPartida: MenusDaPartida | null = null;
 
 // ---- Câmera e tela dividida ----
 // Cada metade da tela é uma janela sobre uma tela inteira com câmera própria: a da esquerda
@@ -441,6 +444,7 @@ function jogar(escolha: Escolha): Promise<SalaNaSelecao | 'sozinho' | null> {
       encerrarPartida(partida, typeof proxima !== 'object');
       void fecharCortina().then(() => {
         partida = null;
+        menusDaPartida = null;
         camera.esquerda = camera.direita = CAMERA_NO_MEIO;
         olhar.esquerda = olhar.direita = 0;
         camera.dividida = false;
@@ -456,6 +460,7 @@ function jogar(escolha: Escolha): Promise<SalaNaSelecao | 'sozinho' | null> {
       },
       aoSair: () => sair(),
     });
+    menusDaPartida = menus;
     const nova = criarPartida(escolha, (motivo, venceu) => {
       const oponente = escolha.modo === 'online' ? escolha.oponente : 'A CPU';
       const { titulo, texto } = textoDoFim(motivo, venceu, oponente);
@@ -490,6 +495,8 @@ function jogar(escolha: Escolha): Promise<SalaNaSelecao | 'sozinho' | null> {
 async function principal(): Promise<void> {
   // No celular e no tablet, só o aviso: o jogo não carrega (inicio/aparelho.ts).
   if (aparelhoMovel()) return telaSoNoComputador();
+  // Janela pequena demais: o aviso cobre tudo e, na partida, abre o menu (inicio/janela.ts).
+  vigiarJanela(() => menusDaPartida?.abrirMenu());
   const { cenario, herois, online } = await carregar({
     carregarCenario: carregarFolhaCenario,
     carregarHerois,
