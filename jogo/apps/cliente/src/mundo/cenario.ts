@@ -6,6 +6,7 @@ import urlCenario from '../assets/cenario.png';
 import { QUADROS_CENARIO } from '../gerado/cenario-quadros';
 import { carregarImagem, contexto2d, criarSprite, desenharQuadro, novoCanvas, reduzirSprite } from '../motor/imagens';
 import { sortear, suavizar } from '../motor/matematica';
+import { paisagemViva } from './agua';
 import type { Luz, Paleta, Recorte } from '../motor/tipos';
 
 // Quanto cada camada anda quando a câmera anda 1px: as distantes andam menos (paralaxe).
@@ -237,6 +238,10 @@ export function carregarFolhaCenario(): Promise<HTMLImageElement> {
   return carregarImagem(urlCenario);
 }
 
+// A paisagem fica um pouco acima da base da tela: assim o rio do vale aparece por cima do chão e
+// entre as árvores de trás (a faixa de baixo dela fica escondida atrás do chão).
+const PAISAGEM_ACIMA = 26;
+
 // Quanto a paisagem desliza com a câmera em `camX`, em pixels inteiros.
 function deslocamentoPaisagem(camX: number, largura: number): number {
   return Math.round((camX * (QUADROS_CENARIO.paisagem.w - largura)) / (MUNDO - largura));
@@ -396,9 +401,16 @@ function criarCeu(largura: number, altura: number): HTMLCanvasElement {
   return canvas;
 }
 
+// Quanto cada camada de trás acompanha a câmera quando ela sobe atrás do seu personagem (a
+// fração de `olharY`): o que está longe mexe menos — é a paralaxe na vertical, e lá de cima a
+// paisagem parece subir por trás das árvores, mostrando mais do vale e do rio. A fileira de
+// árvores de trás anda junto com o chão, que cobre a base dela. O céu (a faixa de cores) fica.
+const ACOMPANHA = { sol: 0.3, paisagem: 0.45, ceu: 0.6, arvoresFundo: 1 };
+
 // Tudo o que fica atrás do chão, em coordenadas de tela: céu (parado), sol e paisagem
-// (deslizando devagar), pássaros e nuvens e a fileira de árvores de trás, cuja base o chão
-// cobre depois.
+// (deslizando devagar, com a água do rio e das cascatas se mexendo: agua.ts), pássaros e nuvens e
+// a fileira de árvores de trás, cuja base o chão cobre depois. `olharY`: px que a câmera desceu a
+// cena (o seu personagem no alto, pulando ou voando); cada camada desce a sua parte (ACOMPANHA).
 export function desenharFundo(
   ctx: CanvasRenderingContext2D,
   folha: CanvasImageSource,
@@ -408,17 +420,30 @@ export function desenharFundo(
   largura: number,
   altura: number,
   yBase: number,
+  olharY = 0,
 ): void {
   ceu ||= criarCeu(largura, altura);
   ctx.drawImage(ceu, 0, 0);
+  const descer = (camada: keyof typeof ACOMPANHA): void => {
+    ctx.save();
+    ctx.translate(0, Math.round(olharY * ACOMPANHA[camada]));
+  };
+  descer('sol');
   desenharSol(ctx, folha, luz, tempo);
-  desenharQuadro(ctx, folha, QUADROS_CENARIO.paisagem, -deslocamentoPaisagem(camX, largura), 0);
+  ctx.restore();
+  ctx.drawImage(
+    paisagemViva(folha, tempo),
+    -deslocamentoPaisagem(camX, largura),
+    Math.round(olharY * ACOMPANHA.paisagem) - PAISAGEM_ACIMA,
+  );
+  descer('ceu');
   desenharPassaros(ctx, camX, true);
   desenharNuvens(ctx, folha, tempo, camX, largura);
   desenharPassaros(ctx, camX, false);
+  ctx.restore();
 
   const camFundo = Math.round(camX * PARALAXE.arvoresFundo);
-  ctx.save();
+  descer('arvoresFundo');
   ctx.translate(-camFundo, 0);
   desenharFileira(ctx, folha, tempo, luz, 'arvores', ARVORES_FUNDO, yBase + 3, camFundo, largura, true);
   ctx.restore();

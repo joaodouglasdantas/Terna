@@ -38,6 +38,9 @@ const ESTADO = {
   encanto: 0,
   preso: 0,
   veneno: 0,
+  levado: 0,
+  empurrao: 0,
+  canalizando: false,
   energia: 40,
 } as const;
 
@@ -66,10 +69,10 @@ describe('salas de partida', () => {
 
     salas.receber(anfitriao, JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
     expect(b.ultima()).toEqual({ tipo: 'oponente-escolheu', heroi: 'leslie' });
-    salas.receber(convidado, JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
-    const comecou = { tipo: 'comecou', restanteMs: 300_000, heroi: 'leslie', heroiOponente: 'leslie' };
-    expect(a.ultima()).toEqual({ ...comecou, lado: 'anfitriao', oponente: 'Bia' });
-    expect(b.ultima()).toEqual({ ...comecou, lado: 'convidado', oponente: 'Ana' });
+    salas.receber(convidado, JSON.stringify({ tipo: 'heroi', heroi: 'grow' }));
+    const comecou = { tipo: 'comecou', restanteMs: 300_000 };
+    expect(a.ultima()).toEqual({ ...comecou, lado: 'anfitriao', oponente: 'Bia', heroi: 'leslie', heroiOponente: 'grow' });
+    expect(b.ultima()).toEqual({ ...comecou, lado: 'convidado', oponente: 'Ana', heroi: 'grow', heroiOponente: 'leslie' });
   });
 
   it('recusa personagem que ainda não foi liberado e ignora o jogo antes de começar', () => {
@@ -141,7 +144,7 @@ describe('salas de partida', () => {
     expect(a.ultima()).toEqual({ tipo: 'erro', erro: 'mensagem inválida' });
   });
 
-  it('quem morre perde: acaba para os dois com o outro de vencedor', () => {
+  it('quem morre perde: acaba para os dois com o outro de vencedor, e a sala fica para a revanche', () => {
     const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
     const a = conexaoFalsa();
     const b = conexaoFalsa();
@@ -151,13 +154,67 @@ describe('salas de partida', () => {
     salas.receber(convidado, JSON.stringify({ tipo: 'morri' }));
     expect(a.ultima()).toEqual({ tipo: 'fim', motivo: 'morte', vencedor: 'anfitriao' });
     expect(b.ultima()).toEqual({ tipo: 'fim', motivo: 'morte', vencedor: 'anfitriao' });
+    expect(a.conexao.fechada).toBeNull();
+    expect(salas.quantidade).toBe(1);
+    // Depois do fim, o jogo não vale mais.
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'morri' }));
+    expect(b.ultima()).toEqual({ tipo: 'fim', motivo: 'morte', vencedor: 'anfitriao' });
+  });
+
+  it('revanche: os dois pedindo, voltam à escolha na mesma sala e jogam de novo', () => {
+    const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    const anfitriao = salas.criar('Ana', a.conexao)!;
+    const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+    escolherLeslie(salas, anfitriao, convidado);
+    salas.receber(convidado, JSON.stringify({ tipo: 'morri' }));
+    // Pedir antes do fim não vale; depois, o outro fica sabendo.
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'revanche' }));
+    expect(b.ultima()).toEqual({ tipo: 'revanche' });
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'revanche' })); // repetido: nada
+    expect(b.recebidas.filter((m) => m.tipo === 'revanche')).toHaveLength(1);
+    salas.receber(convidado, JSON.stringify({ tipo: 'revanche' }));
+    expect(a.ultima()).toEqual({ tipo: 'escolher', lado: 'anfitriao', oponente: 'Bia' });
+    expect(b.ultima()).toEqual({ tipo: 'escolher', lado: 'convidado', oponente: 'Ana' });
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'heroi', heroi: 'grow' }));
+    salas.receber(convidado, JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
+    expect(a.ultima()).toMatchObject({ tipo: 'comecou', heroi: 'grow', heroiOponente: 'leslie' });
+  });
+
+  it('no fim, o outro saindo antes da revanche fecha a sala', () => {
+    const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    const anfitriao = salas.criar('Ana', a.conexao)!;
+    const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+    escolherLeslie(salas, anfitriao, convidado);
+    salas.receber(convidado, JSON.stringify({ tipo: 'morri' }));
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'revanche' }));
+    salas.sair(convidado);
+    expect(a.ultima()).toEqual({ tipo: 'fim', motivo: 'oponente-saiu' });
     expect(a.conexao.fechada).not.toBeNull();
+    expect(salas.quantidade).toBe(0);
+  });
+
+  it('ninguém pedindo a revanche a tempo, a sala fecha', () => {
+    vi.useFakeTimers();
+    const salas = new Salas({ revancheMaxMs: 1000, gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    const anfitriao = salas.criar('Ana', a.conexao)!;
+    const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+    escolherLeslie(salas, anfitriao, convidado);
+    salas.receber(convidado, JSON.stringify({ tipo: 'morri' }));
+    vi.advanceTimersByTime(1000);
+    expect(a.ultima()).toEqual({ tipo: 'erro', erro: 'a sala fechou' });
+    expect(b.conexao.fechada).not.toBeNull();
     expect(salas.quantidade).toBe(0);
   });
 
   it('acaba para os dois quando o tempo termina', () => {
     vi.useFakeTimers();
-    const salas = new Salas({ duracaoMs: 1000, gerarCodigo: () => 'K7P2Q' });
+    const salas = new Salas({ duracaoMs: 1000, contagemMs: 0, gerarCodigo: () => 'K7P2Q' });
     const a = conexaoFalsa();
     const b = conexaoFalsa();
     escolherLeslie(salas, salas.criar('Ana', a.conexao)!, salas.entrar('K7P2Q', 'Bia', b.conexao)!);
@@ -166,7 +223,20 @@ describe('salas de partida', () => {
     vi.advanceTimersByTime(1);
     expect(a.ultima()).toEqual({ tipo: 'fim', motivo: 'tempo' });
     expect(b.ultima()).toEqual({ tipo: 'fim', motivo: 'tempo' });
-    expect(salas.quantidade).toBe(0);
+    expect(salas.quantidade).toBe(1); // aberta para a revanche
+  });
+
+  it('o relógio só corre depois da contagem 3, 2, 1', () => {
+    vi.useFakeTimers();
+    const salas = new Salas({ duracaoMs: 1000, contagemMs: 3000, gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    escolherLeslie(salas, salas.criar('Ana', a.conexao)!, salas.entrar('K7P2Q', 'Bia', b.conexao)!);
+    expect(a.ultima()).toMatchObject({ tipo: 'comecou', restanteMs: 1000 });
+    vi.advanceTimersByTime(3999);
+    expect(a.ultima()?.tipo).toBe('comecou');
+    vi.advanceTimersByTime(1);
+    expect(a.ultima()).toEqual({ tipo: 'fim', motivo: 'tempo' });
   });
 
   it('avisa quem ficou quando o outro sai no meio', () => {
@@ -186,7 +256,7 @@ describe('salas de partida', () => {
     // beirada esquerda, e 6 s entre uma tentativa e outra.
     function salaComArmas() {
       vi.useFakeTimers();
-      const salas = new Salas({ gerarCodigo: () => 'K7P2Q', primeiraArmaMs: 1000, aleatorio: () => 0 });
+      const salas = new Salas({ gerarCodigo: () => 'K7P2Q', contagemMs: 0, primeiraArmaMs: 1000, aleatorio: () => 0 });
       const a = conexaoFalsa();
       const b = conexaoFalsa();
       const anfitriao = salas.criar('Ana', a.conexao)!;

@@ -9,11 +9,13 @@ import logoUrl from '../assets/logo.webp';
 import { carregarImagem } from '../motor/imagens';
 import { checarBanco, checarServidor } from '../rede/saude';
 import { guardarNome, lerNome } from '../save/nome';
+import { VERSAO } from '../versao';
 import { anexarCena } from './cena';
 import { botao, digitandoEm, elemento, palco } from './dom';
 import { logoViva } from './logo-viva';
 import { telaMultiplayer, type EscolhaOnline } from './multiplayer';
 import { telaSelecao } from './selecao';
+import { carregarArteDaTemporada } from './temporada';
 
 // Cada etapa da barra é uma checagem de verdade, com um nome do mundo do jogo no lugar do nome
 // técnico. A barra anda por elas em ordem, mas as checagens correm todas ao mesmo tempo.
@@ -39,7 +41,7 @@ export type Escolha = { modo: 'solo'; nome: string; heroi: Heroi } | EscolhaOnli
 
 // A logo simples (só as letras, em branco) do carregamento. A imagem tem margem vazia em volta
 // das letras: a moldura tem a proporção só das letras e corta o resto (ver inicio.css).
-function logoSimples(): HTMLElement {
+export function logoSimples(): HTMLElement {
   const moldura = elemento('div', 'inicio-logo-simples');
   const img = elemento('img', '');
   img.src = logoSimplesUrl;
@@ -59,6 +61,7 @@ async function prepararTelaInicial(): Promise<void> {
   const [logo] = await Promise.all([
     carregarImagem(logoUrl),
     document.fonts.load('1rem "Tiny5"'),
+    carregarArteDaTemporada(), // a do carregamento antes de cada partida
   ]);
   await logo.decode().catch(() => undefined); // já carregou: se o decode falhar, o navegador decodifica ao mostrar
   logoPronta = logo;
@@ -275,7 +278,7 @@ export function escolherModo(online: boolean): Promise<Escolha> {
     const modos = elemento('div', 'inicio-modos');
     modos.append(campo, erroNome, solo, multiplayer);
     const logo = logoViva();
-    tela.append(logo.palco, modos);
+    tela.append(logo.palco, modos, elemento('p', 'inicio-versao', VERSAO));
     anexarCena(tela, true);
     palco().replaceChildren(tela);
     logo.ligar();

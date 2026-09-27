@@ -1,7 +1,10 @@
 // A base dos efeitos de poder no mapa, de qualquer personagem: quem pode ser acertado, o acerto
 // no corpo, o dano (com o número que sobe de quem apanhou) e a cura, as faíscas soltas e a
 // elipse desenhada no chão. Os poderes de cada um ficam na pasta dele (anjo/poderes.ts,
-// leslie/poderes.ts); entidades/poderes.ts junta os dois.
+// leslie/poderes.ts, grow/poderes.ts); entidades/poderes.ts junta todos.
+//
+// Dano e defesa: um corpo com `defesa` (o golem do Grow) absorve essa parte do dano que leva. O
+// número de dano mostra o que passou e, em cima dele, o que a defesa segurou ("DEF 32").
 //
 // Online, cada um confere só o que acerta o próprio personagem: os efeitos do outro também
 // passam pelo corpo dele aqui, mas só para a imagem — a vida dele chega pela rede.
@@ -14,6 +17,13 @@ import { ALTURA_FONTE, textoEmPixels } from '../motor/fonte';
 export interface CorpoAlvo {
   x: number; // eixo do corpo
   y: number; // linha dos pés
+  vy: number;
+  noChao: boolean;
+  medida: Medida; // o tamanho do corpo para os acertos (o golem é maior)
+  defesa: number; // parte do dano que o corpo absorve (0 a 1; o golem, DEFESA_GOLEM)
+  pesado: boolean; // o golem: o vento quase não empurra, os pássaros não levantam, as trombadas mal mexem
+  levado: number; // segundos que ainda faltam carregado pela Revoada do Grow (sem andar nem cair)
+  empurrao: number; // px/s de empurrão de lado (vento, trombada), que vai sumindo sozinho
   vida: number;
   ferido: number; // segundos do piscar de quem apanhou
   encanto: Encanto | null; // enfeitiçado pela Rajada de Amor do Anjo
@@ -33,11 +43,42 @@ export interface Alvo {
   ferir: boolean;
 }
 
-// Quem lança um poder: o corpo de onde ele sai (`y`: a linha dos pés).
-export type Dono = { x: number; y: number; direcao: 1 | -1 };
+// Um movimento que o poder faz o próprio corpo fazer (o Salto e a Investida do golem): agacha
+// `espera` segundos e vai de `x0` a `x1` em `duracao`, subindo até `altura` no meio (0 = rente ao
+// chão). O corpo e o efeito leem o mesmo objeto; quem passa o tempo é o corpo.
+export interface Manobra {
+  tipo: 'salto' | 'investida';
+  x0: number;
+  x1: number;
+  idade: number;
+  espera: number;
+  duracao: number;
+  altura: number;
+}
 
-// O corpo para o acerto: do eixo para os lados e dos pés para cima.
-export const CORPO = { meiaLargura: 6, altura: 30 };
+// Quem lança um poder: o corpo de onde ele sai (`y`: a linha dos pés). `manobra`: o golem, que o
+// Salto e a Investida levam junto.
+export type Dono = { x: number; y: number; direcao: 1 | -1; manobra?: Manobra | null };
+
+export interface Medida {
+  meiaLargura: number;
+  altura: number;
+}
+
+// O corpo de gente para o acerto: do eixo para os lados e dos pés para cima.
+export const CORPO: Medida = { meiaLargura: 6, altura: 30 };
+
+// Quanto da manobra já foi (0 antes de sair do lugar, 1 no fim) e onde o corpo está nela.
+export function andamento(m: Manobra): number {
+  return Math.max(0, Math.min(1, (m.idade - m.espera) / m.duracao));
+}
+
+export function pontoDaManobra(m: Manobra, yChao: number): { x: number; y: number } {
+  const u = andamento(m);
+  return { x: m.x0 + (m.x1 - m.x0) * u, y: yChao - 4 * m.altura * u * (1 - u) };
+}
+
+export const manobraAcabou = (m: Manobra): boolean => m.idade >= m.espera + m.duracao;
 const PISCAR = 0.3;
 
 export interface Particula {
@@ -51,6 +92,7 @@ export interface Particula {
   cor: string;
   somar: boolean; // soma luz (brilhos) em vez de pintar por cima (terra, folhas)
   pousar?: boolean; // cai e para no chão (torrões de terra, grama), em vez de atravessar
+  tam?: number; // px de lado (1 sem ele): lascas de pedra
 }
 
 interface Numero {
@@ -126,20 +168,24 @@ const COR_DO_NUMERO: Record<ZonaDoCorpo, string> = { cabeca: '#ffd966', corpo: '
 const SOMBRA_DO_NUMERO = '#3a1420';
 const COR_DA_CURA = '#b8f59a';
 const COR_DO_VENENO = '#a8e05a';
+const COR_DA_DEFESA = '#a9c6dc'; // o cinza-azulado da pedra
+const SOMBRA_DA_DEFESA = '#1a2430';
 const SOMBRA_DA_CURA = '#16361a';
 const ZONA_VALE = 1; // segundos: a vida do outro chegou até isto depois do acerto, é dele
 
-function numero(e: Nucleo<EfeitoBase>, alvo: { x: number; y: number }, texto: string, cor: string, sombra: string, escala = 1, vida = 0.9): { x: number; y: number } {
+function numero(e: Nucleo<EfeitoBase>, alvo: { x: number; y: number; medida?: Medida }, texto: string, cor: string, sombra: string, escala = 1, vida = 0.9): { x: number; y: number } {
   // Sai de um lado da cabeça, um de cada vez: dois acertos seguidos não se empilham, e nenhum
   // nasce em cima do nome.
   ladoDoNumero = ladoDoNumero === 1 ? -1 : 1;
-  const x = alvo.x + ladoDoNumero * 20;
-  const y = alvo.y - CORPO.altura + 2;
+  const medida = alvo.medida ?? CORPO;
+  const x = alvo.x + ladoDoNumero * (14 + medida.meiaLargura);
+  const y = alvo.y - medida.altura + 2;
   e.numeros.push({ x, y, imagem: textoEmPixels(texto, cor), sombra: textoEmPixels(texto, sombra), vida, escala });
   return { x, y };
 }
 
-export function mostrarDano(e: Nucleo<EfeitoBase>, alvo: CorpoAlvo, dano: number, zona?: ZonaDoCorpo): void {
+// `dano`: o que passou (a vida que caiu); `absorvido`: o que a defesa segurou, mostrado em cima.
+export function mostrarDano(e: Nucleo<EfeitoBase>, alvo: CorpoAlvo, dano: number, zona?: ZonaDoCorpo, absorvido = 0): void {
   alvo.ferido = PISCAR;
   const pendente = e.zonas.get(alvo);
   e.zonas.delete(alvo);
@@ -147,18 +193,22 @@ export function mostrarDano(e: Nucleo<EfeitoBase>, alvo: CorpoAlvo, dano: number
   const critico = onde === 'cabeca';
   const cor = COR_DO_NUMERO[onde];
   const { x, y } = numero(e, alvo, `-${Math.round(dano)}`, cor, SOMBRA_DO_NUMERO, critico ? 2 : 1, critico ? 1.1 : 0.9);
-  // O aviso fica logo acima do número em dobro (que cresce para cima), com um pixel entre os dois.
-  if (critico) {
-    e.numeros.push({
-      x,
-      y: y - 2 * ALTURA_FONTE - 2,
-      imagem: textoEmPixels('CRÍTICO!', cor),
-      sombra: textoEmPixels('CRÍTICO!', SOMBRA_DO_NUMERO),
-      vida: 1.1,
-      escala: 1,
-    });
-  }
+  // Os avisos ficam logo acima do número (o crítico em dobro cresce para cima), com um pixel entre.
+  let acima = y - (critico ? 2 : 1) * ALTURA_FONTE - 2;
+  const aviso = (texto: string, cor: string, sombra: string): void => {
+    e.numeros.push({ x, y: acima, imagem: textoEmPixels(texto, cor), sombra: textoEmPixels(texto, sombra), vida: 1.1, escala: 1 });
+    acima -= ALTURA_FONTE + 2;
+  };
+  if (critico) aviso('CRÍTICO!', cor, SOMBRA_DO_NUMERO);
+  if (Math.round(absorvido) > 0) aviso(`DEF ${Math.round(absorvido)}`, COR_DA_DEFESA, SOMBRA_DA_DEFESA);
 }
+
+// O que a defesa do corpo segura de um dano.
+export const absorvidoPor = (c: { defesa: number }, dano: number): number => Math.round(dano * c.defesa);
+
+// Online, a vida do outro caiu `passou` pela rede: quanto a defesa dele deve ter segurado.
+export const absorvidoDoQuePassou = (c: { defesa: number }, passou: number): number =>
+  c.defesa > 0 && c.defesa < 1 ? Math.round((passou * c.defesa) / (1 - c.defesa)) : 0;
 
 // A vida que voltou (a Fúria da Floresta cura a Leslie): o número sobe em verde, com um "+".
 export function mostrarCura(e: Nucleo<EfeitoBase>, alvo: { x: number; y: number }, cura: number): void {
@@ -169,8 +219,10 @@ export function mostrarCura(e: Nucleo<EfeitoBase>, alvo: { x: number; y: number 
 // parte do corpo que pegaram (`zona`).
 export function ferirAlvo(e: Nucleo<EfeitoBase>, alvo: Alvo, dano: number, zona?: ZonaDoCorpo): void {
   if (alvo.ferir) {
-    alvo.corpo.vida = Math.max(0, alvo.corpo.vida - dano);
-    mostrarDano(e, alvo.corpo, dano, zona);
+    const absorvido = absorvidoPor(alvo.corpo, dano);
+    const passou = dano - absorvido;
+    alvo.corpo.vida = Math.max(0, alvo.corpo.vida - passou);
+    mostrarDano(e, alvo.corpo, passou, zona, absorvido);
   } else {
     alvo.corpo.ferido = PISCAR;
     if (zona) e.zonas.set(alvo.corpo, { zona, resta: ZONA_VALE });
@@ -179,7 +231,18 @@ export function ferirAlvo(e: Nucleo<EfeitoBase>, alvo: Alvo, dano: number, zona?
 
 // Um ponto (com `raio` de folga) dentro do corpo: do eixo para os lados e dos pés para cima.
 export function acertaCorpo(c: CorpoAlvo, x: number, y: number, raio: number): boolean {
-  return Math.abs(x - c.x) <= CORPO.meiaLargura + raio && y >= c.y - CORPO.altura - raio && y <= c.y + raio;
+  const { meiaLargura, altura } = c.medida;
+  return Math.abs(x - c.x) <= meiaLargura + raio && y >= c.y - altura - raio && y <= c.y + raio;
+}
+
+// O corpo encosta na faixa do chão de `x - raio` a `x + raio`?
+export const dentroDaFaixa = (c: CorpoAlvo, x: number, raio: number): boolean => Math.abs(c.x - x) <= raio + c.medida.meiaLargura;
+
+// Empurra para o lado (`forca` em px/s, com sinal): o pesado sente só uma parte. Não soma: vale o
+// empurrão mais forte.
+export function empurrar(c: CorpoAlvo, forca: number, pesado = 0.35): void {
+  const f = c.pesado ? forca * pesado : forca;
+  if (Math.abs(f) > Math.abs(c.empurrao) || Math.sign(f) !== Math.sign(c.empurrao)) c.empurrao = f;
 }
 
 // Os alvos que o efeito de `dono` pode acertar: os outros, de pé.
@@ -204,8 +267,9 @@ export function atualizarVeneno(e: Nucleo<EfeitoBase>, alvos: readonly Alvo[], d
     c.venenoTique += dt;
     while (c.venenoTique >= VENENO.intervalo) {
       c.venenoTique -= VENENO.intervalo;
-      c.vida = Math.max(0, c.vida - VENENO.dano);
-      numero(e, c, `-${VENENO.dano}`, COR_DO_VENENO, SOMBRA_DA_CURA, 1, 0.7);
+      const passou = VENENO.dano - absorvidoPor(c, VENENO.dano);
+      c.vida = Math.max(0, c.vida - passou);
+      numero(e, c, `-${passou}`, COR_DO_VENENO, SOMBRA_DA_CURA, 1, 0.7);
     }
   }
 }
@@ -269,7 +333,8 @@ export function desenharParticulas(ctx: CanvasRenderingContext2D, e: Nucleo<Efei
       if (p.somar !== somar) continue;
       ctx.globalAlpha = Math.min(1, (p.vida / p.total) * 1.6);
       ctx.fillStyle = p.cor;
-      ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
+      const tam = p.tam ?? 1;
+      ctx.fillRect(Math.round(p.x), Math.round(p.y) - (tam - 1), tam, tam);
     }
   }
   ctx.restore();

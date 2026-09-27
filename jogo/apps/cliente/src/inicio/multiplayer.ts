@@ -17,6 +17,7 @@ export interface EscolhaOnline {
   restanteMs: number;
   heroi: Heroi;
   heroiOponente: Heroi;
+  comecouEm: number; // performance.now() do aviso de que começou (o carregamento conta dele)
   conexao: ConexaoPartida;
 }
 

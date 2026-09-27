@@ -45,12 +45,14 @@ const FANTASMA = {
   vida: 0.22, // segundos até sumir
   alfa: 0.65, // a cópia recém-deixada
 };
-// A cor das cópias: verde-claro na Leslie; no Anjo, azul-claro na forma base e dourado-claro de
+// A cor das cópias: verde-claro na Leslie; bege no Grow e cinza de pedra no golem; no Anjo, azul-claro na forma base e dourado-claro de
 // anjo. A tinta cobre o sprite quase todo, deixando só um resto do sombreado para a silhueta
 // ainda ler como o personagem.
-export type TintaRastro = 'leslie' | 'base' | 'anjo';
+export type TintaRastro = 'leslie' | 'grow' | 'golem' | 'base' | 'anjo';
 const TINTA: Record<TintaRastro, string> = {
   leslie: 'rgba(210, 250, 190, 0.8)',
+  grow: 'rgba(236, 222, 190, 0.8)',
+  golem: 'rgba(214, 204, 178, 0.8)',
   base: 'rgba(200, 230, 255, 0.8)',
   anjo: 'rgba(255, 236, 170, 0.8)',
 };

@@ -1,9 +1,14 @@
 // Uma partida: você e o outro no mapa, com o tempo correndo, cada um com o personagem que
-// escolheu. Sozinho, o outro é a CPU (o sósia, com o mesmo personagem que você) e o tempo é
+// escolheu. Sozinho, o outro é a CPU (com um personagem sorteado entre os liberados, diferente do
+// seu, quando há outro) e o tempo é
 // daqui — o menu pausa tudo. Online, o outro é o personagem de quem entrou na sala: cada um
 // simula o próprio e manda botões + posição; aqui o corpo dele anda com os mesmos botões (pula,
 // troca de modo, vira anjo igual) e a posição é corrigida aos poucos. O tempo online é do
 // servidor: o fim chega por mensagem, ao mesmo tempo para os dois.
+//
+// Antes de tudo, a contagem 3, 2, 1: os dois parados, sem poder nem arma, e o relógio esperando
+// (online, o servidor também espera por ela). No fim por morte, quem venceu (`fim.vencedor`)
+// ganha a luz do céu e quem caiu fica deitado no chão.
 //
 // Os poderes: o seu sai do clique (o botão direito troca o escolhido), o da CPU do cérebro dela
 // e o do outro online chega pela rede e é lançado no corpo dele aqui. Cada um confere o dano que
@@ -11,22 +16,28 @@
 // partida, com o outro de vencedor.
 //
 // As armas: o clique esquerdo ataca com a arma da mão (se tiver) quando não está com os poderes
-// (a Leslie no modo arma; o Anjo na forma base). Encostou numa arma no chão, pega — sozinho na
-// hora; online pedindo ao servidor, que decide quem leva. O Anjo virando anjo com ela, ela cai no
-// chão; o tempo dela acabando, quebra; a tecla E joga fora e ela some. Sozinho as quedas saem
-// daqui; online, do servidor.
+// (a Leslie e o Grow no modo arma; o Anjo na forma base). Encostou numa arma no chão, pega —
+// sozinho na hora; online pedindo ao servidor, que decide quem leva. Virando anjo ou golem com
+// ela, ela cai no chão; o tempo dela acabando, quebra; a tecla E joga fora e ela some. Sozinho as
+// quedas saem daqui; online, do servidor.
+//
+// O Vendaval do Grow sopra enquanto o botão esquerdo fica segurado: o seu para quando você
+// solta; o da CPU quando o cérebro dela solta; o do outro online quando o estado dele chega sem
+// ele soprando.
 
 import {
+  CARREGAMENTO_MS,
+  CONTAGEM_MS,
   DURACAO_PARTIDA_MS,
-  ENERGIA_PIXY,
   FURIA,
+  HEROIS_LIBERADOS,
   MUNDO,
   VIDA_MAXIMA,
   type EstadoJogador,
+  type Heroi,
   type Lado,
   type MotivoFim,
 } from '@terna/compartilhado';
-import { alternarForma, transformando } from './entidades/anjo/anjo';
 import {
   armaAoAlcance,
   armasNoChao,
@@ -56,13 +67,17 @@ import {
   gesticular,
   maoDo,
   peitoDo,
+  personagemLivre,
   podePegarArma,
   precisaLargarArma,
+  trocarFormaNaMarra,
   usaPoderes,
+  virarGolem,
   type Controles,
   type Personagem,
 } from './entidades/personagem';
 import {
+  absorvidoDoQuePassou,
   ameacasPara,
   atualizarEfeitos,
   comecarRecarga,
@@ -71,6 +86,8 @@ import {
   avisar,
   mostrarCura,
   mostrarDano,
+  pararVento,
+  soprando,
   tentarUsar,
   trocarPoder,
   type Alvo,
@@ -104,14 +121,16 @@ const PARADO: Controles = { esquerda: false, direita: false, pular: false, trans
 export type FimDaPartida = MotivoFim | 'conexao';
 
 // O que o mouse fez desde o último quadro: quantas vezes o botão direito trocou o poder e, se o
-// esquerdo foi clicado, onde (no mapa). E se a tecla E foi apertada (jogar a arma fora).
+// esquerdo foi clicado, onde (no mapa); se o esquerdo continua segurado (o Vendaval sopra enquanto
+// isso). E se a tecla E foi apertada (jogar a arma fora).
 export interface AcoesMouse {
   trocar: number;
   usar: { x: number; y: number } | null;
+  segurando: boolean;
   descartar: boolean;
 }
 
-export const SEM_ACOES: AcoesMouse = { trocar: 0, usar: null, descartar: false };
+export const SEM_ACOES: AcoesMouse = { trocar: 0, usar: null, segurando: false, descartar: false };
 
 interface Remoto {
   conexao: ConexaoPartida;
@@ -141,7 +160,12 @@ export interface Partida {
   restanteMs: number;
   fimEm: number;
   menuAberto: boolean;
+  contagem: number; // segundos que faltam da contagem 3, 2, 1 (0 = já valendo)
+  contagemInicial: number; // quanto dela havia quando a partida apareceu
+  relogio: number; // segundos desde que a partida apareceu (a contagem inclusa)
   acabou: boolean;
+  // No fim: quem venceu (null: sem vencedor, como no fim do tempo) e há quantos segundos acabou.
+  fim: { vencedor: Personagem | null; ha: number } | null;
   cpu: CerebroSosia | null;
   remoto: Remoto | null;
   // `venceu`: no fim por morte, se foi você quem ficou de pé; nos outros fins, null.
@@ -154,8 +178,11 @@ export function criarPartida(
 ): Partida {
   const convidado = escolha.modo === 'online' && escolha.lado === 'convidado';
   const [meuX, meuLado, dele, ladoDele] = convidado ? [AO_LADO, -1, MEIO, 1] as const : [MEIO, 1, AO_LADO, -1] as const;
-  // A CPU é o seu sósia: o mesmo personagem que você.
-  const heroiDele = escolha.modo === 'online' ? escolha.heroiOponente : escolha.heroi;
+  const heroiDele = escolha.modo === 'online' ? escolha.heroiOponente : heroiDaCpu(escolha.heroi);
+  // Online, o relógio conta do aviso de que começou (o carregamento e a contagem vêm antes): os
+  // dois lados terminam a contagem juntos, mesmo se um abriu o mapa um pouco depois.
+  const agora = performance.now();
+  const valendo = escolha.modo === 'online' ? escolha.comecouEm + CARREGAMENTO_MS + CONTAGEM_MS : agora + CONTAGEM_MS;
   const p: Partida = {
     online: escolha.modo === 'online',
     jogador: criarPersonagem(escolha.heroi, meuX, meuLado),
@@ -165,9 +192,14 @@ export function criarPartida(
     efeitos: criarEfeitos(),
     arsenal: criarArsenal(escolha.modo === 'solo'),
     restanteMs: escolha.modo === 'online' ? escolha.restanteMs : DURACAO_PARTIDA_MS,
-    fimEm: performance.now() + (escolha.modo === 'online' ? escolha.restanteMs : DURACAO_PARTIDA_MS),
+    // Online, o fim do servidor vem depois da contagem.
+    fimEm: valendo + (escolha.modo === 'online' ? escolha.restanteMs : DURACAO_PARTIDA_MS),
     menuAberto: false,
+    contagem: Math.max(0, Math.min(CONTAGEM_MS, valendo - agora)) / 1000,
+    contagemInicial: Math.max(0, Math.min(CONTAGEM_MS, valendo - agora)) / 1000,
+    relogio: 0,
     acabou: false,
+    fim: null,
     cpu: escolha.modo === 'solo' ? criarCerebroSosia(AO_LADO) : null,
     remoto: null,
     aoFim,
@@ -203,7 +235,8 @@ export function criarPartida(
           // bate nele), então é daqui que sai a sua energia pixy. A dele vem pronta.
           if (m.estado.vida < p.outro.vida) {
             const dano = p.outro.vida - m.estado.vida;
-            mostrarDano(p.efeitos, p.outro, dano);
+            // De golem, a pele de pedra dele segurou uma parte: mostra quanto.
+            mostrarDano(p.efeitos, p.outro, dano, undefined, absorvidoDoQuePassou(p.outro, dano));
             ganharEnergia(p.jogador, dano);
           } else if (m.estado.vida > p.outro.vida && p.outro.vida > 0) {
             mostrarCura(p.efeitos, p.outro, m.estado.vida - p.outro.vida); // a Fúria da Floresta
@@ -217,11 +250,19 @@ export function criarPartida(
           p.outro.encanto = m.estado.encanto > 0 ? { resta: m.estado.encanto, dono: p.jogador } : null;
           p.outro.preso = m.estado.preso;
           p.outro.veneno = m.estado.veneno;
+          p.outro.levado = m.estado.levado;
+          p.outro.empurrao = m.estado.empurrao;
+          if (!m.estado.canalizando) pararVento(p.efeitos, p.outro);
         }
         if (m.tipo === 'poder' && !p.acabou) {
-          gesticular(p.outro, { x: m.uso.alvoX, y: m.uso.alvoY }, m.uso.poder === 'julgamento');
           comecarRecarga(p.outro.poderes, m.uso.poder);
-          lancarPoder(p.efeitos, p.outro, m.uso);
+          if (m.uso.poder === 'golem') {
+            virarGolem(p.outro);
+          } else {
+            gesticular(p.outro, { x: m.uso.alvoX, y: m.uso.alvoY }, m.uso.poder === 'julgamento');
+            lancarPoder(p.efeitos, p.outro, m.uso);
+            if (m.uso.poder === 'vento') p.outro.canalizando = true;
+          }
         }
         if (m.tipo === 'golpe' && !p.acabou) lancarAtaque(p.arsenal, p.outro, m.uso);
         if (m.tipo === 'arma-caiu') {
@@ -245,18 +286,26 @@ export function criarPartida(
   return p;
 }
 
+// A CPU: um personagem sorteado entre os liberados que não é o seu (sobrando só o seu, o seu).
+function heroiDaCpu(seu: Heroi): Heroi {
+  const outros = HEROIS_LIBERADOS.filter((h) => h !== seu);
+  return outros.length ? outros[Math.floor(Math.random() * outros.length)] : seu;
+}
+
 function terminar(p: Partida, motivo: FimDaPartida, venceu: boolean | null): void {
   if (p.acabou) return;
   p.acabou = true;
+  p.fim = { vencedor: venceu === true ? p.jogador : venceu === false ? p.outro : null, ha: 0 };
   p.menuAberto = false;
   if (p.online) p.restanteMs = Math.max(0, p.fimEm - performance.now());
   p.aoFim(motivo, venceu);
 }
 
 // Saiu da partida (menu → Sair, ou voltou ao menu depois do fim).
-export function encerrarPartida(p: Partida): void {
+// `fecharConexao`: online, sem ela a sala continua (a revanche usa a mesma conexão).
+export function encerrarPartida(p: Partida, fecharConexao = true): void {
   p.acabou = true;
-  p.remoto?.conexao.fechar();
+  if (fecharConexao) p.remoto?.conexao.fechar();
 }
 
 // Usa o poder escolhido de `corpo` mirando em `alvo`; saiu, vira para lá e volta o uso (para
@@ -264,16 +313,24 @@ export function encerrarPartida(p: Partida): void {
 function usarPoder(p: Partida, corpo: Personagem, alvo: { x: number; y: number }): void {
   const uso = tentarUsar(corpo.poderes, bloqueioDosPoderes(corpo), peitoDo(corpo), alvo);
   if (!uso) return;
+  // Os poderes da Leslie e os do Grow de gente gastam energia (mais, quanto mais forte). A do
+  // outro online chega pela rede, com a vida e a energia dele.
+  if (!corpo.daRede) corpo.energia = Math.max(0, corpo.energia - custoDeEnergia(corpo, uso.poder));
+  if (uso.poder === 'golem') {
+    // O terceiro do Grow: vira golem (a pedra sobe do chão; nada sai da mão).
+    virarGolem(corpo);
+    if (corpo === p.jogador) p.remoto?.conexao.enviarPoder(uso);
+    return;
+  }
   // O braço estica na direção da mira e o poder sai da mão.
   gesticular(corpo, alvo, uso.poder === 'julgamento');
   const mao = maoDo(corpo);
   uso.x = Math.max(0, Math.min(MUNDO, mao.x));
   uso.y = mao.y;
   lancarPoder(p.efeitos, corpo, uso);
-  // Os poderes da Leslie gastam energia (mais, quanto mais forte), e a Fúria da Floresta cura. A
-  // do outro online chega pela rede, com a vida e a energia dele.
+  if (uso.poder === 'vento') corpo.canalizando = true;
+  // A Fúria da Floresta cura a Leslie.
   if (corpo.heroi === 'leslie' && !corpo.daRede) {
-    corpo.energia = Math.max(0, corpo.energia - custoDeEnergia(corpo, uso.poder));
     if (uso.poder === 'furia') {
       const cura = Math.min(FURIA.cura, VIDA_MAXIMA - corpo.vida);
       corpo.vida += cura;
@@ -321,6 +378,21 @@ function cuidarDaArma(p: Partida, corpo: Personagem, dt: number): void {
 export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMouse, dt: number, tempo: number): void {
   // Sozinho com o menu aberto: tudo parado, inclusive o tempo.
   if (!p.online && p.menuAberto) return;
+  p.relogio += dt;
+  if (p.fim) p.fim.ha += dt;
+
+  // A contagem: os dois parados (online, o estado segue indo e vindo), o relógio esperando.
+  if (p.contagem > 0) {
+    p.contagem = Math.max(0, p.contagem - dt);
+    atualizarPersonagem(p.jogador, PARADO, dt, tempo);
+    if (p.cpu) atualizarPersonagem(p.outro, PARADO, dt, tempo);
+    if (p.remoto) {
+      atualizarRemoto(p.remoto, p.outro, dt, tempo);
+      enviarEstado(p.remoto, p.jogador, PARADO);
+      p.restanteMs = Math.max(0, Math.min(p.restanteMs, p.fimEm - performance.now()));
+    }
+    return;
+  }
 
   // A vida dos dois no começo do quadro: sozinho, o que cada um perdeu é energia pixy do outro.
   const vidas = [p.jogador.vida, p.outro.vida];
@@ -330,6 +402,8 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
     if (mouse.usar) usarAcao(p, p.jogador, mouse.usar);
     if (mouse.descartar && descartarArma(p.arsenal, p.jogador)) p.remoto?.conexao.descartarArma();
   }
+  // Soltou o botão (ou abriu o menu, ou caiu): o Vendaval para.
+  if (p.jogador.canalizando && !(livre && mouse.segurando)) pararVento(p.efeitos, p.jogador);
   atualizarPersonagem(p.jogador, livre ? teclado : PARADO, dt, tempo);
   if (p.cpu) {
     const pode = !p.acabou && p.outro.vida > 0;
@@ -340,6 +414,7 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
       usarPoder(p, p.outro, decisao.mira);
     }
     if (pode && decisao.golpe) usarAcao(p, p.outro, decisao.golpe);
+    if (p.outro.canalizando && (!pode || decisao.soltar)) pararVento(p.efeitos, p.outro);
   }
   if (p.remoto) {
     atualizarRemoto(p.remoto, p.outro, dt, tempo);
@@ -363,6 +438,9 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
         { corpo: p.outro, ferir: !p.online },
       ];
   atualizarEfeitos(p.efeitos, dt, alvos);
+  // Sopra enquanto o Vendaval dele estiver no mapa.
+  p.jogador.canalizando = soprando(p.efeitos, p.jogador);
+  p.outro.canalizando = soprando(p.efeitos, p.outro);
   atualizarArsenal(p.arsenal, p.efeitos, dt, [p.jogador, p.outro], alvos);
   // Online, a energia do outro vem da rede e a sua sai da vida dele que chega (acima).
   if (!p.online) {
@@ -397,8 +475,16 @@ function atualizarRemoto(r: Remoto, corpo: Personagem, dt: number, tempo: number
   const a = r.alvo;
   if (!a) return;
   r.idadeAlvo += dt;
-  const alvoX = Math.max(0, Math.min(MUNDO, a.x + a.vx * Math.min(r.idadeAlvo, EXTRAPOLAR_ATE)));
-  if (Math.abs(alvoX - corpo.x) > TELEPORTE || Math.abs(a.y - corpo.y) > TELEPORTE) {
+  // No Salto e na Investida o corpo segue o caminho do golpe (o mesmo lá e aqui): sem correção.
+  if (corpo.manobra) return;
+  const alvoX = Math.max(0, Math.min(MUNDO, a.x + (a.vx + a.empurrao) * Math.min(r.idadeAlvo, EXTRAPOLAR_ATE)));
+  if (corpo.levado > 0 || a.levado > 0) {
+    // Carregado pela Revoada: a altura também vem de lá.
+    const k = Math.min(1, dt * CORRIGIR * 1.5);
+    corpo.x += (alvoX - corpo.x) * k;
+    corpo.y += (a.y - corpo.y) * k;
+    corpo.noChao = false;
+  } else if (Math.abs(alvoX - corpo.x) > TELEPORTE || Math.abs(a.y - corpo.y) > TELEPORTE) {
     Object.assign(corpo, { x: alvoX, y: a.y, vx: a.vx, vy: a.vy, noChao: a.noChao });
   } else if (!a.noChao && corpo.noChao && r.idadeAlvo < 0.2) {
     // Ele pulou e aqui o corpo ficou no chão (o botão foi rápido demais): sai do chão junto.
@@ -409,13 +495,13 @@ function atualizarRemoto(r: Remoto, corpo: Personagem, dt: number, tempo: number
     // No ar os dois, a altura também se acerta; no chão ela já é a mesma.
     if (!a.noChao && !corpo.noChao) corpo.y += (a.y - corpo.y) * k;
   }
-  // Um toque rápido em R pode se perder entre dois estados: se a forma dele ficar diferente da
-  // recebida por um tempo, troca aqui também — mesmo com a recarga do anjo correndo aqui, que
-  // pode estar um pouco atrás da dele.
-  if (a.forma !== formaDo(corpo) && !transformando(corpo.anjo)) {
+  // Um toque rápido em R (ou o aviso do golem) pode se perder entre dois estados: se a forma dele
+  // ficar diferente da recebida por um tempo, troca aqui também — mesmo com a recarga correndo
+  // aqui, que pode estar um pouco atrás da dele.
+  if (a.forma !== formaDo(corpo) && personagemLivre(corpo)) {
     r.formaDiverge += dt;
     if (r.formaDiverge > FORMA_DIVERGE) {
-      alternarForma(corpo.anjo, true);
+      trocarFormaNaMarra(corpo);
       r.formaDiverge = 0;
     }
   } else {
@@ -452,6 +538,9 @@ function enviarEstado(r: Remoto, corpo: Personagem, segurados: Controles, agora 
     encanto: Math.min(10, corpo.encanto?.resta ?? 0),
     preso: Math.min(10, corpo.preso),
     veneno: Math.min(10, corpo.veneno),
+    levado: Math.min(10, corpo.levado),
+    empurrao: Math.max(-1000, Math.min(1000, corpo.empurrao)),
+    canalizando: corpo.canalizando,
     energia: corpo.energia,
   });
 }

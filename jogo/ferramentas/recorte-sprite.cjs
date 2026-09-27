@@ -1,6 +1,6 @@
-// Peças comuns dos geradores de sprite de personagem (gerar-anjo.cjs, gerar-leslie.cjs): achar
-// um quadro na folha de referência, reduzir para o tamanho do jogo, montar a paleta e achar o
-// eixo do corpo.
+// Peças comuns dos geradores de sprite de personagem (gerar-anjo.cjs, gerar-herois.cjs): achar
+// um quadro na folha de referência, reduzir para o tamanho do jogo, deixar a redução nítida
+// (afiar, contornar, limpar), montar a paleta e achar o eixo do corpo.
 
 const OPACO = 128; // alfa mínimo para um pixel da folha contar como personagem
 
@@ -97,6 +97,85 @@ function reduzir(img, quadro, escala) {
   return { lw, lh, px: saida };
 }
 
+// A média de área deixa tudo meio borrado: puxa cada pixel para longe da média dos vizinhos
+// opacos (3×3), o que devolve o contraste dos detalhes — olhos, rachaduras, dobras da roupa.
+function afiar(red, forca) {
+  const { lw, lh, px } = red;
+  const saida = Float32Array.from(px);
+  for (let y = 0; y < lh; y++) {
+    for (let x = 0; x < lw; x++) {
+      const o = (y * lw + x) * 4;
+      if (!px[o + 3]) continue;
+      const soma = [0, 0, 0];
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx;
+          const yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= lw || yy >= lh) continue;
+          const q = (yy * lw + xx) * 4;
+          if (!px[q + 3]) continue;
+          soma[0] += px[q];
+          soma[1] += px[q + 1];
+          soma[2] += px[q + 2];
+          n++;
+        }
+      }
+      for (let c = 0; c < 3; c++) saida[o + c] = Math.max(0, Math.min(255, px[o + c] + forca * (px[o + c] - soma[c] / n)));
+    }
+  }
+  return { lw, lh, px: saida };
+}
+
+const opacoEm = (red, x, y) => x >= 0 && y >= 0 && x < red.lw && y < red.lh && red.px[(y * red.lw + x) * 4 + 3] > 0;
+
+// O contorno da folha original some na redução: escurece a borda da silhueta (os pixels opacos
+// com um vizinho de lado vazio), e o personagem volta a se destacar do cenário.
+function contornar(red, fator) {
+  const { lw, lh, px } = red;
+  const saida = Float32Array.from(px);
+  for (let y = 0; y < lh; y++) {
+    for (let x = 0; x < lw; x++) {
+      const o = (y * lw + x) * 4;
+      if (!px[o + 3]) continue;
+      const borda = !opacoEm(red, x - 1, y) || !opacoEm(red, x + 1, y) || !opacoEm(red, x, y - 1) || !opacoEm(red, x, y + 1);
+      if (borda) for (let c = 0; c < 3; c++) saida[o + c] = px[o + c] * fator;
+    }
+  }
+  return { lw, lh, px: saida };
+}
+
+// Depois da paleta: tira o pixel solto (sem nenhum vizinho, nem na diagonal) e tapa o furo de um
+// pixel (vazio com os quatro vizinhos de lado cheios) com a cor da paleta mais perto da média deles.
+function limpar(red, paleta) {
+  const { lw, lh, px } = red;
+  for (let y = 0; y < lh; y++) {
+    for (let x = 0; x < lw; x++) {
+      const o = (y * lw + x) * 4;
+      if (!px[o + 3]) continue;
+      let vizinhos = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && opacoEm(red, x + dx, y + dy)) vizinhos++;
+      if (!vizinhos) px[o + 3] = 0;
+    }
+  }
+  for (let y = 0; y < lh; y++) {
+    for (let x = 0; x < lw; x++) {
+      const o = (y * lw + x) * 4;
+      if (px[o + 3]) continue;
+      const lados = [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]];
+      if (!lados.every(([xx, yy]) => opacoEm(red, xx, yy))) continue;
+      const media = [0, 0, 0];
+      for (const [xx, yy] of lados) for (let c = 0; c < 3; c++) media[c] += px[(yy * lw + xx) * 4 + c] / 4;
+      const cor = paleta[maisProxima(paleta, media)];
+      px[o] = cor[0];
+      px[o + 1] = cor[1];
+      px[o + 2] = cor[2];
+      px[o + 3] = 255;
+    }
+  }
+  return red;
+}
+
 function kmeans(amostras, k) {
   const ordenadas = [...amostras].sort((a, b) => a[0] + a[1] + a[2] - (b[0] + b[1] + b[2]));
   let centros = Array.from({ length: k }, (_, i) => [...ordenadas[Math.floor(((i + 0.5) * ordenadas.length) / k)]]);
@@ -145,4 +224,4 @@ function ancoraX(red, modo) {
   return soma / n;
 }
 
-module.exports = { OPACO, recortarQuadro, reduzir, kmeans, maisProxima, ancoraX };
+module.exports = { OPACO, recortarQuadro, reduzir, afiar, contornar, limpar, kmeans, maisProxima, ancoraX };

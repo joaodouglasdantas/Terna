@@ -1,12 +1,14 @@
-// O sósia: um personagem idêntico a você (o mesmo personagem que você escolheu) que anda sozinho
-// pelo mapa. Ele não tem física nem desenho próprios — o corpo é o mesmo seu
-// (entidades/personagem.ts), então anda, pula e usa os poderes exatamente como você. O cérebro
+// A CPU (o "sósia"): um personagem sorteado, diferente do seu, que anda sozinho pelo mapa. Ele
+// não tem física nem desenho próprios — o corpo é o mesmo de todos (entidades/personagem.ts),
+// então anda, pula e usa os poderes exatamente como você com o mesmo personagem. O cérebro
 // daqui só decide, a cada quadro, que botões apertar e onde mirar: anda por perto de você, para
 // um pouco, pula de vez em quando, tenta sair de baixo das marcas dos seus poderes e pular o que
 // vem voando. Vai buscar as armas que caem perto e luta com elas: com a espada chega junto; com
 // o arco fica longe e atira.
 // - Leslie: com uma arma boa na mão, fica no modo arma; sem ela, aperta R para o modo poderes e
 //   ataca com os três quando você está no alcance (a Fúria, só com a barra de energia cheia).
+// - Grow: de gente, como a Leslie (os pássaros e o vento — soprando um tempo sorteado); com a
+//   barra cheia, vira golem pelo terceiro quadrinho e aí chega perto e bate com os do golem.
 // - Anjo: quando a energia e a recarga deixam, vira anjo (e aí voa, plana e às vezes solta o
 //   botão no meio) e ataca com os poderes dele. Com uma arma boa na mão, adia virar anjo
 //   (virando, ela cairia no chão).
@@ -16,8 +18,12 @@ import {
   ENERGIA_PIXY,
   FURIA,
   IMPACTO,
+  INVESTIDA,
   JULGAMENTO,
   MUNDO,
+  PEDRA,
+  REVOADA,
+  SALTO,
   RAIZES,
   RAJADA,
   CHICOTE,
@@ -26,6 +32,7 @@ import {
 } from '@terna/compartilhado';
 import { sortear } from '../motor/matematica';
 import { ALCANCE_ANJO } from './anjo/poderes';
+import { ALCANCE_GROW } from './grow/poderes';
 import { ALCANCE_LESLIE } from './leslie/poderes';
 import {
   armaPronta,
@@ -34,6 +41,7 @@ import {
   personagemLivre,
   podePegarArma,
   podeVirarAnjo,
+  podeVirarGolem,
   usaPoderes,
   type Controles,
   type Forma,
@@ -49,15 +57,15 @@ const SOSIA = {
   // Segundos até o próximo pulo (com os pés no chão) e quanto tempo segura o botão. Na forma
   // base, de um toque ao pulo longo; de anjo, sobe e plana — um voo inteiro, subindo e planando
   // até o chão, leva ~3,3 s: segurando menos que isso ele solta no meio do voo e despenca.
-  pulo: { base: [2.5, 7], anjo: [1.5, 4] } as Record<Forma, Intervalo>,
-  segurar: { base: [0.05, 0.4], anjo: [0.9, 4.5] } as Record<Forma, Intervalo>,
+  pulo: { base: [2.5, 7], anjo: [1.5, 4], golem: [3, 8] } as Record<Forma, Intervalo>,
+  segurar: { base: [0.05, 0.4], anjo: [0.9, 4.5], golem: [0.05, 0.3] } as Record<Forma, Intervalo>,
   // Segundos em cada forma. Na base, conta depois de a barra de energia encher (e a recarga do
   // anjo acabar); de anjo, às vezes passa da duração (DURACAO_ANJO) e o tempo acaba antes: ele
   // volta sozinho.
-  forma: { base: [1, 6], anjo: [15, 32] } as Record<Forma, Intervalo>,
-  // A casa segue você: fica a esta distância, do lado em que ele está. A Leslie no modo poderes
-  // fica um pouco mais longe: o chicote alcança.
-  distancia: { base: 120, anjo: 140 } as Record<Forma, number>,
+  forma: { base: [1, 6], anjo: [15, 32], golem: [99, 99] } as Record<Forma, Intervalo>,
+  // A casa segue você: fica a esta distância, do lado em que ele está. A Leslie e o Grow no modo
+  // poderes ficam um pouco mais longe: o chicote e os pássaros alcançam. O golem chega perto.
+  distancia: { base: 120, anjo: 140, golem: 70 } as Record<Forma, number>,
   distanciaPoderes: 95,
   entreAtaques: [0.6, 1.6] as Intervalo, // segundos entre uma tentativa de ataque e outra
   guardarEspecial: 0.35, // chance de guardar o especial pronto numa tentativa, para variar
@@ -69,6 +77,7 @@ const SOSIA = {
   espada: { perto: 14, golpe: 24 }, // chega a esta distância e golpeia a partir desta
   arco: { longe: 150, de: 40, ate: 250 }, // fica a esta distância e atira neste intervalo
   entreGolpes: [0.05, 0.35] as Intervalo, // segundos de hesitação depois da arma ficar pronta
+  soprar: [0.8, 2.2] as Intervalo, // segundos segurando o Vendaval
 };
 
 export interface CerebroSosia {
@@ -82,6 +91,7 @@ export interface CerebroSosia {
   ateAtacar: number; // segundos até a próxima tentativa de ataque
   ateDesviar: number; // segundos até poder decidir de novo se pula um coração
   ateGolpe: number; // segundos até atacar com a arma pronta
+  soprar: number; // segundos que ainda segura o Vendaval
 }
 
 // Onde mirar e com qual poder (índice em PODERES).
@@ -95,6 +105,7 @@ export interface DecisaoSosia {
   controles: Controles;
   mira: Mira | null;
   golpe: { x: number; y: number } | null; // atacar com a arma da mão, mirando aqui
+  soltar: boolean; // soltar o botão do Vendaval
 }
 
 export function criarCerebroSosia(casa: number): CerebroSosia {
@@ -109,6 +120,7 @@ export function criarCerebroSosia(casa: number): CerebroSosia {
     ateAtacar: sortear(SOSIA.entreAtaques),
     ateDesviar: 0,
     ateGolpe: 0,
+    soprar: 0,
   };
 }
 
@@ -124,13 +136,15 @@ function escolherDestino(c: CerebroSosia, x: number): number {
 }
 
 // Até onde cada poder pega.
-const ALCANCE: Record<IdPoder, number> = { ...ALCANCE_ANJO, ...ALCANCE_LESLIE };
+const ALCANCE: Record<IdPoder, number> = { ...ALCANCE_ANJO, ...ALCANCE_LESLIE, ...ALCANCE_GROW };
 // O aviso de cada poder de área: a mira adianta o passo do oponente por parte dele.
 const AVISO: Partial<Record<IdPoder, number>> = {
   impacto: IMPACTO.aviso,
   julgamento: JULGAMENTO.aviso,
   raizes: RAIZES.aviso,
   furia: FURIA.aviso,
+  salto: SALTO.agachar + SALTO.voo,
+  investida: INVESTIDA.preparo + 0.2,
 };
 
 // Com qual poder atacar agora, se algum estiver pronto e alcançar: o mais forte primeiro, às
@@ -140,7 +154,8 @@ function escolherPoder(corpo: Personagem, distancia: number): number | null {
   const pode = (i: number): boolean =>
     recarga[i] <= 0 &&
     distancia <= ALCANCE[lista[i]] &&
-    corpo.energia >= custoDeEnergia(corpo, lista[i]);
+    corpo.energia >= custoDeEnergia(corpo, lista[i]) &&
+    !(lista[i] === 'golem' && corpo.golem.recarga > 0);
   const ordem = [2, 1, 0].filter(pode);
   if (ordem[0] === 2 && ordem.length > 1 && Math.random() < SOSIA.guardarEspecial) ordem.shift();
   return ordem[0] ?? null;
@@ -159,6 +174,15 @@ function mirar(corpo: Personagem, oponente: Personagem, poder: number): Mira {
     const voo = (Math.abs(oponente.x - corpo.x) / CHICOTE.alcance) * CHICOTE.estica;
     return { poder, x: oponente.x + oponente.vx * voo * 0.7 + erro(), y: oponente.y - 16 + erro() / 2 };
   }
+  if (id === 'aves') {
+    const voo = Math.abs(oponente.x - corpo.x) / REVOADA.velocidade;
+    return { poder, x: oponente.x + oponente.vx * voo * 0.7 + erro(), y: oponente.y - 16 + erro() / 2 };
+  }
+  if (id === 'pedra') {
+    const voo = PEDRA.preparo + Math.abs(oponente.x - corpo.x) / PEDRA.velocidade;
+    return { poder, x: oponente.x + oponente.vx * voo * 0.6 + erro(), y: oponente.y - 14 + erro() / 2 };
+  }
+  if (id === 'vento' || id === 'golem' || id === 'investida') return { poder, x: oponente.x, y: oponente.y - 16 };
   const aviso = AVISO[id] ?? 0.5;
   const x = oponente.x + oponente.vx * aviso * sortear([0.2, 0.9]) + erro();
   if (id === 'raizes') {
@@ -238,7 +262,9 @@ export function pensarSosia(
   armas: readonly { x: number }[] = [],
 ): DecisaoSosia {
   const controles: Controles = { esquerda: false, direita: false, pular: false, transformar: false };
-  const decisao: DecisaoSosia = { controles, mira: null, golpe: null };
+  // O Vendaval sopra até o tempo sorteado acabar.
+  c.soprar -= dt;
+  const decisao: DecisaoSosia = { controles, mira: null, golpe: null, soltar: c.soprar <= 0 };
   // Transformando, o corpo não responde: espera a luz passar.
   if (!personagemLivre(corpo)) return decisao;
   const forma = formaDo(corpo);
@@ -250,17 +276,19 @@ export function pensarSosia(
   }
   // A casa acompanha você, do lado em que ele está.
   const lado = corpo.x >= oponente.x ? 1 : -1;
-  const longe = corpo.heroi === 'leslie' && corpo.modo === 'poderes' ? SOSIA.distanciaPoderes : SOSIA.distancia[forma];
+  const longe = corpo.heroi !== 'anjo' && forma === 'base' && corpo.modo === 'poderes' ? SOSIA.distanciaPoderes : SOSIA.distancia[forma];
   c.casa = noMapa(oponente.x + lado * longe);
 
   const guardando = corpo.arma !== null && corpo.arma.durabilidade > SOSIA.guardarArma;
   const podeApertar = corpo.noChao && c.segurando <= 0 && !corpo.transformarSegurado;
-  if (corpo.heroi === 'leslie') {
-    // Com uma arma boa (ou sem energia nem para o chicote), o modo arma; senão, os poderes. Aperta
-    // R por um quadro só.
-    const semEnergia = corpo.energia < custoDeEnergia(corpo, 'chicote');
-    const quer: Modo = guardando || semEnergia ? 'arma' : 'poderes';
-    if (corpo.modo !== quer && podeApertar) {
+  if (corpo.heroi !== 'anjo') {
+    // Com uma arma boa (ou sem energia nem para o primeiro poder), o modo arma; senão, os
+    // poderes. Aperta R por um quadro só. De golem não aperta (desfaria a pedra).
+    const semEnergia = corpo.energia < custoDeEnergia(corpo, corpo.poderes.lista[0]);
+    // O Grow com a barra cheia quer os poderes: o terceiro vira golem.
+    const cheia = podeVirarGolem(corpo);
+    const quer: Modo = (guardando || semEnergia) && !cheia ? 'arma' : 'poderes';
+    if (forma === 'base' && corpo.modo !== quer && podeApertar && !corpo.canalizando) {
       controles.transformar = true;
       return decisao;
     }
@@ -326,7 +354,13 @@ export function pensarSosia(
   if (c.ateAtacar <= 0 && comPoderes && oponente.vida > 0) {
     c.ateAtacar = sortear(SOSIA.entreAtaques);
     const poder = escolherPoder(corpo, Math.abs(oponente.x - corpo.x));
-    if (poder !== null) decisao.mira = mirar(corpo, oponente, poder);
+    if (poder !== null && !corpo.canalizando) {
+      decisao.mira = mirar(corpo, oponente, poder);
+      if (corpo.poderes.lista[poder] === 'vento') {
+        c.soprar = sortear(SOSIA.soprar);
+        decisao.soltar = false;
+      }
+    }
   }
   return decisao;
 }

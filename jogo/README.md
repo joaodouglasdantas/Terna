@@ -32,8 +32,10 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 | `npm run build` | gera `apps/cliente/dist/` (site estático) e `apps/servidor/dist/` |
 | `npm run db:gerar` | cria a migração do banco depois de mudar `schema.ts` |
 | `npm run db:migrar` | aplica as migrações (o servidor também aplica sozinho ao subir) |
-| `npm run arte:cenario` | regera o cenário a partir de `fontes/` |
+| `npm run arte:cenario` | regera o cenário a partir de `fontes/` (a paisagem com o rio, e onde fica a água que o jogo anima) |
 | `npm run arte:leslie` | regera a Leslie a partir de `fontes/leslie.png` |
+| `npm run arte:grow` | regera o Grow (com o musgo pintado no cajado), o golem e as águias a partir de `fontes/grow.png`, `golem.png` e `aguia.png` |
+| `node ferramentas/tirar-fundo.cjs <folha.png> <nome>` | tira o fundo preto de uma folha nova de personagem e grava em `fontes/` (os pretos de dentro do desenho — olhos, contornos — ficam); com `--cor-do-canto`, o fundo é a cor do canto da folha (as águias vieram num azul-escuro) |
 | `npm run arte:anjo` | regera o Anjo (desligado por enquanto) a partir de `fontes/SpriteBase.png` |
 
 ## Personagens
@@ -43,12 +45,35 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
   botão direito troca o poder escolhido). Cada poder gasta energia pixy (mais, quanto mais forte), dar
   dano enche, e a Fúria só sai com a barra cheia. Números em `packages/compartilhado/src/conteudo/leslie.ts`
   e, os custos de energia, em `conteudo/poderes.ts`.
-- **Anjo**: pronto, mas desligado até a atualização dele. Aparece na seleção como "em breve".
+- **Grow**, o metamorfo: de gente é como a Leslie (arma ou poderes na **R**), mas os poderes dele
+  quase não tiram vida — servem para afastar: a Revoada de Águias (três águias levam o outro bem alto
+  e para longe, e o largam) e o Vendaval (segurando o botão, o vento empurra para longe). Os dois gastam um pouquinho
+  de energia. Com a barra cheia, o terceiro vira **golem de pedra** por 20 s: Salto Esmagador,
+  Investida e Pedra, que batem forte e não gastam energia (a barra só desce com o tempo). O golem
+  é pesado e tem **defesa**: 40% do dano que leva é absorvido e aparece em cima do número ("DEF").
+  A **R** desfaz o golem antes do tempo. Números em `conteudo/grow.ts`; o código em
+  `apps/cliente/src/entidades/grow/`.
+- **Anjo**: pronto, mas desligado até a atualização dele. Não aparece na seleção (fica guardado, fora da vista do público).
   Para ligar, `LIBERADO.anjo = true` em `packages/compartilhado/src/conteudo/herois.ts`. O código
   dele mora em `apps/cliente/src/entidades/anjo/` e os números em `conteudo/anjo.ts`.
 
-A escolha é feita na tela de seleção, depois do Singleplayer (a CPU fica com o mesmo personagem)
+A escolha é feita na tela de seleção, depois do Singleplayer (a CPU fica com outro personagem, sorteado)
 ou, no Multiplayer, com os dois já na sala: a partida só começa quando os dois escolhem.
+
+Antes de cada partida vem o carregamento da temporada atual (**Temporada 1 — Chamado da
+Floresta**), com a arte num outdoor, os nomes dos personagens e o do mapa (**Floresta da Divisa**);
+depois, a contagem 3, 2, 1. No fim (por tempo ou morte) dá para clicar em **Jogar novamente**:
+contra a CPU, volta direto à escolha de personagem (com o da rodada anterior já marcado); online a
+sala continua e, os dois clicando, voltam à escolha e jogam outra rodada, sem sair da sala. A arte
+da temporada fica em `apps/cliente/src/assets/temporada-chamado-da-floresta.webp` (original em
+`fontes/`), e o nome, os personagens e o mapa em `apps/cliente/src/inicio/temporada.ts`.
+
+Na partida, a tecla **Tab** abre (e fecha) a tela de controles: andar, pular, pulo duplo, dash,
+pegar e largar arma, poderes, energia pixy, transformações e os poderes do seu personagem
+(`apps/cliente/src/inicio/ajuda.ts`). Sozinho, o jogo pausa enquanto ela está aberta.
+
+O jogo é feito para notebook ou computador (teclado e mouse): no celular e no tablet ele não
+carrega e aparece só um aviso para abrir no computador (`apps/cliente/src/inicio/aparelho.ts`).
 
 ## Como está organizado
 
@@ -64,7 +89,8 @@ jogo/
 │   │       ├── motor/        peças genéricas: carregar imagem, criar/reduzir sprite, sorteio
 │   │       ├── mundo/        céu, sol, nuvens, árvores, luz, chão e minhocas
 │   │       ├── entidades/    personagem (corpo comum), animais, armas e poderes;
-│   │       │                 leslie/ (poderes da dríade) e anjo/ (o Anjo, desligado)
+│   │       │                 leslie/ (poderes da dríade), grow/ (o golem e os poderes do
+│   │       │                 Grow) e anjo/ (o Anjo, desligado)
 │   │       ├── rede/         API HTTP e conexão de tempo real com o servidor
 │   │       ├── save/         save local (navegador) ou na conta (servidor), mesmo jeito de usar
 │   │       ├── gerado/       recortes das folhas de sprite (saída das ferramentas; não editar)

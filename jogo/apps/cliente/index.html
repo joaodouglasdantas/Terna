@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Terna</title>
   <style>
-    html, body { margin: 0; height: 100%; background: #1b1b24; }
+    /* A página nunca rola (nem mostra a barra do navegador): o que não cabe rola dentro das
+       telas do jogo, com a barra no jeito dele (inicio.css). */
+    html, body { margin: 0; height: 100%; background: #1b1b24; overflow: hidden; overscroll-behavior: none; }
     body { display: flex; align-items: center; justify-content: center; overflow: hidden; }
     /* A tela do jogo: o canvas e, por cima, o que é HTML dentro da partida (a engrenagem). */
     #tela {

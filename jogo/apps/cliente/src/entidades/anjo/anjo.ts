@@ -9,10 +9,12 @@ import { DURACAO_ANJO, ENERGIA_PIXY, RECARGA_ANJO } from '@terna/compartilhado';
 import { contexto2d, criarSprite, novoCanvas } from '../../motor/imagens';
 import { suavizar } from '../../motor/matematica';
 import type { Paleta } from '../../motor/tipos';
-import type { Forma } from '../personagem';
 import type { Pose, QuadroPersonagem } from '../pose';
 
 export type { Pose };
+
+// As duas formas do Anjo.
+type Forma = 'base' | 'anjo';
 
 // O personagem, como o laço principal o guarda: `x` é o eixo do corpo e `y` a linha dos pés.
 export interface CorpoAnjo {

@@ -61,10 +61,104 @@
   opacity: 0;
 }
 
+/* A barra de rolagem das telas, quando o conteúdo não cabe no quadro: a do navegador some e entra
+   a do jogo (inicio/dom.ts) — o trilho de madeira escura e a alça verde com relevo, por cima de
+   tudo da tela. A roda do mouse, o toque e o teclado rolam como sempre. (A página em si nunca
+   rola: index.html.) */
+.inicio-tela {
+  scrollbar-width: none;
+}
+
+.inicio-tela::-webkit-scrollbar {
+  display: none;
+}
+
+.inicio-rolagem {
+  position: fixed;
+  top: 10px;
+  right: 6px;
+  bottom: 10px;
+  z-index: 5;
+  width: 12px;
+  background: rgba(26, 18, 10, 0.88);
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 3px 0 rgba(0, 0, 0, 0.4);
+  touch-action: none;
+}
+
+.inicio-rolagem[hidden] {
+  display: none;
+}
+
+.inicio-rolagem-alca {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: var(--verde);
+  box-shadow: inset 3px 3px 0 var(--verde-claro), inset -3px -3px 0 var(--verde-fundo), 0 0 0 2px var(--contorno);
+  cursor: grab;
+}
+
+.inicio-rolagem-alca:hover {
+  background: #93e57d;
+}
+
+.inicio-rolagem-arrastando .inicio-rolagem-alca {
+  cursor: grabbing;
+  background: #93e57d;
+}
+
+/* A versão do jogo, discreta, no canto de baixo da tela inicial. */
+.inicio-versao {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  color: var(--suave);
+  opacity: 0.8;
+  text-shadow: 0 2px 0 var(--contorno);
+  pointer-events: none;
+}
+
+/* Cada tela nova aparece esmaecendo (e a que sai esmaece: .inicio-saindo). Só o começo da
+   animação vale ("backwards"): depois, a transição da saída funciona normalmente. */
+.inicio-tela {
+  animation: inicio-entra 0.35s ease backwards;
+}
+
+@keyframes inicio-entra {
+  from {
+    opacity: 0;
+  }
+}
+
+/* A cortina preta por cima do jogo (inicio/dom.ts): fecha e abre nas trocas de tela. */
+#cortina {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* ---- carregamento ---- */
 
 .inicio-carregando {
   background: radial-gradient(ellipse at 50% 40%, #33271a 0%, var(--fundo) 70%);
+}
+
+/* O aviso do celular/tablet (aparelho.ts): ocupa a tela toda do aparelho, e o texto quebra na
+   tela estreita. */
+#inicio:has(.inicio-bloqueio) {
+  width: 100vw;
+  height: 100vh;
+}
+
+.inicio-bloqueio .inicio-caixa {
+  max-width: min(420px, 100%);
+  text-align: center;
 }
 
 /* Em tela baixa o flexbox espremia a barra até sumir o recheio: sem encolher, o que não couber rola. */
@@ -552,8 +646,9 @@
 .inicio-cartao {
   display: grid;
   grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto auto 1fr;
+  grid-template-rows: auto 1fr;
   column-gap: 0.9rem;
+  row-gap: 0.5rem;
   align-items: start;
   width: min(23rem, 100%);
   padding: 0.8rem 0.9rem;
@@ -597,7 +692,7 @@
 
 .inicio-cartao-palco {
   position: relative;
-  grid-row: 1 / 5;
+  grid-row: 1 / 3;
   display: grid;
   place-items: end center;
   padding: 0.3rem 0.4rem 0.2rem;
@@ -635,21 +730,6 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   text-shadow: 0 3px 0 var(--marrom-escuro);
-}
-
-.inicio-cartao-titulo {
-  margin: 0 0 0.3rem;
-  font-size: 0.95rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--verde);
-}
-
-.inicio-cartao-frase {
-  margin: 0 0 0.5rem;
-  font-size: 0.95rem;
-  line-height: 1.35;
-  color: var(--suave);
 }
 
 .inicio-cartao-poderes {
@@ -801,15 +881,12 @@
   .inicio-titulo-tela {
     gap: 0.6rem;
   }
-  /* Quadro baixo: a seleção fica mais compacta (sem a frase dos cartões). */
+  /* Quadro baixo: a seleção fica mais compacta. */
   .inicio-selecao-tela {
     gap: 0.5rem;
   }
   .inicio-selecao-tela .inicio-titulo {
     font-size: 1.5rem;
-  }
-  .inicio-cartao-frase {
-    display: none;
   }
   .inicio-cartao-sprite {
     width: 96px;
@@ -820,4 +897,484 @@
   .inicio-cartao-sprite {
     width: 160px; /* × 4 */
   }
+}
+
+/* ---- carregamento da partida: a temporada ---- */
+
+.inicio-temporada {
+  gap: 0.7rem;
+  background: radial-gradient(ellipse at 50% 35%, #3a2a1a 0%, #1f160d 55%, var(--fundo) 100%);
+}
+
+.inicio-temporada > * {
+  flex-shrink: 0;
+}
+
+.inicio-temporada-selo {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-shadow: 0 3px 0 var(--contorno);
+}
+
+.inicio-temporada-numero {
+  padding: 0.15rem 0.55rem;
+  font-size: 0.95rem;
+  color: #2a1a06;
+  background: #ffd966;
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 -3px 0 #d9a53a;
+  text-shadow: none; /* a sombra escura do selo, em letra escura, parecia o nome duplicado */
+}
+
+/* O outdoor: lâmpadas em cima, o quadro de madeira com parafusos nos cantos e dois pés. */
+.inicio-outdoor {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(84cqh, 78cqw);
+  animation: inicio-outdoor-chega 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.15) backwards;
+}
+
+.inicio-outdoor-lampadas {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-around;
+  width: 70%;
+  height: 12px;
+  margin-bottom: -6px;
+}
+
+/* Cada lâmpada: a cúpula escura com a luz amarela embaixo, e o cone de luz descendo no quadro. */
+.inicio-outdoor-lampada {
+  position: relative;
+  width: 22px;
+  height: 10px;
+  background: #3a2a1a;
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 -3px 0 #ffe79a;
+}
+
+.inicio-outdoor-lampada::after {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 140px;
+  height: 120px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at 50% 0%, rgba(255, 226, 140, 0.45), rgba(255, 226, 140, 0) 70%);
+  pointer-events: none;
+  animation: inicio-lampada 3.1s steps(1) infinite;
+}
+
+.inicio-outdoor-lampada:nth-child(2)::after {
+  animation-delay: -1.3s;
+}
+
+.inicio-outdoor-lampada:nth-child(3)::after {
+  animation-delay: -2.2s;
+}
+
+.inicio-outdoor-quadro {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: 9px;
+  box-sizing: border-box;
+  background: linear-gradient(to bottom, #9a6a3a, #6b4424);
+  box-shadow:
+    0 0 0 3px var(--contorno),
+    inset 0 3px 0 #c9955a,
+    inset 0 -3px 0 #4e3016,
+    0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+/* Os parafusos nos quatro cantos da madeira. */
+.inicio-outdoor-quadro::before,
+.inicio-outdoor-quadro::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  width: 4px;
+  height: 4px;
+  background: #e6c9a0;
+  box-shadow: 0 0 0 1px var(--contorno);
+}
+
+.inicio-outdoor-quadro::before {
+  left: 3px;
+}
+
+.inicio-outdoor-quadro::after {
+  right: 3px;
+}
+
+.inicio-outdoor-tela {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 0 0 3px var(--contorno);
+}
+
+/* A arte se aproxima e se afasta devagar. */
+.inicio-outdoor-arte {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  transform-origin: 50% 72%; /* o nome da temporada, embaixo, não sai do quadro */
+  animation: inicio-outdoor-zoom 14s ease-in-out infinite alternate;
+}
+
+.inicio-outdoor-brilhos {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+/* O reflexo que passa pelo vidro, de tempos em tempos. */
+.inicio-outdoor-reluz {
+  position: absolute;
+  inset: -20% auto -20% 0;
+  width: 22%;
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0) 0%, rgba(255, 250, 225, 0.28) 45%, rgba(255, 255, 255, 0) 100%);
+  transform: translateX(-120%) skewX(-12deg);
+  animation: inicio-outdoor-reluz 4.2s ease-in-out infinite;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+/* A luz das lâmpadas no alto da arte e a sombra nos cantos (vinheta). */
+.inicio-outdoor-luz {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(255, 226, 140, 0.25), rgba(255, 226, 140, 0) 45%),
+    radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 0) 60%, rgba(10, 6, 2, 0.45) 100%);
+  pointer-events: none;
+}
+
+.inicio-outdoor-pes {
+  display: flex;
+  justify-content: space-between;
+  width: 62%;
+  height: 16px;
+}
+
+.inicio-outdoor-pes span {
+  width: 14px;
+  height: 100%;
+  background: linear-gradient(to right, #9a6a3a, #6b4424);
+  box-shadow: 0 0 0 3px var(--contorno);
+}
+
+.inicio-temporada-novidades {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inicio-temporada-novidades li {
+  padding: 0.2rem 0.55rem;
+  font-size: 0.95rem;
+  color: var(--verde-claro);
+  background: rgba(26, 18, 10, 0.9);
+  box-shadow: 0 0 0 2px var(--contorno), inset 0 0 0 2px rgba(127, 214, 107, 0.35);
+}
+
+/* O mapa, em dourado; os personagens, em verde. */
+.inicio-temporada-novidades .inicio-temporada-mapa {
+  color: var(--tinta);
+  box-shadow: 0 0 0 2px var(--contorno), inset 0 0 0 2px rgba(255, 217, 102, 0.4);
+}
+
+.inicio-temporada-mapa span {
+  margin-right: 0.15rem;
+  color: #ffd966;
+}
+
+.inicio-temporada-dica {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--suave);
+}
+
+.inicio-temporada .inicio-frase {
+  font-size: 1.1rem;
+}
+
+.inicio-temporada[data-estado='falhou'] .inicio-barra-cheia {
+  background: linear-gradient(to bottom, #ffc79a 0 30%, #ff9a4a 30% 75%, #d8702a 75%);
+}
+
+@keyframes inicio-outdoor-chega {
+  from {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.96);
+  }
+}
+
+@keyframes inicio-outdoor-zoom {
+  from {
+    transform: scale(1.02);
+  }
+  to {
+    transform: scale(1.07) translate(-1%, 0.5%);
+  }
+}
+
+@keyframes inicio-outdoor-reluz {
+  0%,
+  55% {
+    transform: translateX(-120%) skewX(-12deg);
+  }
+  100% {
+    transform: translateX(560%) skewX(-12deg);
+  }
+}
+
+/* A luz de cada lâmpada, firme, com uma piscada rápida de vez em quando. */
+@keyframes inicio-lampada {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 0.35;
+  }
+  95% {
+    opacity: 1;
+  }
+}
+
+@container (max-height: 480px) {
+  .inicio-temporada {
+    gap: 0.4rem;
+  }
+  .inicio-temporada-dica {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inicio-outdoor,
+  .inicio-outdoor-arte,
+  .inicio-outdoor-reluz,
+  .inicio-outdoor-lampada::after {
+    animation: none;
+  }
+}
+
+/* ---- revanche (tela de fim online) ---- */
+
+.inicio-revanche-estado {
+  margin: 0;
+  min-height: 1.4em;
+  font-size: 1.05rem;
+  color: var(--suave);
+}
+
+.inicio-revanche-estado:empty {
+  display: none;
+}
+
+/* O outro pediu: o aviso chama a atenção. */
+.inicio-revanche-estado[data-destaque='true'] {
+  color: var(--verde-claro);
+  animation: inicio-respira 1.4s ease-in-out infinite;
+}
+
+/* ---- a tela de controles da partida (Tab: ajuda.ts) ---- */
+
+.inicio-ajuda {
+  justify-content: safe center;
+}
+
+.inicio-ajuda-caixa {
+  width: min(56rem, 100%);
+  gap: 0.6rem;
+  padding: 0.8rem 1.25rem 0.9rem;
+  text-align: left;
+}
+
+.inicio-ajuda-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.inicio-ajuda-topo .inicio-titulo {
+  font-size: 1.6rem;
+}
+
+.inicio-ajuda-fechar.inicio-botao {
+  min-width: 0;
+  min-height: 0;
+  padding: 0.3rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.inicio-ajuda-colunas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem 1.25rem;
+}
+
+.inicio-ajuda-colunas > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+@container (max-width: 700px) {
+  .inicio-ajuda-colunas {
+    grid-template-columns: 1fr;
+  }
+}
+
+.inicio-ajuda-secao h2 {
+  margin: 0 0 0.4rem;
+  padding-bottom: 0.2rem;
+  font-size: 1rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffd966;
+  border-bottom: 2px solid rgba(154, 106, 58, 0.55);
+}
+
+.inicio-ajuda-secao h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--verde-claro);
+}
+
+.inicio-ajuda-secao dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  align-items: center;
+  gap: 0.25rem 0.7rem;
+  margin: 0;
+}
+
+.inicio-ajuda-secao dd {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.25;
+  color: var(--tinta);
+}
+
+.inicio-ajuda-teclas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* As teclas: tampinhas de madeira clara com o degrau embaixo, como os botões. */
+.inicio-ajuda-teclas kbd {
+  min-width: 1.1rem;
+  padding: 0.05rem 0.35rem 0.12rem;
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  text-align: center;
+  color: #2a1a06;
+  background: var(--marrom-claro);
+  box-shadow: 0 0 0 2px var(--contorno), inset 0 -3px 0 #b88f5e;
+}
+
+.inicio-ajuda-ou {
+  font-size: 0.75rem;
+  color: var(--suave);
+}
+
+.inicio-ajuda-nota {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--suave);
+}
+
+.inicio-ajuda-poderes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.5rem;
+}
+
+.inicio-ajuda-poderes > div {
+  flex: 1 1 16rem;
+}
+
+.inicio-ajuda-poderes ul,
+.inicio-ajuda-dicas {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inicio-ajuda-poderes li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.inicio-ajuda-poderes strong {
+  display: block;
+  font-weight: 400;
+  color: var(--tinta);
+}
+
+.inicio-ajuda-poderes li span > span {
+  color: var(--suave);
+}
+
+.inicio-ajuda-icone {
+  flex-shrink: 0;
+  width: 22px; /* 11 px × 2 */
+  height: 22px;
+  image-rendering: pixelated;
+  background: rgba(26, 10, 22, 0.85);
+  box-shadow: 0 0 0 1px rgba(255, 250, 240, 0.32);
+}
+
+.inicio-ajuda-dicas {
+  margin-top: 0.45rem;
+  gap: 0.2rem;
+}
+
+.inicio-ajuda-dicas li {
+  padding-left: 0.9rem;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  color: var(--suave);
+  text-indent: -0.9rem;
+}
+
+.inicio-ajuda-dicas li::before {
+  content: '▸ ';
+  color: var(--verde);
 }

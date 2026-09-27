@@ -1,8 +1,8 @@
 // Tela de seleção de personagem. Vem depois do Singleplayer e, no Multiplayer, com os dois já
 // na sala (os dois escolhem ao mesmo tempo; a partida começa quando os dois escolherem). Cada
 // personagem é um cartão com o sprite grande — parado de frente e, escolhido, correndo —, o
-// nome, uma frase e os três poderes. Os que ainda não foram liberados (o Anjo) aparecem
-// apagados, com "Em breve", e não dá para escolher.
+// nome e os três poderes (a história de cada um fica para depois). Só aparecem os liberados: o
+// Anjo, pronto mas guardado, não é mostrado.
 //
 // Setas (ou A/D) passam de um cartão para o outro, Enter joga e Esc volta.
 
@@ -15,6 +15,7 @@ import {
   type Heroi,
   type IdPoder,
   type Lado,
+  type MensagemPartidaDoServidor,
 } from '@terna/compartilhado';
 import { spritesDo } from '../entidades/personagem';
 import { contexto2d } from '../motor/imagens';
@@ -24,29 +25,40 @@ import { anexarCena } from './cena';
 import { botao, elemento, palco, sairComEsmaecer } from './dom';
 
 // Uma linha sobre cada poder, para o cartão.
-const SOBRE_PODER: Record<IdPoder, string> = {
+export const SOBRE_PODER: Record<IdPoder, string> = {
   chicote: 'uma vinha de espinhos que estala e envenena',
   raizes: 'uma fileira de raízes rompe a terra e prende; a última, por mais tempo',
   furia: 'com a energia cheia: trepadeiras rompem uma área grande, e ela se cura',
   impacto: 'uma fileira de explosões correndo pelo chão',
   rajada: 'dois corações que enfeitiçam quem acertam',
   julgamento: 'um pilar de luz desce do céu',
+  aves: 'três águias agarram, levam bem alto e para longe e largam lá de cima',
+  vento: 'segurando o botão, uma ventania com folhas empurra para longe',
+  golem: 'com a energia cheia: vira golem de pedra (Salto, Investida e Pedra) e segura parte do dano',
+  salto: 'pula alto e esmaga quem está embaixo',
+  investida: 'corre em linha reta atropelando quem estiver na frente',
+  pedra: 'arremessa um pedregulho que estoura em lascas',
 };
 
 const QUADRO_CORRENDO = 0.09; // segundos por quadro da corrida no cartão
 
 // O que chega da sala enquanto a tela está aberta.
+// `pendentes`: o que a sala mandou antes de a tela abrir (na revanche, o outro pode escolher antes).
 export interface SalaNaSelecao {
   conexao: ConexaoPartida;
   oponente: string;
+  pendentes?: MensagemPartidaDoServidor[];
 }
 
+// `comecouEm`: performance.now() de quando chegou o aviso — dele contam o carregamento, a
+// contagem e o relógio, iguais para os dois.
 export interface ComecouOnline {
   lado: Lado;
   oponente: string;
   restanteMs: number;
   heroi: Heroi;
   heroiOponente: Heroi;
+  comecouEm: number;
 }
 
 export type ResultadoSelecao =
@@ -84,8 +96,6 @@ function montarCartao(heroi: Heroi, aoEscolher: () => void): Cartao {
   if (!liberado) palcoSprite.append(elemento('span', 'inicio-cartao-selo', 'Em breve'));
 
   const nome = elemento('h2', 'inicio-cartao-nome', sobre.nome);
-  const titulo = elemento('p', 'inicio-cartao-titulo', sobre.titulo);
-  const frase = elemento('p', 'inicio-cartao-frase', sobre.frase);
   const poderes = elemento('ul', 'inicio-cartao-poderes');
   PODERES_DO_HEROI[heroi].forEach((poder, i) => {
     const item = elemento('li', 'inicio-cartao-poder');
@@ -100,7 +110,7 @@ function montarCartao(heroi: Heroi, aoEscolher: () => void): Cartao {
     item.append(icone, texto);
     poderes.append(item);
   });
-  cartao.append(palcoSprite, nome, titulo, frase, poderes);
+  cartao.append(palcoSprite, nome, poderes);
   return { heroi, elemento: cartao, sprite };
 }
 
@@ -115,11 +125,12 @@ function desenharSprite(c: Cartao, escolhido: boolean, tempo: number): void {
   ctx.drawImage(imagem, Math.round(c.sprite.width / 2 - eixo), c.sprite.height - 1 - imagem.height);
 }
 
-export function telaSelecao(sala?: SalaNaSelecao): Promise<ResultadoSelecao> {
+// `anterior`: jogando de novo, o personagem da rodada que acabou já vem escolhido.
+export function telaSelecao(sala?: SalaNaSelecao, anterior?: Heroi): Promise<ResultadoSelecao> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-selecao-tela');
     const titulo = elemento('h1', 'inicio-titulo', 'Escolha o personagem');
-    const sub = elemento('p', 'inicio-sub', sala ? `Partida contra ${sala.oponente}` : 'Sua CPU vai ser o mesmo personagem');
+    const sub = elemento('p', 'inicio-sub', sala ? `Partida contra ${sala.oponente}` : 'A CPU vai ser outro personagem, sorteado');
     const grade = elemento('div', 'inicio-cartoes');
     grade.setAttribute('role', 'radiogroup');
     grade.setAttribute('aria-label', 'Personagens');
@@ -128,11 +139,11 @@ export function telaSelecao(sala?: SalaNaSelecao): Promise<ResultadoSelecao> {
     const acoes = elemento('div', 'inicio-acoes');
 
     const liberados = HEROIS.filter((h) => LIBERADO[h]);
-    let escolhido: Heroi = liberados[0];
+    let escolhido: Heroi = anterior && liberados.includes(anterior) ? anterior : liberados[0];
     let confirmado = false;
     let acabou = false;
 
-    const cartoes = HEROIS.map((heroi) => montarCartao(heroi, () => escolher(heroi)));
+    const cartoes = liberados.map((heroi) => montarCartao(heroi, () => escolher(heroi)));
     grade.append(...cartoes.map((c) => c.elemento));
 
     const escolher = (heroi: Heroi): void => {
@@ -172,20 +183,19 @@ export function telaSelecao(sala?: SalaNaSelecao): Promise<ResultadoSelecao> {
 
     if (sala) {
       estado.textContent = `${sala.oponente} está escolhendo…`;
-      sala.conexao.ouvir(
-        (m) => {
+      const ouvir = (m: MensagemPartidaDoServidor): void => {
           if (m.tipo === 'oponente-escolheu') {
             estado.dataset.oponente = m.heroi;
             estado.textContent = `${sala.oponente} escolheu ${SOBRE_HEROI[m.heroi].nome}${confirmado ? '' : ' e está esperando você'}.`;
           }
           if (m.tipo === 'comecou') {
             const { lado, oponente, restanteMs, heroi, heroiOponente } = m;
-            terminar({ tipo: 'comecou', partida: { lado, oponente, restanteMs, heroi, heroiOponente } });
+            terminar({ tipo: 'comecou', partida: { lado, oponente, restanteMs, heroi, heroiOponente, comecouEm: performance.now() } });
           }
           if (m.tipo === 'fim') terminar({ tipo: 'caiu', erro: `${sala.oponente} saiu da sala.` });
-        },
-        (erro) => terminar({ tipo: 'caiu', erro }),
-      );
+      };
+      sala.conexao.ouvir(ouvir, (erro) => terminar({ tipo: 'caiu', erro }));
+      for (const m of sala.pendentes ?? []) ouvir(m);
     }
 
     // Setas (ou A/D) andam entre os liberados; Enter joga; Esc volta.

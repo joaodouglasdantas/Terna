@@ -1,4 +1,4 @@
-// Gerado por ferramentas/gerar-leslie.cjs a partir de fontes/leslie.png — não editar à mão.
+// Gerado por ferramentas/gerar-herois.cjs a partir de fontes/leslie.png — não editar à mão.
 // x/y/w/h: recorte em assets/leslie.png; ax: eixo do corpo (os pés ficam na base do recorte).
 export const QUADROS_LESLIE = {
   "parado": [
@@ -83,7 +83,7 @@ export const QUADROS_LESLIE = {
       "y": 0,
       "w": 21,
       "h": 33,
-      "ax": 9
+      "ax": 8
     },
     {
       "x": 253,
@@ -100,6 +100,36 @@ export const QUADROS_LESLIE = {
       "w": 18,
       "h": 31,
       "ax": 9
+    }
+  ],
+  "morto": [
+    {
+      "x": 293,
+      "y": 0,
+      "w": 17,
+      "h": 23,
+      "ax": 9
+    },
+    {
+      "x": 311,
+      "y": 0,
+      "w": 22,
+      "h": 19,
+      "ax": 11
+    },
+    {
+      "x": 334,
+      "y": 0,
+      "w": 26,
+      "h": 15,
+      "ax": 13
+    },
+    {
+      "x": 361,
+      "y": 0,
+      "w": 26,
+      "h": 14,
+      "ax": 13
     }
   ]
 };

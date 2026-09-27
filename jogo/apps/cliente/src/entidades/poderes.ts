@@ -1,11 +1,13 @@
-// Os poderes de cada personagem: os três que ele tem (os do Anjo ou os da Leslie, na ordem dos
-// quadrinhos do painel), o escolhido e as recargas; e os efeitos no mapa, dos dois lados juntos.
-// Cada efeito é desenhado e atualizado pela parte do personagem dono dele (anjo/poderes.ts,
-// leslie/poderes.ts); a base comum — acerto, dano, números, faíscas — fica em efeitos.ts.
+// Os poderes de cada personagem: os três que ele tem agora (na ordem dos quadrinhos do painel —
+// o Grow troca de jogo ao virar golem), o escolhido e as recargas; e os efeitos no mapa, dos dois
+// lados juntos. Cada efeito é desenhado e atualizado pela parte do personagem dono dele
+// (anjo/poderes.ts, leslie/poderes.ts, grow/poderes.ts); a base comum — acerto, dano, defesa,
+// números, faíscas — fica em efeitos.ts.
 
 import {
   MUNDO,
   PODERES_DO_HEROI,
+  PODERES_GOLEM,
   RECARGA_PODER,
   type Heroi,
   type IdPoder,
@@ -34,6 +36,19 @@ import {
   type Nucleo,
 } from './efeitos';
 import {
+  ameacasDoGrow,
+  atualizarEfeitoGrow,
+  desenharGrowNaFrente,
+  desenharGrowNoChao,
+  desenharPreviaGrow,
+  lancarPoderGrow,
+  PODERES_DO_GROW,
+  pararVentoGrow,
+  ventoDo,
+  type EfeitoGrow,
+  type PoderGrow,
+} from './grow/poderes';
+import {
   ameacasDaLeslie,
   atualizarEfeitoLeslie,
   desenharLeslieNaFrente,
@@ -46,8 +61,8 @@ import {
 
 export { desenharBordaDoEncanto, desenharEncanto } from './anjo/poderes';
 export { desenharPreso, desenharVeneno } from './leslie/poderes';
-export { acertaCorpo, ferirAlvo, mostrarCura, mostrarDano } from './efeitos';
-export type { Alvo, Ameacas, CorpoAlvo, Encanto } from './efeitos';
+export { absorvidoDoQuePassou, acertaCorpo, ferirAlvo, mostrarCura, mostrarDano } from './efeitos';
+export type { Alvo, Ameacas, CorpoAlvo, Encanto, Manobra, Medida } from './efeitos';
 
 // ---- O que cada personagem tem ----
 
@@ -55,16 +70,33 @@ const AVISO = 1.1; // segundos que o aviso fica embaixo do painel
 const TREMOR = 0.3; // segundos que o quadrinho treme quando o poder não sai
 
 export interface Poderes {
-  lista: readonly IdPoder[]; // os três do personagem, na ordem do painel
+  lista: readonly IdPoder[]; // os três do personagem agora, na ordem do painel
   selecionado: number; // índice na lista
-  recarga: number[]; // segundos que faltam, por poder
+  recarga: number[]; // segundos que faltam, por poder da lista
+  guardadas: Map<IdPoder, number>; // as recargas do outro jogo (o Grow de golem guarda as de gente)
   aviso: { texto: string; resta: number } | null; // o motivo do último poder que não saiu
   tremor: number; // segundos do tremor do quadrinho escolhido
 }
 
 export function criarPoderes(heroi: Heroi): Poderes {
   const lista = PODERES_DO_HEROI[heroi];
-  return { lista, selecionado: 0, recarga: lista.map(() => 0), aviso: null, tremor: 0 };
+  return { lista, selecionado: 0, recarga: lista.map(() => 0), guardadas: new Map(), aviso: null, tremor: 0 };
+}
+
+// Os três de agora: o Grow de golem tem os do golem; os outros, sempre os seus.
+export function poderesDaForma(heroi: Heroi, golem: boolean): readonly IdPoder[] {
+  return golem ? PODERES_GOLEM : PODERES_DO_HEROI[heroi];
+}
+
+// Trocou de jogo (virou golem ou voltou): guarda as recargas do jogo que sai e pega as do que
+// entra; o escolhido volta ao primeiro.
+export function trocarLista(p: Poderes, lista: readonly IdPoder[]): void {
+  if (p.lista === lista) return;
+  p.lista.forEach((poder, i) => p.guardadas.set(poder, p.recarga[i]));
+  p.lista = lista;
+  p.recarga = lista.map((poder) => p.guardadas.get(poder) ?? 0);
+  for (const poder of lista) p.guardadas.delete(poder);
+  p.selecionado = 0;
 }
 
 export function poderEscolhido(p: Poderes): IdPoder {
@@ -83,6 +115,7 @@ export function avisar(p: Poderes, texto: string): void {
 
 export function atualizarRecargas(p: Poderes, dt: number): void {
   for (let i = 0; i < p.recarga.length; i++) p.recarga[i] = Math.max(0, p.recarga[i] - dt);
+  for (const [poder, falta] of p.guardadas) p.guardadas.set(poder, Math.max(0, falta - dt));
   p.tremor = Math.max(0, p.tremor - dt);
   if (p.aviso && (p.aviso.resta -= dt) <= 0) p.aviso = null;
 }
@@ -119,7 +152,7 @@ export function tentarUsar(
 
 // ---- No mapa ----
 
-type Efeito = EfeitoAnjo | EfeitoLeslie;
+type Efeito = EfeitoAnjo | EfeitoLeslie | EfeitoGrow;
 export type Efeitos = Nucleo<Efeito>;
 
 export function criarEfeitos(): Efeitos {
@@ -136,20 +169,35 @@ const PODERES_LESLIE: readonly IdPoder[] = PODERES_DO_HEROI.leslie;
 const daLeslie = (poder: IdPoder): poder is PoderLeslie => PODERES_LESLIE.includes(poder);
 const efeitoDaLeslie = (ef: Efeito): ef is EfeitoLeslie =>
   ef.tipo === 'chicote' || ef.tipo === 'raizes' || ef.tipo === 'furia';
+const doGrow = (poder: IdPoder): poder is PoderGrow => (PODERES_DO_GROW as readonly IdPoder[]).includes(poder);
+const efeitoDoGrow = (ef: Efeito): ef is EfeitoGrow =>
+  ef.tipo === 'aves' || ef.tipo === 'vento' || ef.tipo === 'salto' || ef.tipo === 'investida' || ef.tipo === 'pedra';
 
 // Põe no mapa o poder usado — o seu, o da CPU ou o do outro jogador que chegou pela rede. Tudo
 // sai do uso (origem e alvo), então os dois lados online montam o mesmo poder.
 export function lancarPoder(e: Efeitos, dono: Dono, uso: PoderUsado): void {
   const poder = uso.poder;
   if (daLeslie(poder)) lancarPoderLeslie(e as Nucleo<EfeitoLeslie>, dono, { ...uso, poder });
+  else if (doGrow(poder)) lancarPoderGrow(e as Nucleo<EfeitoGrow>, dono, { ...uso, poder });
   else lancarPoderAnjo(e as Nucleo<EfeitoAnjo>, dono, { ...uso, poder: poder as PoderAnjo });
+}
+
+// O Vendaval de `dono`: soltou o botão (para assim que passar o mínimo) e se ainda sopra.
+export function pararVento(e: Efeitos, dono: Dono): void {
+  pararVentoGrow(e, dono);
+}
+
+export function soprando(e: Efeitos, dono: Dono): boolean {
+  return ventoDo(e, dono);
 }
 
 export function atualizarEfeitos(e: Efeitos, dt: number, alvos: readonly Alvo[]): void {
   e.lista = e.lista.filter((ef) =>
     efeitoDaLeslie(ef)
       ? atualizarEfeitoLeslie(e as Nucleo<EfeitoLeslie>, ef, dt, alvos)
-      : atualizarEfeitoAnjo(e as Nucleo<EfeitoAnjo>, ef, dt, alvos),
+      : efeitoDoGrow(ef)
+        ? atualizarEfeitoGrow(e as Nucleo<EfeitoGrow>, ef, dt, alvos)
+        : atualizarEfeitoAnjo(e as Nucleo<EfeitoAnjo>, ef, dt, alvos),
   );
   atualizarVeneno(e, alvos, dt);
   atualizarNucleo(e, dt);
@@ -162,6 +210,7 @@ export function ameacasPara(e: Efeitos, corpo: Dono): Ameacas {
   for (const ef of e.lista) {
     if (ef.dono === corpo) continue;
     if (efeitoDaLeslie(ef)) ameacasDaLeslie(ef, ameacas);
+    else if (efeitoDoGrow(ef)) ameacasDoGrow(ef, ameacas);
     else ameacasDoAnjo(ef, ameacas);
   }
   return ameacas;
@@ -171,6 +220,7 @@ export function ameacasPara(e: Efeitos, corpo: Dono): Ameacas {
 export function desenharEfeitosNoChao(ctx: CanvasRenderingContext2D, e: Efeitos, tempo: number): void {
   for (const ef of e.lista) {
     if (efeitoDaLeslie(ef)) desenharLeslieNoChao(ctx, ef, tempo);
+    else if (efeitoDoGrow(ef)) desenharGrowNoChao(ctx, ef, tempo);
     else desenharAnjoNoChao(ctx, ef, tempo);
   }
 }
@@ -179,6 +229,7 @@ export function desenharEfeitosNoChao(ctx: CanvasRenderingContext2D, e: Efeitos,
 export function desenharEfeitosNaFrente(ctx: CanvasRenderingContext2D, e: Efeitos, tempo: number): void {
   for (const ef of e.lista) {
     if (efeitoDaLeslie(ef)) desenharLeslieNaFrente(ctx, ef, tempo);
+    else if (efeitoDoGrow(ef)) desenharGrowNaFrente(ctx, ef, tempo);
     else desenharAnjoNaFrente(ctx, ef, tempo);
   }
   desenharParticulas(ctx, e);
@@ -199,6 +250,7 @@ export function desenharPreviaDoPoder(
   ctx.save();
   ctx.globalAlpha = PREVIA.alfa * (0.8 + 0.2 * Math.sin(tempo * 4));
   if (daLeslie(poder)) desenharPreviaLeslie(ctx, poder, origem, alvo, tempo, PREVIA);
+  else if (doGrow(poder)) desenharPreviaGrow(ctx, poder, origem, alvo, tempo, PREVIA);
   else desenharPreviaAnjo(ctx, poder as PoderAnjo, origem, alvo, tempo);
   ctx.restore();
 }

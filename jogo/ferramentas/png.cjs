@@ -9,6 +9,7 @@ function lerPng(arquivo) {
   let off = 8;
   let largura = 0;
   let altura = 0;
+  let canais = 4;
   const partes = [];
   while (off < buf.length) {
     const tam = buf.readUInt32BE(off);
@@ -16,8 +17,9 @@ function lerPng(arquivo) {
     if (tipo === 'IHDR') {
       largura = buf.readUInt32BE(off + 8);
       altura = buf.readUInt32BE(off + 12);
-      if (buf[off + 16] !== 8 || buf[off + 17] !== 6 || buf[off + 20] !== 0) {
-        throw new Error('o PNG precisa ser RGBA 8 bits sem entrelaçamento');
+      canais = buf[off + 17] === 6 ? 4 : buf[off + 17] === 2 ? 3 : 0;
+      if (buf[off + 16] !== 8 || !canais || buf[off + 20] !== 0) {
+        throw new Error('o PNG precisa ser RGBA (ou RGB) 8 bits sem entrelaçamento');
       }
     }
     if (tipo === 'IDAT') partes.push(buf.subarray(off + 8, off + 8 + tam));
@@ -25,15 +27,16 @@ function lerPng(arquivo) {
     off += 12 + tam;
   }
   const bruto = zlib.inflateSync(Buffer.concat(partes));
-  const passo = largura * 4;
-  const px = Buffer.alloc(largura * altura * 4);
+  const passo = largura * canais;
+  const lido = Buffer.alloc(largura * altura * canais);
+  const px = lido;
   for (let y = 0; y < altura; y++) {
     const filtro = bruto[y * (passo + 1)];
     const ini = y * (passo + 1) + 1;
     for (let x = 0; x < passo; x++) {
-      const a = x >= 4 ? px[y * passo + x - 4] : 0;
+      const a = x >= canais ? px[y * passo + x - canais] : 0;
       const b = y > 0 ? px[(y - 1) * passo + x] : 0;
-      const c = x >= 4 && y > 0 ? px[(y - 1) * passo + x - 4] : 0;
+      const c = x >= canais && y > 0 ? px[(y - 1) * passo + x - canais] : 0;
       let v = bruto[ini + x];
       if (filtro === 1) v += a;
       else if (filtro === 2) v += b;
@@ -48,7 +51,16 @@ function lerPng(arquivo) {
       px[y * passo + x] = v & 255;
     }
   }
-  return { largura, altura, px };
+  if (canais === 4) return { largura, altura, px };
+  // RGB: vira RGBA opaco.
+  const rgba = Buffer.alloc(largura * altura * 4);
+  for (let i = 0; i < largura * altura; i++) {
+    rgba[i * 4] = lido[i * 3];
+    rgba[i * 4 + 1] = lido[i * 3 + 1];
+    rgba[i * 4 + 2] = lido[i * 3 + 2];
+    rgba[i * 4 + 3] = 255;
+  }
+  return { largura, altura, px: rgba };
 }
 
 const TABELA_CRC = Array.from({ length: 256 }, (_, n) => {

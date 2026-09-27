@@ -5,19 +5,24 @@
 // - Leslie: o da arma da mão e os três dos poderes, lado a lado; o que o clique esquerdo usa
 //   agora (a tecla R troca) fica aceso e o outro lado, apagado. A energia pixy é verde e brilha
 //   quando a Fúria da Floresta está pronta.
+// - Grow: de gente, como a Leslie (a energia pixy em verde-musgo, que brilha quando dá para virar
+//   golem); de golem, a barra de pedra com o tempo que resta, descendo, e os três poderes do golem.
 // - Anjo: na forma base, a energia pixy (brilha quando dá para virar anjo) e o quadrinho da arma;
 //   de anjo, o tempo que resta e os três poderes.
 // O escolhido fica em destaque. Em pixels da tela do jogo, desenhado por último, por cima da luz.
 // Tudo sai do canto para dentro: as barras se esvaziam em direção à borda da tela, dos dois lados.
 
-import { DADOS_ARMA, ENERGIA_PIXY, RECARGA_PODER, type IdPoder, type TipoArma } from '@terna/compartilhado';
+import { DADOS_ARMA, ENERGIA_PIXY, RECARGA_GOLEM, RECARGA_PODER, type IdPoder, type TipoArma } from '@terna/compartilhado';
 import { barraDoAnjo } from '../entidades/anjo/anjo';
+import { barraDoGolem } from '../entidades/grow/golem';
 import { DESENHO_ICONE, PALETA_ICONE, type ArmaNaMao } from '../entidades/armas';
 import {
+  ALTURA_RETRATO,
   LARGURA_RETRATO,
   VIDA_MAXIMA,
   usaPoderes,
   custoDeEnergia,
+  formaDo,
   personagemLivre,
   retratoDo,
   type Personagem,
@@ -45,7 +50,7 @@ const PISCADAS = 4; // por segundo
 const VIDA_Y = 0;
 const ANJO_Y = 9;
 const ESPACOS_Y = 17;
-const FOTO = { x: 0, w: LARGURA_RETRATO + 2, h: ESPACOS_Y + ESPACO }; // da altura de todo o resto
+const FOTO = { x: 0, w: LARGURA_RETRATO + 2, h: ALTURA_RETRATO + 2 }; // da altura de todo o resto (ESPACOS_Y + ESPACO)
 const ICONE_X = FOTO.x + FOTO.w + 4;
 const BARRA_X = ICONE_X + 9;
 const FUNDO = { x: -4, y: -4, w: BARRA_X + BARRA + 2 + 8, h: FOTO.h + 8 };
@@ -55,6 +60,8 @@ const CORACAO = criarSprite(['.rr.rr.', 'rcrrrrr', 'rrrrrrr', '.rrrrr.', '..rre.
 const AUREOLA = criarSprite(['.wyyyy.', 'y.....y', '.yyyyy.'], PALETA_ICONES);
 // A folha da energia pixy da Leslie.
 const FOLHA = criarSprite(['...gg..', '.gcggg.', 'tggge..'], { g: '#8fd45a', c: '#d4f7a8', e: '#4f9a38', t: '#6b4424' });
+// A pedrinha com musgo da energia do Grow (e do tempo do golem).
+const PEDRINHA = criarSprite(['..vgv..', '.lkkkk.', 'skkkkks'], { v: '#9cbc45', g: '#6b8a2a', l: '#d2c3a2', k: '#a8977a', s: '#75654f' });
 
 interface CoresBarra {
   fundo: string;
@@ -71,6 +78,10 @@ const ANJO_PISCANDO: CoresBarra = { fundo: '#2a2442', cheio: '#fff4c2', brilho: 
 const ENERGIA: CoresBarra = { fundo: '#2a2442', cheio: '#b48cff', brilho: '#e6d9ff', sombra: '#7c52e8' };
 // A energia pixy da Leslie, no verde da floresta.
 const ENERGIA_LESLIE: CoresBarra = { fundo: '#1c2a18', cheio: '#8fd45a', brilho: '#d4f7a8', sombra: '#4f9a38' };
+// A do Grow, no verde do musgo; de golem, a barra vira pedra (e clareia piscando no fim).
+const ENERGIA_GROW: CoresBarra = { fundo: '#1e2214', cheio: '#9cbc45', brilho: '#d8ec9a', sombra: '#6b8a2a' };
+const GOLEM: CoresBarra = { fundo: '#221c16', cheio: '#a8977a', brilho: '#d2c3a2', sombra: '#75654f' };
+const GOLEM_PISCANDO: CoresBarra = { fundo: '#221c16', cheio: '#d2c3a2', brilho: '#fff4dc', sombra: '#a8977a' };
 
 // Desenha no espaço do painel: `x` é a distância do canto para dentro da tela.
 interface Pincel {
@@ -113,11 +124,11 @@ function pincel(ctx: CanvasRenderingContext2D, canto: Canto, largura: number): P
 }
 
 // A foto no canto: moldura na cor do jogador, fundo claro dela com o chão um pouco mais
-// escuro e o personagem de frente, encostado embaixo e centrado.
+// escuro e o personagem de frente, no meio da moldura, com o corpo até a borda de baixo.
 function desenharFoto(p: Pincel, retrato: HTMLCanvasElement, cores: CorDoJogador): void {
   p.retangulo(FOTO.x + 1, 1, FOTO.w - 2, FOTO.h - 2, cores.clara);
   p.retangulo(FOTO.x + 1, FOTO.h - 9, FOTO.w - 2, 8, 'rgba(20, 16, 40, 0.12)');
-  p.imagem(retrato, FOTO.x + 1 + ((FOTO.w - 2 - retrato.width) >> 1), FOTO.h - 1 - retrato.height);
+  p.imagem(retrato, FOTO.x + 1 + ((FOTO.w - 2 - retrato.width) >> 1), 1);
   p.contorno(FOTO.x, 0, FOTO.w, FOTO.h, cores.cor);
 }
 
@@ -154,7 +165,120 @@ const PALETA_LESLIE: Paleta = {
   v: '#8fd45a',
   w: '#d4f7a8',
 };
+// Os do Grow: os pássaros da Revoada, o vento com a folha do Vendaval e a cara do golem; os do
+// golem nos cinzas da pedra com musgo: o Salto caindo na terra, a Investida e o pedregulho.
+const PALETA_GROW: Paleta = {
+  t: '#3c2412',
+  m: '#6b4424',
+  c: '#9c6a3a',
+  p: '#e8d8b0',
+  y: '#f0c040',
+  w: '#f4f8ff',
+  a: '#a9c6dc',
+  g: '#6fb842',
+  v: '#9cbc45',
+  S: '#2b241c',
+  k: '#75654f',
+  l: '#a8977a',
+  L: '#d2c3a2',
+};
 const ICONES: Record<IdPoder, HTMLCanvasElement> = {
+  aves: criarSprite(
+    [
+      '...........',
+      '.t...t.....',
+      '..tmt......',
+      '...cmmy....',
+      '...ppm.....',
+      '...........',
+      '......t..t.',
+      '.......tmt.',
+      '........cmy',
+      '........pm.',
+      '...........',
+    ],
+    PALETA_GROW,
+  ),
+  vento: criarSprite(
+    [
+      '...........',
+      '.aawwwwa...',
+      '.......wa..',
+      '..awwwa..w.',
+      '.......w.a.',
+      '.aawwa.w...',
+      '.....wa..g.',
+      '.awwwa..gvg',
+      '.........g.',
+      '..aawwwa...',
+      '...........',
+    ],
+    PALETA_GROW,
+  ),
+  golem: criarSprite(
+    [
+      '...v.gv....',
+      '..SvkvkkS..',
+      '.SkllkllkS.',
+      '.SkSySySkS.',
+      '.SkkkkkkkS.',
+      '..SklllkS..',
+      '.vSkSSSkSv.',
+      'SkkS...SkkS',
+      'SllS...SllS',
+      'SkkS...SkkS',
+      '.SS.....SS.',
+    ],
+    PALETA_GROW,
+  ),
+  salto: criarSprite(
+    [
+      '.....L.....',
+      '....lLl....',
+      '.....L.....',
+      '...SkvkS...',
+      '..SkllkkS..',
+      '..SkkkkkS..',
+      '..SkS.SkS..',
+      '.SkkS.SkkS.',
+      'tSSStStSSSt',
+      'mtmmtmtmmtm',
+      't.t..t..t.t',
+    ],
+    PALETA_GROW,
+  ),
+  investida: criarSprite(
+    [
+      '...........',
+      '.....SSvS..',
+      '....SkllvS.',
+      'w...SklllkS',
+      '.ww.SkSykkS',
+      'w...SkkkkkS',
+      '.ww..SkkkS.',
+      'w...SkSSkS.',
+      '...SkS.SkS.',
+      '..mSS..SSm.',
+      '.mtmtmtmtmt',
+    ],
+    PALETA_GROW,
+  ),
+  pedra: criarSprite(
+    [
+      '...vgvv....',
+      '..SvgvlkS..',
+      '.SklLLlkkS.',
+      '.SlLlllkkS.',
+      'SklllkkkkSS',
+      'SkllkkSkkkS',
+      'SkkkkkkkkkS',
+      '.SkkkkkkSS.',
+      '.tSSkkSSSt.',
+      'mtmSSSSmtmt',
+      '.t.t.t.t.t.',
+    ],
+    PALETA_GROW,
+  ),
   chicote: criarSprite(
     [
       '........e.c',
@@ -336,7 +460,28 @@ export function desenharPainel(
 
   const pulso = 0.5 + 0.5 * Math.sin(tempo * 5);
   const { poderes } = personagem;
-  if (personagem.heroi === 'leslie') {
+  if (personagem.heroi === 'grow') {
+    const golem = barraDoGolem(personagem.golem, personagem.energia);
+    const piscando = golem.ativa && golem.resta <= ALERTA_ANJO && Math.floor(tempo * PISCADAS) % 2 === 0;
+    p.imagem(PEDRINHA, ICONE_X, ANJO_Y + 1, golem.ativa ? 1 : golem.disponivel ? 0.7 + 0.3 * pulso : 0.6);
+    desenharBarra(p, ANJO_Y, 3, golem.cheia, !golem.ativa ? ENERGIA_GROW : piscando ? GOLEM_PISCANDO : GOLEM);
+    if (!golem.ativa) {
+      // Marquinhas onde a Revoada e o Vendaval já saem.
+      for (const poder of ['aves', 'vento'] as const) {
+        const custo = ENERGIA_PIXY.custoGrow[poder];
+        const x = Math.round((BARRA * custo) / ENERGIA_PIXY.maxima);
+        p.retangulo(BARRA_X + 1 + x, ANJO_Y + 1, 1, 3, personagem.energia >= custo ? 'rgba(20, 30, 10, 0.55)' : 'rgba(216, 236, 154, 0.55)');
+      }
+    }
+    if (golem.disponivel) desenharBrilho(p, ANJO_Y, 3, tempo);
+    // De golem, só os três poderes dele (a mão não segura arma).
+    if (formaDo(personagem) === 'golem') {
+      desenharPoderes(p, personagem);
+    } else {
+      desenharEspacoDaArma(p, personagem.arma, tempo, personagem.modo === 'arma');
+      desenharPoderes(p, personagem, ESPACO + ENTRE_ESPACOS);
+    }
+  } else if (personagem.heroi === 'leslie') {
     // A energia pixy, que enche para a Fúria; e a arma e os poderes lado a lado.
     const cheia = personagem.energia >= ENERGIA_PIXY.maxima;
     p.imagem(FOLHA, ICONE_X, ANJO_Y + 1, cheia ? 0.7 + 0.3 * pulso : 0.6);
@@ -397,7 +542,12 @@ function desenharPoderes(p: Pincel, personagem: Personagem, desde = 0): void {
     const x = BARRA_X + desde + i * (ESPACO + ENTRE_ESPACOS) + tremor;
     const semEnergia = personagem.energia < custoDeEnergia(personagem, poder);
     const ativo = prontos && !semEnergia;
-    desenharEspaco(p, x, ESPACOS_Y, ICONES[poder], escolhido, ativo, poderes.recarga[i], RECARGA_PODER[poder]);
+    // O quadrinho do golem mostra a recarga da transformação (depois de voltar a ser gente).
+    const [falta, total] =
+      poder === 'golem' && personagem.golem.recarga > poderes.recarga[i]
+        ? [personagem.golem.recarga, RECARGA_GOLEM]
+        : [poderes.recarga[i], RECARGA_PODER[poder]];
+    desenharEspaco(p, x, ESPACOS_Y, ICONES[poder], escolhido, ativo, falta, total);
   });
 }
 

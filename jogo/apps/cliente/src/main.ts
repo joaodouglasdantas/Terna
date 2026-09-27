@@ -2,7 +2,7 @@
 // principal (atualizar → desenhar) a cada quadro do navegador. Por cima, o ciclo das telas:
 // carregamento → tela inicial → partida → fim → tela inicial de novo.
 
-import { MUNDO } from '@terna/compartilhado';
+import { CARREGAMENTO_MS, MUNDO } from '@terna/compartilhado';
 import { atualizarAnimais, desenharAnimais, desenharAnimaisNoAr, prepararAnimais } from './entidades/animais';
 import { desenharArmasNaFrente, desenharArmasNoChao, desenharPreviaDoArco, prepararArmas } from './entidades/armas';
 import {
@@ -16,6 +16,7 @@ import {
   prepararPersonagens,
   usaPoderes,
   type Controles,
+  type Personagem,
 } from './entidades/personagem';
 import {
   desenharBordaDoEncanto,
@@ -26,9 +27,17 @@ import {
   poderEscolhido,
   prepararPoderes,
 } from './entidades/poderes';
+import { desenharLuzAtras, desenharLuzNaFrente } from './entidades/luz-da-vitoria';
 import { prepararCena } from './inicio/cena';
+import { abrirCortina, fecharCortina } from './inicio/dom';
+import { aparelhoMovel, telaSoNoComputador } from './inicio/aparelho';
 import { carregar, escolherModo, type Escolha } from './inicio/inicio';
+import { ouvirRevanche } from './inicio/revanche';
+import { telaSelecao, type SalaNaSelecao } from './inicio/selecao';
+import { telaTemporada } from './inicio/temporada';
 import { montarMenus } from './inicio/na-partida';
+import { criarBordas, desenharBordas, sentirBordas } from './interface/bordas';
+import { desenharContagem } from './interface/contagem';
 import { desenharCronometro } from './interface/cronometro';
 import { desenharEtiquetas } from './interface/etiqueta';
 import { aplicarMira } from './interface/mira';
@@ -159,7 +168,8 @@ function lerTeclado(): Controles {
     esquerda: Boolean(teclas['ArrowLeft'] || teclas['KeyA']),
     direita: Boolean(teclas['ArrowRight'] || teclas['KeyD']),
     pular: Boolean(teclas['Space'] || teclas['ArrowUp'] || teclas['KeyW']),
-    // R: a Leslie troca a arma pelos poderes (e volta); o Anjo alterna entre a forma base e a de anjo.
+    // R: a Leslie e o Grow trocam a arma pelos poderes (e voltam; o golem desfaz a pedra); o Anjo
+    // alterna entre a forma base e a de anjo.
     transformar: Boolean(teclas['KeyR']) || r,
   };
 }
@@ -170,7 +180,7 @@ function lerTeclado(): Controles {
 // ponto sai da câmera da metade clicada. O menu do botão direito do navegador não abre no jogo.
 // Em cima do jogo, no lugar da seta do sistema, o cursor vira a mira (interface/mira.ts). A
 // posição guardada aqui serve às prévias do poder e do arco.
-const mouse: AcoesMouse = { trocar: 0, usar: null, descartar: false };
+const mouse: AcoesMouse = { trocar: 0, usar: null, segurando: false, descartar: false };
 const cursor = { x: 0, y: 0, dentro: false }; // em pixels da tela do jogo
 
 function pontoNaTela(evento: PointerEvent): { x: number; y: number } {
@@ -183,14 +193,26 @@ function pontoNaTela(evento: PointerEvent): { x: number; y: number } {
 
 function telaParaMapa({ x, y }: { x: number; y: number }): { x: number; y: number } {
   const { esquerda, direita, dividida } = camerasNaTela();
-  return { x: (dividida && x >= METADE ? direita : esquerda) + x, y };
+  const altos = olharNaTela();
+  const naDireita = dividida && x >= METADE;
+  return { x: (naDireita ? direita : esquerda) + x, y: y - (naDireita ? altos.direita : altos.esquerda) };
 }
 
 canvas.addEventListener('contextmenu', (evento) => evento.preventDefault());
 canvas.addEventListener('pointerdown', (evento) => {
   if (!partida || evento.pointerType === 'touch') return;
   if (evento.button === 2) mouse.trocar++;
-  else if (evento.button === 0) mouse.usar = telaParaMapa(pontoNaTela(evento));
+  else if (evento.button === 0) {
+    mouse.usar = telaParaMapa(pontoNaTela(evento));
+    mouse.segurando = true;
+  }
+});
+// O botão esquerdo solto (em qualquer lugar da página): o Vendaval do Grow para.
+window.addEventListener('pointerup', (evento) => {
+  if (evento.button === 0) mouse.segurando = false;
+});
+window.addEventListener('blur', () => {
+  mouse.segurando = false;
 });
 canvas.addEventListener('pointermove', (evento) => {
   if (evento.pointerType === 'touch') return;
@@ -217,7 +239,35 @@ function lerMouse(): AcoesMouse {
   mouse.trocar = 0;
   mouse.usar = null;
   mouse.descartar = false;
+  // `segurando` continua até o botão ser solto.
   return acoes;
+}
+
+// As bordas da sua tela (apanhou, envenenado, preso…): interface/bordas.ts.
+let bordas = criarBordas();
+// A câmera na vertical: com o personagem no alto (pulando, voando, levado pelas águias), ela sobe
+// um pouco atrás dele — a cena toda desce na tela: chão, árvores, bichos, efeitos e, com
+// paralaxe (o longe mexe menos: desenharFundo), a paisagem, as nuvens, os pássaros e o sol. É só
+// uma mexida leve: `porPixel` de cada pixel de altura, até `maxima`, e persegue o alvo devagar
+// (`seguir`, por segundo), sem tranco. Com a tela dividida, cada metade olha o personagem dela.
+const OLHAR = { porPixel: 0.16, maxima: 18, seguir: 2.2 };
+const olhar = { esquerda: 0, direita: 0 };
+
+function atualizarOlhar(dt: number): void {
+  const altura = (quem: Personagem | undefined): number => (quem ? Math.max(0, Y_CHAO - quem.y) : 0);
+  const p = partida;
+  // Tela inteira: o seu personagem; dividida, o da esquerda e o da direita.
+  let [esquerda, direita] = [p?.jogador, p?.jogador];
+  if (p && camera.dividida) [esquerda, direita] = p.jogador.x <= p.outro.x ? [p.jogador, p.outro] : [p.outro, p.jogador];
+  const k = Math.min(1, dt * OLHAR.seguir);
+  olhar.esquerda += (Math.min(OLHAR.maxima, altura(esquerda) * OLHAR.porPixel) - olhar.esquerda) * k;
+  olhar.direita += (Math.min(OLHAR.maxima, altura(direita) * OLHAR.porPixel) - olhar.direita) * k;
+}
+
+// Quanto a cena desce em cada metade, em pixels inteiros (inteira, a da esquerda vale para tudo).
+function olharNaTela(): { esquerda: number; direita: number } {
+  const esquerda = Math.round(olhar.esquerda);
+  return { esquerda, direita: camera.dividida ? Math.round(olhar.direita) : esquerda };
 }
 
 function atualizar(dt: number, tempo: number): void {
@@ -225,7 +275,9 @@ function atualizar(dt: number, tempo: number): void {
   if (partida) {
     atualizarPartida(partida, lerTeclado(), acoes, dt, tempo);
     atualizarCamera(partida, dt);
+    sentirBordas(bordas, partida.jogador, dt);
   }
+  atualizarOlhar(dt);
   const { esquerda, direita } = camerasNaTela();
   atualizarPassaros(dt, LARGURA, esquerda, direita);
   atualizarAnimais(dt, partida ? [partida.jogador, partida.outro] : [], vistas());
@@ -234,15 +286,16 @@ function atualizar(dt: number, tempo: number): void {
 
 // Uma tela inteira vista pela câmera `camX`, recortada na faixa de `x0` a `x0 + largura` da
 // tela. O fundo é desenhado em coordenadas de tela, com paralaxe; chão, plantas da frente e os
-// personagens em coordenadas do mapa, deslocados pela câmera.
-function desenharVista(tempo: number, luz: Luz, camX: number, x0: number, largura: number): void {
+// personagens em coordenadas do mapa, deslocados pela câmera (`olharY`: o quanto ela subiu, e a
+// cena desce).
+function desenharVista(tempo: number, luz: Luz, camX: number, olharY: number, x0: number, largura: number): void {
   ctx.save();
   ctx.beginPath();
   ctx.rect(x0, 0, largura, ALTURA);
   ctx.clip();
-  desenharFundo(ctx, folhaCenario, tempo, luz, camX, LARGURA, ALTURA, Y_CHAO);
+  desenharFundo(ctx, folhaCenario, tempo, luz, camX, LARGURA, ALTURA, Y_CHAO, olharY);
 
-  ctx.translate(-camX, 0);
+  ctx.translate(-camX, olharY);
   ctx.drawImage(chao, 0, Y_CHAO - FOLGA_TUFOS);
   desenharMinhocas(ctx, camX, LARGURA);
   desenharVegetacao(ctx, folhaCenario, tempo, luz, Y_CHAO, camX, LARGURA);
@@ -255,8 +308,12 @@ function desenharVista(tempo: number, luz: Luz, camX: number, x0: number, largur
     desenharArmasNoChao(ctx, partida.arsenal, tempo);
     desenharSombraDoPersonagem(ctx, partida.outro, luz);
     desenharSombraDoPersonagem(ctx, partida.jogador, luz);
+    // Quem venceu: o facho de luz do céu por trás e o brilho por cima.
+    const vencedor = partida.fim?.vencedor;
+    if (vencedor) desenharLuzAtras(ctx, vencedor.x, vencedor.y, partida.fim!.ha, tempo);
     desenharPersonagem(ctx, partida.outro, tempo);
     desenharPersonagem(ctx, partida.jogador, tempo);
+    if (vencedor) desenharLuzNaFrente(ctx, vencedor.x, vencedor.y, vencedor.medida.altura, partida.fim!.ha, tempo);
     desenharEfeitosNaFrente(ctx, partida.efeitos, tempo);
     desenharArmasNaFrente(ctx, partida.arsenal);
     if (mostrarMira(partida) && acaoPronta(partida)) {
@@ -274,12 +331,12 @@ function desenharVista(tempo: number, luz: Luz, camX: number, x0: number, largur
 
 // Os nomes em cima de cada um, na vista da câmera `camX` recortada como em desenharVista. O
 // do outro vem primeiro: juntos, o nome dele é o que sobe. Os números de dano vêm por cima.
-function desenharNomes(p: Partida, camX: number, x0: number, largura: number): void {
+function desenharNomes(p: Partida, camX: number, olharY: number, x0: number, largura: number): void {
   ctx.save();
   ctx.beginPath();
   ctx.rect(x0, 0, largura, ALTURA);
   ctx.clip();
-  ctx.translate(-camX, 0);
+  ctx.translate(-camX, olharY);
   desenharEtiquetas(
     ctx,
     [
@@ -306,29 +363,34 @@ function desenharDivisao(forca: number): void {
 function desenhar(tempo: number): void {
   const luz = luzDoSol(tempo, LARGURA);
   const { esquerda, direita, dividida } = camerasNaTela();
+  const altos = olharNaTela();
   if (dividida) {
-    desenharVista(tempo, luz, esquerda, 0, METADE);
-    desenharVista(tempo, luz, direita, METADE, METADE);
+    desenharVista(tempo, luz, esquerda, altos.esquerda, 0, METADE);
+    desenharVista(tempo, luz, direita, altos.direita, METADE, METADE);
   } else {
-    desenharVista(tempo, luz, esquerda, 0, LARGURA);
+    desenharVista(tempo, luz, esquerda, altos.esquerda, 0, LARGURA);
   }
   desenharLuz(ctx, luz, LARGURA, ALTURA);
   const p = partida;
   if (!p) return;
   // Os nomes vêm depois da luz, para o sol não tingir o azul e o vermelho.
   if (dividida) {
-    desenharNomes(p, esquerda, 0, METADE);
-    desenharNomes(p, direita, METADE, METADE);
+    desenharNomes(p, esquerda, altos.esquerda, 0, METADE);
+    desenharNomes(p, direita, altos.direita, METADE, METADE);
   } else {
-    desenharNomes(p, esquerda, 0, LARGURA);
+    desenharNomes(p, esquerda, altos.esquerda, 0, LARGURA);
   }
   if (dividida) desenharDivisao(Math.min(1, Math.abs(direita - esquerda) / DIVISAO_APARECE));
-  // Enfeitiçado, a sua tela ganha a borda rosa (por baixo dos painéis).
+  // As bordas contam o que acontece com você (por baixo dos painéis): na tela toda, ou na sua
+  // metade, com ela dividida. Enfeitiçado, a borda rosa.
+  const minhaMetade = !dividida ? [0, LARGURA] : p.jogador.x <= p.outro.x ? [0, METADE] : [METADE, METADE];
+  desenharBordas(ctx, bordas, p.jogador, minhaMetade[0], minhaMetade[1], ALTURA, tempo);
   if (p.jogador.encanto) desenharBordaDoEncanto(ctx, p.jogador.encanto, LARGURA, ALTURA, tempo);
   // Os painéis ficam sempre no mesmo canto: o seu à esquerda, o do outro à direita.
   desenharPainel(ctx, p.jogador, p.eu, 'esquerda', LARGURA, tempo, true);
   desenharPainel(ctx, p.outro, p.ele, 'direita', LARGURA, tempo);
   desenharCronometro(ctx, p.restanteMs, LARGURA, tempo);
+  desenharContagem(ctx, p.contagem, p.relogio - p.contagemInicial, LARGURA, ALTURA);
 }
 
 // A mira é o cursor do sistema (interface/mira.ts): na partida, fora do menu e antes do fim.
@@ -363,33 +425,51 @@ function textoDoFim(motivo: FimDaPartida, venceu: boolean | null, oponente: stri
   return { titulo: 'Fim de partida', texto };
 }
 
-// No fim por morte, a tela espera um pouco: dá para ver o último golpe e quem caiu.
-const ESPERA_FIM_MORTE = 1200; // ms
+// No fim por morte, a tela espera um pouco: dá para ver o último golpe, quem caiu deitado no
+// chão e a luz do céu em quem venceu.
+const ESPERA_FIM_MORTE = 2800; // ms
 
 // Uma partida inteira: começa, roda até o tempo acabar (ou alguém sair) e termina quando a
-// pessoa volta ao menu.
-function jogar(escolha: Escolha): Promise<void> {
+// pessoa volta ao menu (null) ou pede para jogar de novo: sozinho ('sozinho'), na hora; online,
+// quando os dois pedem a revanche (a sala, para a escolha de personagem de novo).
+function jogar(escolha: Escolha): Promise<SalaNaSelecao | 'sozinho' | null> {
   return new Promise((resolver) => {
-    const sair = (): void => {
+    // Sai escurecendo: a próxima tela aparece do escuro. Com `proxima` (a revanche online), a
+    // conexão continua aberta.
+    const sair = (proxima?: SalaNaSelecao | 'sozinho'): void => {
       if (!partida) return;
-      encerrarPartida(partida);
-      partida = null;
-      camera.esquerda = camera.direita = CAMERA_NO_MEIO;
-      camera.dividida = false;
-      resolver();
+      encerrarPartida(partida, typeof proxima !== 'object');
+      void fecharCortina().then(() => {
+        partida = null;
+        camera.esquerda = camera.direita = CAMERA_NO_MEIO;
+        olhar.esquerda = olhar.direita = 0;
+        camera.dividida = false;
+        resolver(proxima ?? null);
+      });
     };
     const menus = montarMenus({
       online: escolha.modo === 'online',
+      heroi: escolha.heroi,
       aoMudarMenu: (aberto) => {
         if (partida) partida.menuAberto = aberto;
         if (aberto) soltarTeclas();
       },
-      aoSair: sair,
+      aoSair: () => sair(),
     });
     const nova = criarPartida(escolha, (motivo, venceu) => {
       const oponente = escolha.modo === 'online' ? escolha.oponente : 'A CPU';
       const { titulo, texto } = textoDoFim(motivo, venceu, oponente);
-      const mostrar = (): void => void menus.mostrarFim(titulo, texto).then(sair);
+      // Por tempo ou morte dá para jogar de novo: sozinho, direto; online a sala continua e é a
+      // revanche (já ouvindo, que o outro pode pedir antes de a tela de fim aparecer).
+      const deNovo = motivo === 'morte' || motivo === 'tempo';
+      const revanche =
+        escolha.modo !== 'online' ? (deNovo ? 'sozinho' : undefined) : deNovo ? ouvirRevanche(escolha.conexao, escolha.oponente) : undefined;
+      const mostrar = (): void =>
+        void menus.mostrarFim(titulo, texto, revanche).then((como) => {
+          if (como !== 'revanche' || !revanche) return sair();
+          if (revanche === 'sozinho' || escolha.modo !== 'online') return sair('sozinho');
+          sair({ conexao: escolha.conexao, oponente: escolha.oponente, pendentes: revanche.pendentes });
+        });
       if (motivo === 'morte') setTimeout(mostrar, ESPERA_FIM_MORTE);
       else mostrar();
     });
@@ -398,12 +478,18 @@ function jogar(escolha: Escolha): Promise<void> {
     // Teclas apertadas nas telas (o Enter do botão) não valem no jogo.
     soltarTeclas();
     partida = nova;
+    bordas = criarBordas();
+    // A partida aparece do escuro (a tela de antes sumiu escurecendo o jogo junto).
+    void abrirCortina();
   });
 }
 
 // Carregamento primeiro (confere a arte, o servidor e o banco); depois o cenário começa a rodar
-// atrás da tela inicial e, a cada partida que acaba, a tela inicial volta.
+// atrás da tela inicial. Cada partida passa pelo carregamento da temporada; quando ela acaba, a
+// tela inicial volta (ou, jogando de novo, a escolha de personagem).
 async function principal(): Promise<void> {
+  // No celular e no tablet, só o aviso: o jogo não carrega (inicio/aparelho.ts).
+  if (aparelhoMovel()) return telaSoNoComputador();
   const { cenario, herois, online } = await carregar({
     carregarCenario: carregarFolhaCenario,
     carregarHerois,
@@ -417,7 +503,29 @@ async function principal(): Promise<void> {
   prepararCena(cenario);
   requestAnimationFrame(loop);
 
-  for (;;) await jogar(await escolherModo(online));
+  for (;;) {
+    let escolha: Escolha | null = await escolherModo(online);
+    while (escolha) {
+      const atual: Escolha = escolha;
+      escolha = null;
+      // O carregamento da temporada; online, termina junto para os dois (conta do início no
+      // servidor). O outro saindo enquanto isso, volta ao menu.
+      const ate = (atual.modo === 'online' ? atual.comecouEm : performance.now()) + CARREGAMENTO_MS;
+      const online = atual.modo === 'online' ? { conexao: atual.conexao, oponente: atual.oponente } : undefined;
+      const { saiu } = await telaTemporada({ ate, online });
+      if (saiu) break;
+      const revanche = await jogar(atual);
+      // Jogar de novo: a escolha de personagem outra vez — sozinho, contra outra CPU sorteada;
+      // online, na mesma sala, e os dois escolhendo começa outra rodada. Voltando, o menu.
+      if (revanche === 'sozinho' && atual.modo === 'solo') {
+        const r = await telaSelecao(undefined, atual.heroi);
+        if (r.tipo === 'escolheu') escolha = { modo: 'solo', nome: atual.nome, heroi: r.heroi };
+      } else if (revanche && revanche !== 'sozinho' && atual.modo === 'online') {
+        const r = await telaSelecao(revanche, atual.heroi);
+        if (r.tipo === 'comecou') escolha = { modo: 'online', nome: atual.nome, ...r.partida, conexao: atual.conexao };
+      }
+    }
+  }
 }
 
 void principal();

@@ -1,6 +1,8 @@
 import { randomInt } from 'node:crypto';
 import {
   DADOS_ARMA,
+  CARREGAMENTO_MS,
+  CONTAGEM_MS,
   DURACAO_PARTIDA_MS,
   HEROI_PADRAO,
   LETRAS_DO_CODIGO,
@@ -36,6 +38,11 @@ const LIMITE_POR_SEGUNDO = 30;
 
 export interface OpcoesSalas {
   duracaoMs: number;
+  // O que vem antes do relógio: a tela de carregamento da temporada e a contagem 3, 2, 1 (as
+  // armas e o fim esperam por elas).
+  contagemMs: number;
+  // Depois do fim, quanto tempo a sala espera os dois pedirem a revanche antes de fechar.
+  revancheMaxMs: number;
   // Quanto tempo uma sala espera o segundo jogador antes de fechar.
   esperaMaxMs: number;
   // Quanto tempo os dois têm para escolher o personagem.
@@ -54,6 +61,8 @@ export function codigoAleatorio(): string {
 
 const PADRAO: OpcoesSalas = {
   duracaoMs: DURACAO_PARTIDA_MS,
+  contagemMs: CARREGAMENTO_MS + CONTAGEM_MS,
+  revancheMaxMs: 3 * 60 * 1000,
   esperaMaxMs: 10 * 60 * 1000,
   escolhaMaxMs: 90 * 1000,
   maxSalas: 500,
@@ -77,7 +86,10 @@ interface SalaPartida {
   timer: ReturnType<typeof setTimeout>; // espera o convidado; depois, a escolha; depois, o fim do tempo
   armas: ArmasDaSala;
   herois: Record<Lado, Heroi | null>; // a escolha de cada um, antes de começar
-  comecou: boolean;
+  // esperando o convidado → escolhendo os personagens → jogando → no fim (a revanche volta para a
+  // escolha).
+  fase: 'esperando' | 'escolher' | 'jogando' | 'fim';
+  revanche: Record<Lado, boolean>; // no fim: quem já pediu para jogar de novo
 }
 
 // Uma conexão dentro de uma sala. A rota guarda e devolve em `receber` e `sair`.
@@ -114,7 +126,8 @@ export class Salas {
       convidado: null,
       armas: { chao: new Map(), mao: { anfitriao: null, convidado: null }, proximoId: 1, timer: null },
       herois: { anfitriao: null, convidado: null },
-      comecou: false,
+      fase: 'esperando',
+      revanche: { anfitriao: false, convidado: false },
     } as SalaPartida;
     sala.anfitriao = { nome, conexao, sala, janela: 0, mensagens: 0 };
     sala.timer = setTimeout(() => this.fechar(sala, 'ninguém entrou na sala a tempo'), this.opcoes.esperaMaxMs);
@@ -130,24 +143,39 @@ export class Salas {
 
     const convidado: Participante = { nome, conexao, sala, janela: 0, mensagens: 0 };
     sala.convidado = convidado;
+    this.abrirEscolha(sala);
+    return convidado;
+  }
+
+  // Com os dois na sala (ao entrar, ou os dois pedindo a revanche): cada um escolhe o personagem.
+  private abrirEscolha(sala: SalaPartida): void {
+    const convidado = sala.convidado;
+    if (!convidado) return;
+    sala.fase = 'escolher';
+    sala.herois = { anfitriao: null, convidado: null };
+    sala.revanche = { anfitriao: false, convidado: false };
     clearTimeout(sala.timer);
     sala.timer = setTimeout(() => this.comecar(sala), this.opcoes.escolhaMaxMs);
-    this.mandar(sala.anfitriao.conexao, { tipo: 'escolher', lado: 'anfitriao', oponente: nome });
-    this.mandar(conexao, { tipo: 'escolher', lado: 'convidado', oponente: sala.anfitriao.nome });
-    return convidado;
+    this.mandar(sala.anfitriao.conexao, { tipo: 'escolher', lado: 'anfitriao', oponente: convidado.nome });
+    this.mandar(convidado.conexao, { tipo: 'escolher', lado: 'convidado', oponente: sala.anfitriao.nome });
   }
 
   // Os dois escolheram (ou o tempo de escolher acabou): a partida começa, com o relógio todo.
   private comecar(sala: SalaPartida): void {
     const convidado = sala.convidado;
-    if (sala.comecou || !convidado || this.salas.get(sala.codigo) !== sala) return;
-    sala.comecou = true;
+    if (sala.fase !== 'escolher' || !convidado || this.salas.get(sala.codigo) !== sala) return;
+    sala.fase = 'jogando';
+    // As armas da rodada anterior não passam para esta.
+    sala.armas.chao.clear();
+    sala.armas.mao = { anfitriao: null, convidado: null };
     const herois: Record<Lado, Heroi> = {
       anfitriao: sala.herois.anfitriao ?? HEROI_PADRAO,
       convidado: sala.herois.convidado ?? HEROI_PADRAO,
     };
     clearTimeout(sala.timer);
-    sala.timer = setTimeout(() => this.encerrar(sala, 'tempo'), this.opcoes.duracaoMs);
+    // O carregamento e a contagem 3, 2, 1 vêm antes do relógio: o fim é depois deles (`restanteMs`
+    // é o relógio).
+    sala.timer = setTimeout(() => this.encerrar(sala, 'tempo'), this.opcoes.contagemMs + this.opcoes.duracaoMs);
     const restanteMs = this.opcoes.duracaoMs;
     this.mandar(sala.anfitriao.conexao, {
       tipo: 'comecou',
@@ -165,7 +193,7 @@ export class Salas {
       heroi: herois.convidado,
       heroiOponente: herois.anfitriao,
     });
-    this.agendarArma(sala, this.opcoes.primeiraArmaMs);
+    this.agendarArma(sala, this.opcoes.contagemMs + this.opcoes.primeiraArmaMs);
   }
 
   receber(p: Participante, texto: string): void {
@@ -190,16 +218,22 @@ export class Salas {
     const lado: Lado = p === sala.anfitriao ? 'anfitriao' : 'convidado';
     const { armas } = sala;
     const m = mensagem.data;
-    // Antes de começar, só vale a escolha do personagem; depois de começar, ela não vale mais.
+    // Na escolha, só vale o personagem; no fim, só o pedido de revanche; jogando, o resto.
     if (m.tipo === 'heroi') {
-      if (sala.comecou) return;
+      if (sala.fase !== 'escolher') return;
       if (!LIBERADO[m.heroi]) return this.mandar(p.conexao, { tipo: 'erro', erro: 'esse personagem ainda não está liberado' });
       sala.herois[lado] = m.heroi;
       this.mandar(outro.conexao, { tipo: 'oponente-escolheu', heroi: m.heroi });
       if (sala.herois.anfitriao && sala.herois.convidado) this.comecar(sala);
       return;
     }
-    if (!sala.comecou) return;
+    if (m.tipo === 'revanche') {
+      if (sala.fase !== 'fim' || sala.revanche[lado]) return;
+      sala.revanche[lado] = true;
+      if (sala.revanche.anfitriao && sala.revanche.convidado) return this.abrirEscolha(sala);
+      return this.mandar(outro.conexao, { tipo: 'revanche' });
+    }
+    if (sala.fase !== 'jogando') return;
     switch (m.tipo) {
       case 'estado':
         return this.mandar(outro.conexao, { tipo: 'estado', estado: m.estado });
@@ -266,16 +300,31 @@ export class Salas {
     this.salas.delete(sala.codigo);
   }
 
-  // Termina a partida: avisa quem ainda está nela e fecha as conexões.
+  // Termina a partida e avisa os dois. Por tempo ou morte a sala fica aberta um tempo, para a
+  // revanche; alguém saindo, ela fecha junto com as conexões.
   private encerrar(sala: SalaPartida, motivo: MotivoFim, quemSaiu?: Participante, vencedor?: Lado): void {
     clearTimeout(sala.timer);
     if (sala.armas.timer) clearTimeout(sala.armas.timer);
+    sala.armas.timer = null;
+    if (motivo !== 'oponente-saiu') {
+      sala.fase = 'fim';
+      sala.revanche = { anfitriao: false, convidado: false };
+      this.mandarAosDois(sala, vencedor ? { tipo: 'fim', motivo, vencedor } : { tipo: 'fim', motivo });
+      sala.timer = setTimeout(() => this.fecharDepoisDoFim(sala), this.opcoes.revancheMaxMs);
+      return;
+    }
     this.salas.delete(sala.codigo);
     for (const p of [sala.anfitriao, sala.convidado]) {
       if (!p || p === quemSaiu) continue;
       this.mandar(p.conexao, vencedor ? { tipo: 'fim', motivo, vencedor } : { tipo: 'fim', motivo });
       p.conexao.close(1000, 'fim da partida');
     }
+  }
+
+  // Ninguém pediu a revanche a tempo: a sala fecha.
+  private fecharDepoisDoFim(sala: SalaPartida): void {
+    this.salas.delete(sala.codigo);
+    for (const p of [sala.anfitriao, sala.convidado]) if (p) this.recusar(p.conexao, 'a sala fechou');
   }
 
   // Fecha uma sala que ainda não começou.

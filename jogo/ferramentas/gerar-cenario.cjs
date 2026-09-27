@@ -288,6 +288,45 @@ const paisagem = reduzir(
 );
 quantizar([paisagem], 64);
 
+// A água da paisagem, para o jogo animar: o rio e os córregos (tipo 1) e as cascatas (tipo 2),
+// achados pela cor (o azul forte do rio; o branco-azulado da água caindo) dentro das regiões onde
+// eles estão na arte — frações da largura e da altura da paisagem reduzida (fora delas, o mesmo
+// azul é a névoa das colinas distantes, e o mesmo branco é a neve). Sai em faixas: [y, x, n, tipo].
+const AGUA = {
+  rio: { y0: 0.778, y1: 1 },
+  corrego: { x0: 0.585, x1: 0.83, y0: 0.556, y1: 0.778 },
+  cascatas: [
+    { x0: 0.778, x1: 0.83, y0: 0.452, y1: 0.648 }, // a que desce da montanha
+    { x0: 0.622, x1: 0.785, y0: 0.648, y1: 0.844 }, // as pequenas, no meio do córrego
+  ],
+};
+function acharAgua(red) {
+  const dentro = (r, x, y) => x >= (r.x0 ?? 0) * red.lw && x <= (r.x1 ?? 1) * red.lw && y >= r.y0 * red.lh && y < r.y1 * red.lh;
+  const faixas = [];
+  for (let y = 0; y < red.lh; y++) {
+    let atual = null;
+    for (let x = 0; x <= red.lw; x++) {
+      let tipo = 0;
+      if (x < red.lw) {
+        const i = (y * red.lw + x) * 4;
+        const [r, g, b, a] = [red.px[i], red.px[i + 1], red.px[i + 2], red.px[i + 3]];
+        const azul = a > 0 && b > r + 60 && b > g + 25;
+        const branco = a > 0 && b > 190 && g > 165 && r > 110 && b > r + 20;
+        if (branco && AGUA.cascatas.some((c) => dentro(c, x, y))) tipo = 2;
+        else if (azul && (dentro(AGUA.rio, x, y) || dentro(AGUA.corrego, x, y))) tipo = 1;
+      }
+      if (atual && atual[3] === tipo) {
+        atual[2]++;
+        continue;
+      }
+      if (atual) faixas.push(atual);
+      atual = tipo ? [y, x, 1, tipo] : null;
+    }
+  }
+  return faixas;
+}
+const agua = acharAgua(paisagem);
+
 // Céu: a cor do degradê em cada linha da tela, pintada pelo jogo atrás do sol.
 const colunaCeu = { largura: 1, altura: linhasCeu.length, px: Buffer.alloc(linhasCeu.length * 4) };
 linhasCeu.forEach((c, y) => colunaCeu.px.set([...c.map(Math.round), 255], y * 4));
@@ -402,12 +441,14 @@ const quadros = {
   arbustos: arbustos.map((q) => q.map(recorte)),
 };
 quadros.ceu = ceu;
+quadros.agua = agua;
 
 escreverPng(SAIDA_PNG, larguraFolha, alturaFolha, folha);
 fs.writeFileSync(
   SAIDA_JS,
   '// Gerado por ferramentas/gerar-cenario.cjs a partir de fontes/ — não editar à mão.\n' +
     '// x/y/w/h: recorte em assets/cenario.png; ceu: cor de cada linha da tela.\n' +
+    '// agua: a água da paisagem em faixas [y, x, n, tipo] (1 = rio e córregos, 2 = cascatas).\n' +
     '// Árvores e arbustos: lista de quadros do vento (repouso → curvatura máxima); m é a\n' +
     '// margem à esquerda por onde a copa verga (a base ocupa os w - m px da direita).\n' +
     '// Árvores, arbustos e nuvens seguem a ordem de leitura da folha de origem\n' +
@@ -415,6 +456,6 @@ fs.writeFileSync(
     `export const QUADROS_CENARIO = ${JSON.stringify(quadros)};\n`,
 );
 console.log(
-  `céu + paisagem + sol + ${nuvens.length} nuvens + ${arvores.length} árvores + ${arbustos.length} arbustos` +
+  `céu + paisagem (${agua.reduce((n, f) => n + f[2], 0)} px de água) + sol + ${nuvens.length} nuvens + ${arvores.length} árvores + ${arbustos.length} arbustos` +
     ` -> ${path.relative(RAIZ, SAIDA_PNG)} (${larguraFolha}x${alturaFolha})`,
 );

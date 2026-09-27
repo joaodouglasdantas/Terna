@@ -9,6 +9,10 @@ import { MUNDO } from './mundo';
 // começa com as duas escolhas feitas: ele manda o tempo que resta ao começar e avisa o fim.
 
 export const DURACAO_PARTIDA_MS = 5 * 60 * 1000;
+// Antes do relógio correr: a tela de carregamento da temporada (a mesma duração para os dois) e,
+// já no mapa, a contagem 3, 2, 1 com todo mundo parado.
+export const CARREGAMENTO_MS = 4500;
+export const CONTAGEM_MS = 3000;
 
 // Nome que a pessoa escolhe para aparecer em cima da cabeça (sem conta: só um apelido).
 // A fonte do jogo não tem acento: o nome é mostrado em maiúsculas e sem acento.
@@ -46,8 +50,8 @@ export const EstadoJogador = z.object({
   vy: z.number().min(-3000).max(3000),
   direcao: z.union([z.literal(1), z.literal(-1)]),
   noChao: z.boolean(),
-  forma: z.enum(['base', 'anjo']), // do Anjo; a Leslie está sempre na base
-  modo: z.enum(['arma', 'poderes']), // o que o clique esquerdo da Leslie usa (a tecla R troca)
+  forma: z.enum(['base', 'anjo', 'golem']), // o Anjo vira anjo, o Grow vira golem; a Leslie está sempre na base
+  modo: z.enum(['arma', 'poderes']), // o que o clique esquerdo da Leslie e do Grow usa (a tecla R troca)
   esquerda: z.boolean(),
   direita: z.boolean(),
   pular: z.boolean(),
@@ -58,6 +62,9 @@ export const EstadoJogador = z.object({
   encanto: z.number().min(0).max(10), // segundos que ainda faltam do encanto da Rajada (0 = livre)
   preso: z.number().min(0).max(10), // segundos que ainda faltam presos pelas Raízes (0 = livre)
   veneno: z.number().min(0).max(10), // segundos que ainda faltam do veneno do Chicote (0 = limpo)
+  levado: z.number().min(0).max(10), // segundos que ainda faltam carregado pela Revoada do Grow
+  empurrao: z.number().min(-1000).max(1000), // px/s de empurrão (vento, trombada), que vai sumindo
+  canalizando: z.boolean(), // o Grow segurando o Vendaval
   energia: z.number().min(0).max(ENERGIA_PIXY.maxima), // a energia pixy, para o painel dele aqui
 });
 export type EstadoJogador = z.infer<typeof EstadoJogador>;
@@ -118,6 +125,8 @@ export const MensagemPartidaDoCliente = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('descartar-arma') }),
   // A vida de quem manda chegou a 0: a partida acaba e o outro vence.
   z.object({ tipo: z.literal('morri') }),
+  // Depois do fim: quer jogar de novo com o mesmo oponente (os dois pedindo, voltam à escolha).
+  z.object({ tipo: z.literal('revanche') }),
 ]);
 export type MensagemPartidaDoCliente = z.infer<typeof MensagemPartidaDoCliente>;
 
@@ -151,7 +160,11 @@ export const MensagemPartidaDoServidor = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('arma-quebrou'), lado: Lado }),
   // Só para o outro: `lado` jogou fora a arma da mão.
   z.object({ tipo: z.literal('arma-descartada'), lado: Lado }),
+  // A partida acabou. Por tempo ou morte a sala continua aberta para a revanche; o outro saindo,
+  // ela fecha.
   z.object({ tipo: z.literal('fim'), motivo: MotivoFim, vencedor: Lado.optional() }),
+  // Só para o outro: quem mandou quer jogar de novo. Os dois querendo, chega `escolher` de novo.
+  z.object({ tipo: z.literal('revanche') }),
   z.object({ tipo: z.literal('erro'), erro: z.string() }),
 ]);
 export type MensagemPartidaDoServidor = z.infer<typeof MensagemPartidaDoServidor>;

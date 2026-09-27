@@ -35,12 +35,12 @@ export const CHICOTE = {
   raio: 3, // da ponta, para o acerto
 };
 
-// O veneno do chicote: tira `dano` a cada `intervalo`, por `duracao` segundos (6 × 4 = 24). Um novo
+// O veneno do chicote: tira `dano` a cada `intervalo`, por `duracao` segundos (6 × 6 = 36). Um novo
 // acerto recomeça a contagem (não soma).
 export const VENENO = {
   duracao: 3,
   intervalo: 0.5,
-  dano: 4,
+  dano: 6,
 };
 
 export const RAIZES = {

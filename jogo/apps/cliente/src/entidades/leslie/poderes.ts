@@ -16,7 +16,7 @@
 
 import { CHICOTE, FURIA, MUNDO, RAIZES, type PoderUsado } from '@terna/compartilhado';
 import {
-  CORPO,
+  dentroDaFaixa,
   acertaCorpo,
   chao,
   elipse,
@@ -328,7 +328,7 @@ function atualizarArea(e: Efeitos, a: Area, dt: number, alvos: readonly Alvo[]):
   if (!a.estourou) {
     a.estourou = true;
     for (const alvo of vivos(alvos, a.dono)) {
-      const dentro = Math.abs(alvo.corpo.x - a.x) <= n.raio + CORPO.meiaLargura;
+      const dentro = dentroDaFaixa(alvo.corpo, a.x, n.raio);
       // As raízes pegam só quem está perto do chão; as trepadeiras sobem alto: pular não adianta.
       const alcancaAltura = furia || yChao - alvo.corpo.y <= RAIZES.altura[Math.min(a.indice, RAIZES.altura.length - 1)];
       if (!dentro || !alcancaAltura) continue;
@@ -352,7 +352,7 @@ function atualizarArea(e: Efeitos, a: Area, dt: number, alvos: readonly Alvo[]):
     const altura = RAIZES.altura[Math.min(a.indice, RAIZES.altura.length - 1)];
     for (const alvo of vivos(alvos, a.dono)) {
       if (a.presos.has(alvo.corpo)) continue;
-      const dentro = Math.abs(alvo.corpo.x - a.x) <= n.raio + CORPO.meiaLargura;
+      const dentro = dentroDaFaixa(alvo.corpo, a.x, n.raio);
       if (!dentro || yChao - alvo.corpo.y > altura) continue;
       a.presos.add(alvo.corpo);
       // Online, o "preso" do outro chega pela rede, com o estado dele.
@@ -573,7 +573,7 @@ export function desenharVeneno(ctx: CanvasRenderingContext2D, c: CorpoAlvo, temp
   for (let i = 0; i < 4; i++) {
     const ciclo = (tempo * 0.9 + i / 4) % 1;
     const x = Math.round(c.x + Math.sin(i * 2.3 + tempo * 3) * 5);
-    const y = Math.round(c.y - 8 - ciclo * (CORPO.altura + 4));
+    const y = Math.round(c.y - 8 - ciclo * (c.medida.altura + 4));
     ctx.fillStyle = i % 2 ? VERDE.veneno : VERDE.claro;
     if (ciclo < 0.85) {
       ctx.fillRect(x, y, i % 3 === 0 ? 2 : 1, i % 3 === 0 ? 2 : 1);

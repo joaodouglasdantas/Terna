@@ -15,6 +15,8 @@ export interface CoresBraco {
 export const BRACO_ANJO: CoresBraco = { cima: '#f6d3bd', sombra: '#bf8872', mao: '#ffffff' };
 // A Leslie: o braço de pele, nas cores do próprio sprite dela.
 export const BRACO_LESLIE: CoresBraco = { cima: '#d8a37d', sombra: '#966548', mao: '#f3c69c' };
+// O Grow: o braço magro de pele, nas cores do próprio sprite dele.
+export const BRACO_GROW: CoresBraco = { cima: '#b18874', sombra: '#6e4a3a', mao: '#d2a58a' };
 // A forma base do Anjo: a manga do moletom preto e a mão, nas cores do próprio sprite.
 export const BRACO_BASE: CoresBraco = { cima: '#252228', sombra: '#100c0f', mao: '#ac7c69' };
 

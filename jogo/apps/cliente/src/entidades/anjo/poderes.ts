@@ -6,7 +6,7 @@
 import { IMPACTO, JULGAMENTO, MUNDO, RAJADA, type PoderUsado } from '@terna/compartilhado';
 import { criarSprite } from '../../motor/imagens';
 import {
-  CORPO,
+  dentroDaFaixa,
   acertaCorpo,
   chao,
   elipse,
@@ -225,7 +225,7 @@ function atualizarArea(e: Efeitos, a: Area, dt: number, alvos: readonly Alvo[]):
   if (!a.estourou) {
     a.estourou = true;
     for (const alvo of vivos(alvos, a.dono)) {
-      const dentro = Math.abs(alvo.corpo.x - a.x) <= n.raio + CORPO.meiaLargura;
+      const dentro = dentroDaFaixa(alvo.corpo, a.x, n.raio);
       // O impacto é baixo: quem está alto no pulo passa por cima. O pilar pega até no céu.
       const alcancaAltura = a.tipo === 'julgamento' || yChao - alvo.corpo.y <= IMPACTO.altura;
       if (dentro && alcancaAltura) ferirAlvo(e, alvo, n.dano);
@@ -474,7 +474,7 @@ export function desenharEncanto(ctx: CanvasRenderingContext2D, c: CorpoAlvo, tem
   if (!c.encanto) return;
   const forca = Math.min(1, c.encanto.resta / SUMIR_ENCANTO);
   const cx = c.x;
-  const cy = c.y - CORPO.altura / 2;
+  const cy = c.y - c.medida.altura / 2;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   const luz = ctx.createRadialGradient(cx, cy, 0, cx, cy, 20);
@@ -488,7 +488,7 @@ export function desenharEncanto(ctx: CanvasRenderingContext2D, c: CorpoAlvo, tem
   for (let i = 0; i < 3; i++) {
     const a = tempo * 4 + (i * Math.PI * 2) / 3;
     const x = Math.round(cx + Math.cos(a) * 8 - 1);
-    const y = Math.round(c.y - CORPO.altura - 6 + Math.sin(a) * 2 - 1);
+    const y = Math.round(c.y - c.medida.altura - 6 + Math.sin(a) * 2 - 1);
     ctx.drawImage(CORACAO_ENCANTO, x, y);
   }
   ctx.restore();
