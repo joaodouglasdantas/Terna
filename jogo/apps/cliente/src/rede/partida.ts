@@ -9,6 +9,7 @@
 // Sem ela abrir, tudo vai pelo servidor.
 
 import {
+  IdDaAba,
   MensagemPartidaDoServidor,
   PartidasNaRede,
   type AtaqueUsado,
@@ -22,9 +23,30 @@ import {
 import { ligarDireto, type LigacaoDireta } from './direto';
 import { BASE_API } from './endereco';
 
-// As partidas hospedadas na sua rede, esperando alguém (a lista da tela Na mesma rede).
+// Esta aba do jogo (IdDaAba), guardada enquanto ela estiver aberta (recarregar a página não
+// troca): vai junto ao hospedar e ao procurar, para a lista não mostrar a partida que você
+// mesmo hospedou.
+const CHAVE_DA_ABA = 'terna:aba';
+const EU = ((): string => {
+  try {
+    const guardado = sessionStorage.getItem(CHAVE_DA_ABA);
+    if (guardado && IdDaAba.safeParse(guardado).success) return guardado;
+  } catch {
+    // sem armazenamento: vale só nesta visita
+  }
+  const novo = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
+  try {
+    sessionStorage.setItem(CHAVE_DA_ABA, novo);
+  } catch {
+    // idem
+  }
+  return novo;
+})();
+
+// As partidas hospedadas na sua rede, esperando alguém (a lista da tela Na mesma rede), menos a
+// sua.
 export async function buscarPartidasNaRede(): Promise<PartidaNaRede[]> {
-  const resposta = await fetch(BASE_API + '/partida/rede');
+  const resposta = await fetch(`${BASE_API}/partida/rede?eu=${EU}`);
   if (!resposta.ok) throw new Error(`status ${resposta.status}`);
   return PartidasNaRede.parse(await resposta.json()).partidas;
 }
@@ -65,7 +87,8 @@ export interface ConexaoPartida {
 export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
   const url = new URL(BASE_API + '/partida', window.location.origin);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  for (const [chave, valor] of Object.entries(pedido)) url.searchParams.set(chave, valor);
+  const completo: PedidoPartida = pedido.acao === 'hospedar' ? { ...pedido, eu: pedido.eu ?? EU } : pedido;
+  for (const [chave, valor] of Object.entries(completo)) url.searchParams.set(chave, valor);
 
   const socket = new WebSocket(url);
   let receber: (mensagem: MensagemPartidaDoServidor) => void = () => undefined;

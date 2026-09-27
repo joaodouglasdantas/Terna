@@ -1,4 +1,4 @@
-import { PedidoPartida, type PartidaNaRede } from '@terna/compartilhado';
+import { IdDaAba, PedidoPartida, type PartidaNaRede } from '@terna/compartilhado';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { ipDoPedido } from '../http';
 import { vigiarConexao } from './batimento';
@@ -38,7 +38,7 @@ export function rotaPartida(
         pedido.acao === 'criar'
           ? salas.criar(pedido.nome, socket)
           : pedido.acao === 'hospedar'
-            ? salas.criar(pedido.nome, socket, redeDe(request))
+            ? salas.criar(pedido.nome, socket, redeDe(request), pedido.eu ?? null)
             : salas.entrar(pedido.codigo, pedido.nome, socket, redeDe(request));
       if (!participante) return;
       const parar = vigiarConexao(socket, (idaEVoltaMs) => salas.medirPing(participante, idaEVoltaMs));
@@ -50,10 +50,12 @@ export function rotaPartida(
     },
   );
 
-  // As partidas hospedadas na rede de quem pergunta. A tela da rede pergunta a cada ~2,5 s, e
-  // todo mundo da rede conta como um endereço só: a folga é para uns poucos procurando juntos.
-  app.get('/partida/rede', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (request): Promise<{ partidas: PartidaNaRede[] }> => ({
-    partidas: salas.naRede(redeDe(request)),
-  }));
+  // As partidas hospedadas na rede de quem pergunta (menos as da própria aba: `?eu=`). A tela da
+  // rede pergunta a cada ~2,5 s, e todo mundo da rede conta como um endereço só: a folga é para
+  // uns poucos procurando juntos.
+  app.get('/partida/rede', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (request): Promise<{ partidas: PartidaNaRede[] }> => {
+    const eu = IdDaAba.safeParse((request.query as { eu?: unknown }).eu);
+    return { partidas: salas.naRede(redeDe(request), eu.success ? eu.data : undefined) };
+  });
   return salas;
 }

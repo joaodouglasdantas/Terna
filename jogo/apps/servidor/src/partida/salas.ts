@@ -97,6 +97,7 @@ interface ArmasDaSala {
 interface SalaPartida {
   codigo: string;
   rede: string | null; // hospedada na mesma rede: a de quem hospedou (null: sala com código)
+  dono: string | null; // a aba do jogo de quem hospedou (IdDaAba): a lista dela não mostra esta
   anfitriao: Participante;
   convidado: Participante | null;
   timer: ReturnType<typeof setTimeout>; // espera o convidado; depois, a escolha; depois, o fim do tempo
@@ -131,7 +132,8 @@ export class Salas {
   }
 
   // `rede`: hospedando na mesma rede (a sala aparece em naRede e só entra quem está nela).
-  criar(nome: string, conexao: Conexao, rede: string | null = null): Participante | null {
+  // `dono`: a aba de quem hospedou (a lista dela não mostra esta sala).
+  criar(nome: string, conexao: Conexao, rede: string | null = null, dono: string | null = null): Participante | null {
     if (this.salas.size >= this.opcoes.maxSalas) {
       return this.recusar(conexao, 'o servidor está cheio agora; tente de novo daqui a pouco');
     }
@@ -142,6 +144,7 @@ export class Salas {
     const sala = {
       codigo,
       rede,
+      dono,
       convidado: null,
       armas: { chao: new Map(), mao: { anfitriao: null, convidado: null }, proximoId: 1, timer: null },
       herois: { anfitriao: null, convidado: null },
@@ -168,11 +171,14 @@ export class Salas {
     return convidado;
   }
 
-  // As partidas hospedadas em `rede` esperando alguém entrar.
-  naRede(rede: string): PartidaNaRede[] {
+  // As partidas hospedadas em `rede` esperando alguém entrar, menos as da aba `eu`: quem
+  // hospedou não vê a própria (nem logo depois de cancelar, antes de a sala fechar aqui).
+  naRede(rede: string, eu?: string): PartidaNaRede[] {
     const partidas: PartidaNaRede[] = [];
     for (const sala of this.salas.values()) {
-      if (sala.rede === rede && sala.fase === 'esperando' && !sala.convidado) partidas.push({ codigo: sala.codigo, anfitriao: sala.anfitriao.nome });
+      if (sala.rede !== rede || sala.fase !== 'esperando' || sala.convidado) continue;
+      if (eu && sala.dono === eu) continue;
+      partidas.push({ codigo: sala.codigo, anfitriao: sala.anfitriao.nome });
     }
     return partidas;
   }

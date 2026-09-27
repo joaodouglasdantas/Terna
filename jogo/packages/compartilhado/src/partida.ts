@@ -35,14 +35,19 @@ export const CodigoSala = z
 // Como abrir a conexão: /api/partida?acao=criar&nome=... (sala com código, pela internet),
 // ?acao=hospedar&nome=... (partida na mesma rede: quem estiver nela a vê na lista, sem código) ou
 // ?acao=entrar&codigo=...&nome=... (nas duas: da lista, o código vem junto).
+// Um número sorteado por aba do jogo: quem hospeda manda o seu, e a lista da rede de quem manda
+// o mesmo não mostra essa partida (ninguém vê a partida que ele mesmo hospedou).
+export const IdDaAba = z.string().regex(/^[0-9a-f]{8,32}$/);
+
 export const PedidoPartida = z.discriminatedUnion('acao', [
   z.object({ acao: z.literal('criar'), nome: Apelido }),
-  z.object({ acao: z.literal('hospedar'), nome: Apelido }),
+  z.object({ acao: z.literal('hospedar'), nome: Apelido, eu: IdDaAba.optional() }),
   z.object({ acao: z.literal('entrar'), nome: Apelido, codigo: CodigoSala }),
 ]);
 export type PedidoPartida = z.infer<typeof PedidoPartida>;
 
-// GET /api/partida/rede: as partidas hospedadas na mesma rede de quem pergunta, esperando alguém.
+// GET /api/partida/rede?eu=...: as partidas hospedadas na mesma rede de quem pergunta, esperando
+// alguém — menos as que a própria aba (`eu`) hospedou.
 export const PartidaNaRede = z.object({ codigo: CodigoSala, anfitriao: z.string() });
 export type PartidaNaRede = z.infer<typeof PartidaNaRede>;
 export const PartidasNaRede = z.object({ partidas: z.array(PartidaNaRede) });

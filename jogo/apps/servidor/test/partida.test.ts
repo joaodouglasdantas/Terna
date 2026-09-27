@@ -138,6 +138,14 @@ describe('salas de partida', () => {
     expect(a.ultima()).toEqual({ tipo: 'sinal', sinal });
   });
 
+  it('quem hospedou não vê a própria partida na lista; os outros da rede veem', () => {
+    const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
+    salas.criar('Ana', conexaoFalsa().conexao, '200.1.2.3', 'a1b2c3d4e5f60718');
+    expect(salas.naRede('200.1.2.3', 'a1b2c3d4e5f60718')).toEqual([]);
+    expect(salas.naRede('200.1.2.3', '99887766554433aa')).toEqual([{ codigo: 'K7P2Q', anfitriao: 'Ana' }]);
+    expect(salas.naRede('200.1.2.3')).toEqual([{ codigo: 'K7P2Q', anfitriao: 'Ana' }]);
+  });
+
   it('a sala com código não aparece na rede e não repassa recados de ligação direta', () => {
     const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
     const a = conexaoFalsa();
