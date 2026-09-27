@@ -1,5 +1,7 @@
 // Tela de seleção de personagem. Vem depois do Singleplayer e, no Multiplayer, com os dois já
-// na sala (os dois escolhem ao mesmo tempo; a partida começa quando os dois escolherem). Cada
+// na sala (os dois escolhem ao mesmo tempo; a partida começa quando os dois escolherem). No
+// Multiplayer, depois de apertar Jogar, ainda dá para trocar de personagem até o outro escolher (a
+// troca vai na hora); e ninguém vê o personagem do outro antes de a partida começar. Cada
 // personagem é um cartão com o sprite grande — parado de frente e, escolhido, correndo —, o
 // nome e os três poderes (a história de cada um fica para depois). Só aparecem os liberados: o
 // Anjo, pronto mas guardado, não é mostrado.
@@ -142,17 +144,24 @@ export function telaSelecao(sala?: SalaNaSelecao, anterior?: Heroi): Promise<Res
     let escolhido: Heroi = anterior && liberados.includes(anterior) ? anterior : liberados[0];
     let confirmado = false;
     let acabou = false;
+    const podeTrocar = sala ? `Até ${sala.oponente} escolher, dá para trocar.` : '';
 
     const cartoes = liberados.map((heroi) => montarCartao(heroi, () => escolher(heroi)));
     grade.append(...cartoes.map((c) => c.elemento));
 
     const escolher = (heroi: Heroi): void => {
-      if (!LIBERADO[heroi] || confirmado) return;
+      if (!LIBERADO[heroi]) return;
+      const trocou = heroi !== escolhido;
       escolhido = heroi;
       for (const c of cartoes) {
         const ativo = c.heroi === heroi;
         c.elemento.classList.toggle('inicio-cartao-escolhido', ativo);
         c.elemento.setAttribute('aria-checked', String(ativo));
+      }
+      // Online, já pronto: a troca vai para o servidor na hora (vale até o outro escolher).
+      if (sala && confirmado && trocou) {
+        sala.conexao.escolherHeroi(heroi);
+        estado.textContent = `Trocado para ${SOBRE_HEROI[heroi].nome}. ${podeTrocar}`;
       }
     };
 
@@ -167,13 +176,13 @@ export function telaSelecao(sala?: SalaNaSelecao, anterior?: Heroi): Promise<Res
     const jogar = botao('Jogar', 'inicio-botao inicio-jogar', () => {
       if (confirmado) return;
       if (!sala) return terminar({ tipo: 'escolheu', heroi: escolhido });
-      // Online: manda a escolha e espera o outro (a partida começa quando os dois escolherem).
+      // Online: manda a escolha e espera o outro (a partida começa quando os dois escolherem). Os
+      // cartões continuam valendo: trocar manda a nova escolha.
       confirmado = true;
       sala.conexao.escolherHeroi(escolhido);
       jogar.disabled = true;
       jogar.textContent = 'Pronto!';
-      for (const c of cartoes) c.elemento.classList.toggle('inicio-cartao-travado', c.heroi !== escolhido);
-      if (!estado.dataset.oponente) estado.textContent = `Esperando ${sala.oponente} escolher…`;
+      estado.textContent = `Pronto! ${podeTrocar}`;
     });
     const voltar = botao(sala ? 'Sair da sala' : 'Voltar', 'inicio-botao inicio-botao-claro', () => {
       sala?.conexao.fechar();
@@ -184,10 +193,8 @@ export function telaSelecao(sala?: SalaNaSelecao, anterior?: Heroi): Promise<Res
     if (sala) {
       estado.textContent = `${sala.oponente} está escolhendo…`;
       const ouvir = (m: MensagemPartidaDoServidor): void => {
-          if (m.tipo === 'oponente-escolheu') {
-            estado.dataset.oponente = m.heroi;
-            estado.textContent = `${sala.oponente} escolheu ${SOBRE_HEROI[m.heroi].nome}${confirmado ? '' : ' e está esperando você'}.`;
-          }
+          // Qual ele escolheu, só na partida.
+          if (m.tipo === 'oponente-escolheu') estado.textContent = `${sala.oponente} já escolheu e está esperando você.`;
           if (m.tipo === 'comecou') {
             const { lado, oponente, restanteMs, heroi, heroiOponente } = m;
             terminar({ tipo: 'comecou', partida: { lado, oponente, restanteMs, heroi, heroiOponente, comecouEm: performance.now() } });
@@ -201,7 +208,7 @@ export function telaSelecao(sala?: SalaNaSelecao, anterior?: Heroi): Promise<Res
     // Setas (ou A/D) andam entre os liberados; Enter joga; Esc volta.
     const aoTeclar = (evento: KeyboardEvent): void => {
       const passo = ['ArrowLeft', 'KeyA'].includes(evento.code) ? -1 : ['ArrowRight', 'KeyD'].includes(evento.code) ? 1 : 0;
-      if (passo && !confirmado) {
+      if (passo) {
         evento.preventDefault();
         const i = liberados.indexOf(escolhido);
         escolher(liberados[(i + passo + liberados.length) % liberados.length]);
@@ -221,9 +228,15 @@ export function telaSelecao(sala?: SalaNaSelecao, anterior?: Heroi): Promise<Res
     palco().replaceChildren(tela);
     escolher(escolhido);
 
-    // Os sprites dos cartões andam enquanto a tela estiver aberta.
+    // Os sprites dos cartões andam enquanto a tela estiver aberta. Na mesma rede, avisa quando os
+    // dois computadores se ligaram direto.
+    let avisouLigacao = false;
     const animar = (agora: number): void => {
       if (!tela.isConnected) return;
+      if (sala && !avisouLigacao && sala.conexao.direta()) {
+        avisouLigacao = true;
+        sub.textContent = `Partida contra ${sala.oponente} · ligados direto pela rede`;
+      }
       for (const c of cartoes) desenharSprite(c, c.heroi === escolhido, agora / 1000);
       requestAnimationFrame(animar);
     };

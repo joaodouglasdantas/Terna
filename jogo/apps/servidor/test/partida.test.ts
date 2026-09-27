@@ -68,7 +68,8 @@ describe('salas de partida', () => {
     expect(b.ultima()).toEqual({ tipo: 'escolher', lado: 'convidado', oponente: 'Ana' });
 
     salas.receber(anfitriao, JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
-    expect(b.ultima()).toEqual({ tipo: 'oponente-escolheu', heroi: 'leslie' });
+    // O outro fica sabendo que ela escolheu, mas não qual.
+    expect(b.ultima()).toEqual({ tipo: 'oponente-escolheu' });
     salas.receber(convidado, JSON.stringify({ tipo: 'heroi', heroi: 'grow' }));
     const comecou = { tipo: 'comecou', restanteMs: 300_000 };
     expect(a.ultima()).toEqual({ ...comecou, lado: 'anfitriao', oponente: 'Bia', heroi: 'leslie', heroiOponente: 'grow' });
@@ -96,6 +97,57 @@ describe('salas de partida', () => {
     salas.entrar('K7P2Q', 'Bia', b.conexao);
     vi.advanceTimersByTime(1000);
     expect(a.ultima()).toMatchObject({ tipo: 'comecou', heroi: 'leslie', heroiOponente: 'leslie' });
+  });
+
+  it('até o outro escolher, dá para trocar o personagem; o aviso ao outro vai uma vez só', () => {
+    const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    const anfitriao = salas.criar('Ana', a.conexao)!;
+    const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'heroi', heroi: 'grow' }));
+    expect(b.recebidas.filter((m) => m.tipo === 'oponente-escolheu')).toEqual([{ tipo: 'oponente-escolheu' }]);
+    salas.receber(convidado, JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
+    expect(a.ultima()).toMatchObject({ tipo: 'comecou', heroi: 'grow', heroiOponente: 'leslie' });
+    expect(b.ultima()).toMatchObject({ tipo: 'comecou', heroi: 'leslie', heroiOponente: 'grow' });
+    // Começou: a escolha não troca mais.
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
+    expect(b.ultima()?.tipo).toBe('comecou');
+  });
+
+  it('na mesma rede: a partida aparece só para a rede, só ela entra e os dois tentam a ligação direta', () => {
+    const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    salas.criar('Ana', a.conexao, '200.1.2.3');
+    expect(salas.naRede('200.1.2.3')).toEqual([{ codigo: 'K7P2Q', anfitriao: 'Ana' }]);
+    expect(salas.naRede('189.9.9.9')).toEqual([]);
+
+    const deFora = conexaoFalsa();
+    expect(salas.entrar('K7P2Q', 'Cid', deFora.conexao, '189.9.9.9')).toBeNull();
+    expect(deFora.ultima()).toEqual({ tipo: 'erro', erro: 'não achei essa sala; confira o código' });
+
+    const b = conexaoFalsa();
+    const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao, '200.1.2.3')!;
+    expect(a.ultima()).toEqual({ tipo: 'escolher', lado: 'anfitriao', oponente: 'Bia', direto: true });
+    expect(b.ultima()).toEqual({ tipo: 'escolher', lado: 'convidado', oponente: 'Ana', direto: true });
+    expect(salas.naRede('200.1.2.3')).toEqual([]); // cheia: sai da lista
+
+    const sinal = { descricao: { type: 'answer', sdp: 'v=0' } };
+    salas.receber(convidado, JSON.stringify({ tipo: 'sinal', sinal }));
+    expect(a.ultima()).toEqual({ tipo: 'sinal', sinal });
+  });
+
+  it('a sala com código não aparece na rede e não repassa recados de ligação direta', () => {
+    const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    const anfitriao = salas.criar('Ana', a.conexao)!;
+    expect(salas.naRede('local')).toEqual([]);
+    salas.entrar('K7P2Q', 'Bia', b.conexao, '189.9.9.9');
+    expect(a.ultima()).toEqual({ tipo: 'escolher', lado: 'anfitriao', oponente: 'Bia' });
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'sinal', sinal: { descricao: { type: 'offer', sdp: 'v=0' } } }));
+    expect(b.ultima()?.tipo).toBe('escolher');
   });
 
   it('recusa código que não existe e sala cheia', () => {
@@ -439,10 +491,9 @@ describe('rota /api/partida', () => {
     expect(await b.proxima()).toMatchObject({ tipo: 'escolher', lado: 'convidado', oponente: 'Ana' });
     expect(await a.proxima()).toMatchObject({ tipo: 'escolher', lado: 'anfitriao', oponente: 'Bia é' });
     a.socket.send(JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
-    expect(await b.proxima()).toEqual({ tipo: 'oponente-escolheu', heroi: 'leslie' });
+    expect(await b.proxima()).toEqual({ tipo: 'oponente-escolheu' });
     b.socket.send(JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
     expect(await b.proxima()).toMatchObject({ tipo: 'comecou', lado: 'convidado', oponente: 'Ana', heroi: 'leslie' });
-    expect(await a.proxima()).toEqual({ tipo: 'oponente-escolheu', heroi: 'leslie' });
     expect(await a.proxima()).toMatchObject({ tipo: 'comecou', lado: 'anfitriao', oponente: 'Bia é' });
 
     b.socket.send(JSON.stringify({ tipo: 'estado', estado: ESTADO }));

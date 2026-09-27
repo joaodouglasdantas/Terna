@@ -642,6 +642,22 @@
   animation: inicio-respira 1.6s ease-in-out infinite;
 }
 
+/* Multiplayer: a dica embaixo de cada jeito de jogar fica colada no botão dele. */
+.inicio-modo-dica {
+  margin-top: -0.5rem;
+  font-size: 0.95rem;
+}
+
+/* As partidas hospedadas na rede, uma por botão; a altura de um botão já reservada, para a caixa
+   não pular quando a primeira aparece. */
+.inicio-rede-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-height: 2.75rem;
+  justify-content: center;
+}
+
 .inicio-linha-codigo {
   display: flex;
   gap: 0.75rem;
@@ -741,11 +757,6 @@
   cursor: not-allowed;
   opacity: 0.6;
   filter: grayscale(0.9);
-}
-
-/* Online, depois de confirmar: os outros cartões recuam. */
-.inicio-cartao-travado {
-  opacity: 0.35;
 }
 
 .inicio-cartao-palco {

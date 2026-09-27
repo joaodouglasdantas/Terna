@@ -32,12 +32,37 @@ export const CodigoSala = z
   .toUpperCase()
   .regex(new RegExp(`^[${LETRAS_DO_CODIGO}]{${TAMANHO_CODIGO}}$`), 'código inválido');
 
-// Como abrir a conexão: /api/partida?acao=criar&nome=... ou ?acao=entrar&codigo=...&nome=...
+// Como abrir a conexão: /api/partida?acao=criar&nome=... (sala com código, pela internet),
+// ?acao=hospedar&nome=... (partida na mesma rede: quem estiver nela a vê na lista, sem código) ou
+// ?acao=entrar&codigo=...&nome=... (nas duas: da lista, o código vem junto).
 export const PedidoPartida = z.discriminatedUnion('acao', [
   z.object({ acao: z.literal('criar'), nome: Apelido }),
+  z.object({ acao: z.literal('hospedar'), nome: Apelido }),
   z.object({ acao: z.literal('entrar'), nome: Apelido, codigo: CodigoSala }),
 ]);
 export type PedidoPartida = z.infer<typeof PedidoPartida>;
+
+// GET /api/partida/rede: as partidas hospedadas na mesma rede de quem pergunta, esperando alguém.
+export const PartidaNaRede = z.object({ codigo: CodigoSala, anfitriao: z.string() });
+export type PartidaNaRede = z.infer<typeof PartidaNaRede>;
+export const PartidasNaRede = z.object({ partidas: z.array(PartidaNaRede) });
+
+// Na mesma rede, os dois computadores se ligam direto (WebRTC) e o estado, os poderes e os golpes
+// vão por essa ligação, sem passar pelo servidor. O servidor só leva os recados para ela abrir: a
+// descrição da ligação (a oferta de quem hospeda, a resposta de quem entrou) e os caminhos
+// possíveis de cada um (candidatos). Não abrindo, tudo continua pelo servidor.
+export const Sinal = z.object({
+  descricao: z.object({ type: z.enum(['offer', 'answer']), sdp: z.string().max(3000) }).optional(),
+  candidato: z
+    .object({
+      candidate: z.string().max(500),
+      sdpMid: z.string().max(32).nullish(),
+      sdpMLineIndex: z.number().int().min(0).max(16).nullish(),
+      usernameFragment: z.string().max(64).nullish(),
+    })
+    .optional(),
+});
+export type Sinal = z.infer<typeof Sinal>;
 
 export const IdHeroi = z.enum(HEROIS);
 
@@ -127,6 +152,8 @@ export const MensagemPartidaDoCliente = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('morri') }),
   // Depois do fim: quer jogar de novo com o mesmo oponente (os dois pedindo, voltam à escolha).
   z.object({ tipo: z.literal('revanche') }),
+  // Um recado para a ligação direta com o outro (mesma rede).
+  z.object({ tipo: z.literal('sinal'), sinal: Sinal }),
 ]);
 export type MensagemPartidaDoCliente = z.infer<typeof MensagemPartidaDoCliente>;
 
@@ -137,10 +164,11 @@ export type MotivoFim = z.infer<typeof MotivoFim>;
 export const MensagemPartidaDoServidor = z.discriminatedUnion('tipo', [
   // Para quem criou: o código para passar ao outro jogador.
   z.object({ tipo: z.literal('sala-criada'), codigo: CodigoSala }),
-  // Os dois estão na sala: cada um escolhe o personagem (e manda `heroi`).
-  z.object({ tipo: z.literal('escolher'), lado: Lado, oponente: z.string() }),
-  // Só para o outro: quem mandou já escolheu.
-  z.object({ tipo: z.literal('oponente-escolheu'), heroi: IdHeroi }),
+  // Os dois estão na sala: cada um escolhe o personagem (e manda `heroi`; até o outro escolher,
+  // pode mandar de novo e trocar). `direto`: estão na mesma rede — tentem a ligação direta.
+  z.object({ tipo: z.literal('escolher'), lado: Lado, oponente: z.string(), direto: z.boolean().optional() }),
+  // Só para o outro: quem mandou já escolheu. Qual, ele só vê quando a partida começa (`comecou`).
+  z.object({ tipo: z.literal('oponente-escolheu'), heroi: IdHeroi.optional() }),
   // Os dois escolheram: a partida começou e termina em `restanteMs`.
   z.object({
     tipo: z.literal('comecou'),
@@ -167,6 +195,8 @@ export const MensagemPartidaDoServidor = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('fim'), motivo: MotivoFim, vencedor: Lado.optional() }),
   // Só para o outro: quem mandou quer jogar de novo. Os dois querendo, chega `escolher` de novo.
   z.object({ tipo: z.literal('revanche') }),
+  // Só para o outro: um recado de quem mandou para a ligação direta.
+  z.object({ tipo: z.literal('sinal'), sinal: Sinal }),
   z.object({ tipo: z.literal('erro'), erro: z.string() }),
 ]);
 export type MensagemPartidaDoServidor = z.infer<typeof MensagemPartidaDoServidor>;

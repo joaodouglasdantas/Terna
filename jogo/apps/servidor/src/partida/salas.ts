@@ -19,12 +19,17 @@ import {
   type TipoArma,
   type MensagemPartidaDoServidor,
   type MotivoFim,
+  type PartidaNaRede,
 } from '@terna/compartilhado';
 import type { Conexao } from '../tempo-real/sala';
 
 // Salas de partida 1v1, sem conta: quem cria recebe um código; quem entra com ele completa a
-// sala. Com os dois lá, cada um escolhe o personagem (`escolher` → `heroi`); com as duas escolhas
-// (ou acabando o tempo de escolher: quem não escolheu fica com o padrão) a partida começa. O
+// sala. Hospedando na mesma rede, a sala guarda a rede de quem hospedou (rede.ts): ela aparece
+// na lista de quem está nessa rede, só entra quem está nela, e os dois tentam se ligar direto
+// (WebRTC), com o servidor levando os recados (`sinal`) até a ligação abrir.
+// Com os dois lá, cada um escolhe o personagem (`escolher` → `heroi`): até o outro escolher, dá
+// para trocar (mandando de novo), e ninguém vê o do outro antes de a partida começar. Com as duas
+// escolhas (ou acabando o tempo de escolher: quem não escolheu fica com o padrão) a partida começa. O
 // servidor marca o tempo (a partida acaba para os dois ao mesmo tempo) e só repassa o estado de
 // um jogador para o outro — cada um simula o próprio personagem —, dizendo quanto ele demorou
 // para chegar (o ping de cada um vem do batimento: batimento.ts).
@@ -91,6 +96,7 @@ interface ArmasDaSala {
 
 interface SalaPartida {
   codigo: string;
+  rede: string | null; // hospedada na mesma rede: a de quem hospedou (null: sala com código)
   anfitriao: Participante;
   convidado: Participante | null;
   timer: ReturnType<typeof setTimeout>; // espera o convidado; depois, a escolha; depois, o fim do tempo
@@ -124,7 +130,8 @@ export class Salas {
     return this.salas.size;
   }
 
-  criar(nome: string, conexao: Conexao): Participante | null {
+  // `rede`: hospedando na mesma rede (a sala aparece em naRede e só entra quem está nela).
+  criar(nome: string, conexao: Conexao, rede: string | null = null): Participante | null {
     if (this.salas.size >= this.opcoes.maxSalas) {
       return this.recusar(conexao, 'o servidor está cheio agora; tente de novo daqui a pouco');
     }
@@ -134,6 +141,7 @@ export class Salas {
 
     const sala = {
       codigo,
+      rede,
       convidado: null,
       armas: { chao: new Map(), mao: { anfitriao: null, convidado: null }, proximoId: 1, timer: null },
       herois: { anfitriao: null, convidado: null },
@@ -147,15 +155,26 @@ export class Salas {
     return sala.anfitriao;
   }
 
-  entrar(codigo: string, nome: string, conexao: Conexao): Participante | null {
+  // `rede`: a de quem entra. A partida hospedada numa rede só aceita quem está nela (de fora, ela
+  // nem existe: a mesma resposta de código errado).
+  entrar(codigo: string, nome: string, conexao: Conexao, rede: string | null = null): Participante | null {
     const sala = this.salas.get(codigo);
-    if (!sala) return this.recusar(conexao, 'não achei essa sala; confira o código');
+    if (!sala || (sala.rede !== null && sala.rede !== rede)) return this.recusar(conexao, 'não achei essa sala; confira o código');
     if (sala.convidado) return this.recusar(conexao, 'essa sala já está cheia');
 
     const convidado: Participante = { nome, conexao, sala, janela: 0, mensagens: 0, latencia: 0 };
     sala.convidado = convidado;
     this.abrirEscolha(sala);
     return convidado;
+  }
+
+  // As partidas hospedadas em `rede` esperando alguém entrar.
+  naRede(rede: string): PartidaNaRede[] {
+    const partidas: PartidaNaRede[] = [];
+    for (const sala of this.salas.values()) {
+      if (sala.rede === rede && sala.fase === 'esperando' && !sala.convidado) partidas.push({ codigo: sala.codigo, anfitriao: sala.anfitriao.nome });
+    }
+    return partidas;
   }
 
   // Com os dois na sala (ao entrar, ou os dois pedindo a revanche): cada um escolhe o personagem.
@@ -167,8 +186,10 @@ export class Salas {
     sala.revanche = { anfitriao: false, convidado: false };
     clearTimeout(sala.timer);
     sala.timer = setTimeout(() => this.comecar(sala), this.opcoes.escolhaMaxMs);
-    this.mandar(sala.anfitriao.conexao, { tipo: 'escolher', lado: 'anfitriao', oponente: convidado.nome });
-    this.mandar(convidado.conexao, { tipo: 'escolher', lado: 'convidado', oponente: sala.anfitriao.nome });
+    // Na mesma rede, os dois tentam a ligação direta (quem hospedou começa).
+    const direto = sala.rede !== null ? { direto: true } : {};
+    this.mandar(sala.anfitriao.conexao, { tipo: 'escolher', lado: 'anfitriao', oponente: convidado.nome, ...direto });
+    this.mandar(convidado.conexao, { tipo: 'escolher', lado: 'convidado', oponente: sala.anfitriao.nome, ...direto });
   }
 
   // Os dois escolheram (ou o tempo de escolher acabou): a partida começa, com o relógio todo.
@@ -235,13 +256,21 @@ export class Salas {
     const lado: Lado = p === sala.anfitriao ? 'anfitriao' : 'convidado';
     const { armas } = sala;
     const m = mensagem.data;
+    // Os recados da ligação direta passam em qualquer fase, e só na mesma rede.
+    if (m.tipo === 'sinal') {
+      if (sala.rede === null) return;
+      return this.mandar(outro.conexao, { tipo: 'sinal', sinal: m.sinal });
+    }
     // Na escolha, só vale o personagem; no fim, só o pedido de revanche; jogando, o resto.
     if (m.tipo === 'heroi') {
       if (sala.fase !== 'escolher') return;
       if (!LIBERADO[m.heroi]) return this.mandar(p.conexao, { tipo: 'erro', erro: 'esse personagem ainda não está liberado' });
+      // Mandando de novo, troca (o outro ainda não escolheu: senão a partida já teria começado).
+      const primeira = sala.herois[lado] === null;
       sala.herois[lado] = m.heroi;
-      this.mandar(outro.conexao, { tipo: 'oponente-escolheu', heroi: m.heroi });
-      if (sala.herois.anfitriao && sala.herois.convidado) this.comecar(sala);
+      if (sala.herois.anfitriao && sala.herois.convidado) return this.comecar(sala);
+      // O outro fica sabendo que já tem escolha, mas não qual: essa só na partida.
+      if (primeira) this.mandar(outro.conexao, { tipo: 'oponente-escolheu' });
       return;
     }
     if (m.tipo === 'revanche') {

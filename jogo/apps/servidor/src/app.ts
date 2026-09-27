@@ -4,6 +4,7 @@ import websocket from '@fastify/websocket';
 import { sql } from 'drizzle-orm';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Banco } from './banco/conexao';
+import { ipDoPedido } from './http';
 import { rotaPartida } from './partida/rota';
 import { rotasContas } from './rotas/contas';
 import { rotasRanking } from './rotas/ranking';
@@ -34,15 +35,10 @@ export async function criarApp({
   // Os métodos precisam ser listados: o padrão do @fastify/cors é só GET, HEAD e POST, e o
   // jogo publicado em outro endereço não conseguiria gravar save (PUT) nem sair (DELETE).
   await app.register(cors, { origin: origens, methods: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE'] });
-  // O limite de tentativas é por IP. Atrás de proxy, o Render acrescenta o IP real ao fim do
-  // X-Forwarded-For mas mantém o que o cliente mandou no começo; o CF-Connecting-IP vem da
-  // borda do Cloudflare (por onde o Render recebe o tráfego) e não pode ser forjado.
+  // O limite de tentativas é por IP (ipDoPedido: o de verdade, mesmo atrás do proxy).
   await app.register(rateLimit, {
     global: false,
-    keyGenerator: (request) => {
-      const borda = confiarProxy ? request.headers['cf-connecting-ip'] : undefined;
-      return typeof borda === 'string' && borda ? borda : request.ip;
-    },
+    keyGenerator: (request) => ipDoPedido(request, confiarProxy),
     // Vira um erro lançado; o setErrorHandler abaixo responde { erro: message }.
     errorResponseBuilder: (_request, contexto) => ({
       statusCode: 429,
@@ -73,7 +69,7 @@ export async function criarApp({
       rotasSaves(api, banco);
       rotasRanking(api, banco);
       rotaTempoReal(api, banco);
-      rotaPartida(api);
+      rotaPartida(api, { confiarProxy });
     },
     { prefix: '/api' },
   );

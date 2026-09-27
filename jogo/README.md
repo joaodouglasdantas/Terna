@@ -174,7 +174,17 @@ em cima da cabeça sem acento, porque a fonte de pixels não tem acentos.
 
 - **Singleplayer:** você contra a CPU (o sósia). O cronômetro é do cliente e a engrenagem (ou
   Esc) pausa tudo.
-- **Multiplayer 1v1:** um cria a sala e passa o código de 5 caracteres; o outro entra com ele.
+- **Multiplayer 1v1**, de dois jeitos:
+  - **Na mesma rede** (o mesmo Wi-Fi ou cabo): um hospeda e o outro vê a partida numa lista que se
+    atualiza sozinha e entra com um clique, sem código. O servidor reconhece a rede pelo endereço de
+    saída para a internet (`apps/servidor/src/partida/rede.ts`) e só mostra e só deixa entrar quem
+    está nela. Os dois computadores se ligam direto (WebRTC, `apps/cliente/src/rede/direto.ts`): o
+    estado, os poderes e os golpes vão por essa ligação, sem passar pelo servidor. Se ela não abrir,
+    tudo vai pelo servidor.
+  - **Pela internet:** um cria a sala e passa o código de 5 caracteres; o outro entra com ele.
+
+  Na escolha de personagem, depois de apertar Jogar ainda dá para trocar até o outro escolher, e
+  ninguém vê o personagem do outro antes de a partida começar.
   O servidor marca o tempo e avisa o fim aos dois ao mesmo tempo. Cada cliente simula o próprio
   personagem e manda os botões segurados e a posição ~20 vezes por segundo andando (~5 parado); o
   outro lado move o corpo com os mesmos botões e corrige a posição aos poucos, adiantada pelo

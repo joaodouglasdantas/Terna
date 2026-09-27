@@ -25,4 +25,13 @@ export async function exigirJogador(
   return jogador;
 }
 
+// O IP de quem pediu. Atrás de proxy, o Render acrescenta o IP real ao fim do X-Forwarded-For mas
+// mantém o que o cliente mandou no começo; o CF-Connecting-IP vem da borda do Cloudflare (por onde
+// o Render recebe o tráfego) e não pode ser forjado.
+export function ipDoPedido(request: FastifyRequest, confiarProxy: boolean): string {
+  const borda = confiarProxy ? request.headers['cf-connecting-ip'] : undefined;
+  // (Num pedido simulado, sem conexão de verdade, o `ip` pode não vir.)
+  return typeof borda === 'string' && borda ? borda : (request.ip ?? request.socket?.remoteAddress ?? '');
+}
+
 export const jogadorPublico = (j: JogadorAutenticado) => ({ id: j.id, nome: j.nome, criadoEm: j.criadoEm.toISOString() });

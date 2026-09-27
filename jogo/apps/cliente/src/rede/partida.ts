@@ -3,17 +3,34 @@
 // para os dois. Durante a partida, cada um
 // manda o próprio estado (e os poderes e golpes que usa) e recebe os do outro. As armas do mapa
 // são do servidor: ele avisa as que caem e quem pega; daqui só se pede.
+//
+// Na mesma rede (a partida hospedada), os dois computadores se ligam direto (direto.ts) e o estado,
+// os poderes e os golpes vão por essa ligação; o resto (armas, tempo, fim) continua no servidor.
+// Sem ela abrir, tudo vai pelo servidor.
 
 import {
   MensagemPartidaDoServidor,
+  PartidasNaRede,
   type AtaqueUsado,
   type EstadoJogador,
   type Heroi,
   type MensagemPartidaDoCliente,
+  type PartidaNaRede,
   type PedidoPartida,
   type PoderUsado,
 } from '@terna/compartilhado';
+import { ligarDireto, type LigacaoDireta } from './direto';
 import { BASE_API } from './endereco';
+
+// As partidas hospedadas na sua rede, esperando alguém (a lista da tela Na mesma rede).
+export async function buscarPartidasNaRede(): Promise<PartidaNaRede[]> {
+  const resposta = await fetch(BASE_API + '/partida/rede');
+  if (!resposta.ok) throw new Error(`status ${resposta.status}`);
+  return PartidasNaRede.parse(await resposta.json()).partidas;
+}
+
+// O que pode chegar pela ligação direta: só o que o outro mandaria (o resto é do servidor).
+const PELA_LIGACAO = new Set(['estado', 'poder', 'golpe']);
 
 // Bytes esperando para sair a partir dos quais um estado novo não entra na fila: a rede está
 // engasgada, e o próximo estado (50 ms depois) já é mais novo. Poderes, golpes e armas sempre vão.
@@ -23,8 +40,10 @@ export interface ConexaoPartida {
   // Troca quem recebe as mensagens (a tela de espera, depois o jogo). `aoFechar` recebe o
   // último erro que o servidor mandou, se mandou algum.
   ouvir(aoReceber: (mensagem: MensagemPartidaDoServidor) => void, aoFechar?: (erro: string | null) => void): void;
-  // Com os dois na sala: o personagem escolhido.
+  // Com os dois na sala: o personagem escolhido (mandar de novo troca, até o outro escolher).
   escolherHeroi(heroi: Heroi): void;
+  // Ligados direto pela rede local (o estado, os poderes e os golpes não passam pelo servidor).
+  direta(): boolean;
   // O próprio estado; com a rede engasgada, fica de fora (o próximo o substitui).
   enviar(estado: EstadoJogador): void;
   enviarPoder(uso: PoderUsado): void;
@@ -53,26 +72,55 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
   let fechou: ((erro: string | null) => void) | undefined;
   let ultimoErro: string | null = null;
   let fechadaPorMim = false;
+  let ligacao: LigacaoDireta | null = null;
 
-  socket.addEventListener('message', (evento) => {
-    let json: unknown;
+  const ler = (texto: string): MensagemPartidaDoServidor | null => {
     try {
-      json = JSON.parse(String(evento.data));
+      const mensagem = MensagemPartidaDoServidor.safeParse(JSON.parse(texto));
+      return mensagem.success ? mensagem.data : null;
     } catch {
-      return;
+      return null;
     }
-    const mensagem = MensagemPartidaDoServidor.safeParse(json);
-    if (!mensagem.success) return;
-    if (mensagem.data.tipo === 'erro') ultimoErro = mensagem.data.erro;
-    receber(mensagem.data);
-  });
-  socket.addEventListener('close', () => {
-    if (!fechadaPorMim) fechou?.(ultimoErro);
-  });
-
+  };
   const mandar = (mensagem: MensagemPartidaDoCliente): void => {
     if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(mensagem));
   };
+  // Pela ligação direta, se estiver aberta; senão, pelo servidor.
+  const mandarRapido = (mensagem: MensagemPartidaDoCliente): void => {
+    if (ligacao?.enviar(JSON.stringify(mensagem))) return;
+    mandar(mensagem);
+  };
+  // Quem hospedou oferece a ligação; quem entrou espera a oferta. Na revanche, a que ainda está de
+  // pé continua; a que não abriu (ou caiu) é tentada de novo.
+  const ligar = (oferece: boolean): void => {
+    if (ligacao && !ligacao.morta()) return;
+    ligacao?.fechar();
+    ligacao = ligarDireto(
+      oferece,
+      (sinal) => mandar({ tipo: 'sinal', sinal }),
+      (texto) => {
+        const m = ler(texto);
+        if (m && PELA_LIGACAO.has(m.tipo)) receber(m);
+      },
+    );
+  };
+
+  socket.addEventListener('message', (evento) => {
+    const mensagem = ler(String(evento.data));
+    if (!mensagem) return;
+    if (mensagem.tipo === 'erro') ultimoErro = mensagem.erro;
+    if (mensagem.tipo === 'escolher' && mensagem.direto) ligar(mensagem.lado === 'anfitriao');
+    if (mensagem.tipo === 'sinal') {
+      if (mensagem.sinal.descricao?.type === 'offer' && (!ligacao || ligacao.morta())) ligar(false);
+      ligacao?.receberSinal(mensagem.sinal);
+      return;
+    }
+    receber(mensagem);
+  });
+  socket.addEventListener('close', () => {
+    ligacao?.fechar();
+    if (!fechadaPorMim) fechou?.(ultimoErro);
+  });
 
   return {
     ouvir(aoReceber, aoFechar) {
@@ -82,15 +130,17 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
     escolherHeroi(heroi) {
       mandar({ tipo: 'heroi', heroi });
     },
+    direta: () => ligacao?.aberta() ?? false,
     enviar(estado) {
+      if (ligacao?.enviar(JSON.stringify({ tipo: 'estado', estado }))) return;
       if (socket.bufferedAmount > FILA_MAXIMA) return;
       mandar({ tipo: 'estado', estado });
     },
     enviarPoder(uso) {
-      mandar({ tipo: 'poder', uso });
+      mandarRapido({ tipo: 'poder', uso });
     },
     enviarGolpe(uso) {
-      mandar({ tipo: 'golpe', uso });
+      mandarRapido({ tipo: 'golpe', uso });
     },
     pedirArma(id) {
       mandar({ tipo: 'pegar-arma', id });
@@ -112,6 +162,7 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
     },
     fechar() {
       fechadaPorMim = true;
+      ligacao?.fechar();
       socket.close(1000, 'saiu');
     },
   };

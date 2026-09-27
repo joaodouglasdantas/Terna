@@ -1,15 +1,23 @@
-import { PedidoPartida } from '@terna/compartilhado';
+import { PedidoPartida, type PartidaNaRede } from '@terna/compartilhado';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { ipDoPedido } from '../http';
 import { vigiarConexao } from './batimento';
+import { redeDoEndereco } from './rede';
 import { Salas } from './salas';
 
 // WebSocket da partida 1v1, sem conta:
-//   /api/partida?acao=criar&nome=Ana              → recebe `sala-criada` com o código
+//   /api/partida?acao=criar&nome=Ana              → recebe `sala-criada` com o código (internet)
+//   /api/partida?acao=hospedar&nome=Ana           → o mesmo, mas a partida aparece para quem
+//                                                   está na mesma rede (GET /api/partida/rede)
 //   /api/partida?acao=entrar&codigo=K7P2Q&nome=Bia → a partida começa para os dois
 // O pedido é validado antes do upgrade: nome ou código inválido nem abre a conexão (400). Cada
 // conexão aberta ganha o batimento (batimento.ts): mede o atraso dela e derruba a que morreu.
-export function rotaPartida(app: FastifyInstance, salas = new Salas()): Salas {
+export function rotaPartida(
+  app: FastifyInstance,
+  { salas = new Salas(), confiarProxy = false }: { salas?: Salas; confiarProxy?: boolean } = {},
+): Salas {
   const pedidos = new WeakMap<FastifyRequest, PedidoPartida>();
+  const redeDe = (request: FastifyRequest): string => redeDoEndereco(ipDoPedido(request, confiarProxy));
 
   app.get(
     '/partida',
@@ -27,7 +35,11 @@ export function rotaPartida(app: FastifyInstance, salas = new Salas()): Salas {
       const pedido = pedidos.get(request);
       if (!pedido) return socket.close(4000, 'pedido inválido');
       const participante =
-        pedido.acao === 'criar' ? salas.criar(pedido.nome, socket) : salas.entrar(pedido.codigo, pedido.nome, socket);
+        pedido.acao === 'criar'
+          ? salas.criar(pedido.nome, socket)
+          : pedido.acao === 'hospedar'
+            ? salas.criar(pedido.nome, socket, redeDe(request))
+            : salas.entrar(pedido.codigo, pedido.nome, socket, redeDe(request));
       if (!participante) return;
       const parar = vigiarConexao(socket, (idaEVoltaMs) => salas.medirPing(participante, idaEVoltaMs));
       socket.on('message', (dados) => salas.receber(participante, dados.toString()));
@@ -37,5 +49,11 @@ export function rotaPartida(app: FastifyInstance, salas = new Salas()): Salas {
       });
     },
   );
+
+  // As partidas hospedadas na rede de quem pergunta. A tela da rede pergunta a cada ~2,5 s, e
+  // todo mundo da rede conta como um endereço só: a folga é para uns poucos procurando juntos.
+  app.get('/partida/rede', { config: { rateLimit: { max: 120, timeWindow: '1 minute' } } }, async (request): Promise<{ partidas: PartidaNaRede[] }> => ({
+    partidas: salas.naRede(redeDe(request)),
+  }));
   return salas;
 }
