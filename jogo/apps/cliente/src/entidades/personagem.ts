@@ -668,7 +668,8 @@ export function podeVirarGolem(p: Personagem): boolean {
 // golem, não).
 export function ganharEnergia(p: Personagem, dano: number): void {
   if (dano <= 0 || formaDo(p) !== 'base' || !personagemLivre(p)) return;
-  p.energia = Math.min(ENERGIA_PIXY.maxima, p.energia + dano * ENERGIA_PIXY.porDano);
+  const porDano = p.heroi === 'grow' ? ENERGIA_PIXY.porDanoGrow : ENERGIA_PIXY.porDano;
+  p.energia = Math.min(ENERGIA_PIXY.maxima, p.energia + dano * porDano);
 }
 
 // O Salto e a Investida levam o corpo (o mesmo caminho nos dois lados online: sai do uso).

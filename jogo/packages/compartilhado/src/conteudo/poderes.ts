@@ -16,7 +16,7 @@ export const VIDA_MAXIMA = 1000;
 
 // A energia pixy vem do dano que o personagem dá no adversário (com poder ou com arma): com 0,3
 // por ponto de dano, enche com ~333 de dano dado — um terço da vida do outro, uns 10 golpes de
-// espada. Ela começa vazia. O Anjo a gasta para virar anjo (e de anjo ela não carrega, para uma
+// espada; a do Grow, com 0,4, enche com 250 (a barra cheia dele é o golem). Ela começa vazia. O Anjo a gasta para virar anjo (e de anjo ela não carrega, para uma
 // forma de anjo não emendar na outra). Cada poder da Leslie só sai com a energia dele, e a gasta:
 // o 1 pede pouco (um golpe de espada dá), o 2 mais e a Fúria da Floresta a barra cheia. O Grow,
 // de gente, gasta um pouquinho na Revoada e no Vendaval e a barra cheia para virar golem; de golem
@@ -24,6 +24,7 @@ export const VIDA_MAXIMA = 1000;
 export const ENERGIA_PIXY = {
   maxima: 100,
   porDano: 0.3, // por ponto de dano dado no adversário
+  porDanoGrow: 0.4, // o Grow enche mais depressa
   custoAnjo: 100,
   custoLeslie: { chicote: 10, raizes: 25, furia: 100 },
   custoGrow: { aves: 8, vento: 12, golem: 100 },
