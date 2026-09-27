@@ -19,7 +19,7 @@ export const VIDA_MAXIMA = 1000;
 // espada; a do Grow, com 0,4, enche com 250 (a barra cheia dele é o golem). Ela começa vazia. O Anjo a gasta para virar anjo (e de anjo ela não carrega, para uma
 // forma de anjo não emendar na outra). Cada poder da Leslie só sai com a energia dele, e a gasta:
 // o 1 pede pouco (um golpe de espada dá), o 2 mais e a Fúria da Floresta a barra cheia. O Grow,
-// de gente, gasta um pouquinho na Revoada e no Vendaval e a barra cheia para virar golem; de golem
+// de gente, gasta quase nada na Revoada e no Vendaval e a barra cheia para virar golem; de golem
 // não gasta nada (a barra desce com o tempo da forma) e ela não carrega.
 export const ENERGIA_PIXY = {
   maxima: 100,
@@ -27,7 +27,7 @@ export const ENERGIA_PIXY = {
   porDanoGrow: 0.4, // o Grow enche mais depressa
   custoAnjo: 100,
   custoLeslie: { chicote: 10, raizes: 25, furia: 100 },
-  custoGrow: { aves: 8, vento: 12, golem: 100 },
+  custoGrow: { aves: 2, vento: 3, golem: 100 }, // a Revoada e o Vendaval: quase nada
 };
 
 // Todos os poderes do jogo (o formato das mensagens aceita qualquer um); cada personagem usa os seus.

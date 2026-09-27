@@ -6,7 +6,7 @@
 // Distâncias em pixels, tempos em segundos, velocidades em px/s.
 //
 // A energia pixy (poderes.ts): começa vazia e enche com o dano que ele dá. A Revoada e o Vendaval
-// pedem um pouquinho dela e a gastam; o golem pede a barra cheia. De golem, os poderes não gastam
+// pedem quase nada dela e a gastam; o golem pede a barra cheia. De golem, os poderes não gastam
 // nada: a barra só vai descendo com o tempo que resta da forma, e ela não carrega.
 //
 // Forma humana — cada um se desvia de um jeito:
