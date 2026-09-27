@@ -1,24 +1,43 @@
-// O sósia: um personagem idêntico a você que anda sozinho pelo mapa. Ele não tem física nem
-// desenho próprios — o corpo é o mesmo seu (entidades/personagem.ts), então anda, pula, vira
-// anjo e plana exatamente como você. O cérebro daqui só decide, a cada quadro, que botões
-// apertar e onde mirar: anda por perto de você, para um pouco, pula de vez em quando e, quando
-// a recarga deixa, vira anjo (e aí voa, plana e às vezes solta o botão no meio). De anjo, ataca
-// com os três poderes quando você está no alcance; nas duas formas, tenta sair de baixo das
-// marcas dos seus poderes e pular os seus corações. Na forma base, vai buscar as armas que caem
-// perto e luta com elas: com a espada chega junto; com o arco fica longe e atira. Com uma arma
-// boa na mão, adia virar anjo (virando, ela cairia no chão).
+// O sósia: um personagem idêntico a você (o mesmo personagem que você escolheu) que anda sozinho
+// pelo mapa. Ele não tem física nem desenho próprios — o corpo é o mesmo seu
+// (entidades/personagem.ts), então anda, pula e usa os poderes exatamente como você. O cérebro
+// daqui só decide, a cada quadro, que botões apertar e onde mirar: anda por perto de você, para
+// um pouco, pula de vez em quando, tenta sair de baixo das marcas dos seus poderes e pular o que
+// vem voando. Vai buscar as armas que caem perto e luta com elas: com a espada chega junto; com
+// o arco fica longe e atira.
+// - Leslie: com uma arma boa na mão, fica no modo arma; sem ela, aperta R para o modo poderes e
+//   ataca com os três quando você está no alcance (a Fúria, só com a barra de energia cheia).
+// - Anjo: quando a energia e a recarga deixam, vira anjo (e aí voa, plana e às vezes solta o
+//   botão no meio) e ataca com os poderes dele. Com uma arma boa na mão, adia virar anjo
+//   (virando, ela cairia no chão).
 
-import { ARCO, IMPACTO, JULGAMENTO, MUNDO, PODERES, RAJADA, type IdPoder, type Intervalo } from '@terna/compartilhado';
+import {
+  ARCO,
+  ENERGIA_PIXY,
+  FURIA,
+  IMPACTO,
+  JULGAMENTO,
+  MUNDO,
+  RAIZES,
+  RAJADA,
+  CHICOTE,
+  type IdPoder,
+  type Intervalo,
+} from '@terna/compartilhado';
 import { sortear } from '../motor/matematica';
+import { ALCANCE_ANJO } from './anjo/poderes';
+import { ALCANCE_LESLIE } from './leslie/poderes';
 import {
   armaPronta,
+  custoDeEnergia,
   formaDo,
   personagemLivre,
   podePegarArma,
   podeVirarAnjo,
-  podeUsarPoderes,
+  usaPoderes,
   type Controles,
   type Forma,
+  type Modo,
   type Personagem,
 } from './personagem';
 import type { Ameacas } from './poderes';
@@ -36,8 +55,10 @@ const SOSIA = {
   // anjo acabar); de anjo, às vezes passa da duração (DURACAO_ANJO) e o tempo acaba antes: ele
   // volta sozinho.
   forma: { base: [1, 6], anjo: [15, 32] } as Record<Forma, Intervalo>,
-  // A casa segue você: fica a esta distância, do lado em que ele está.
+  // A casa segue você: fica a esta distância, do lado em que ele está. A Leslie no modo poderes
+  // fica um pouco mais longe: o chicote alcança.
   distancia: { base: 120, anjo: 140 } as Record<Forma, number>,
+  distanciaPoderes: 95,
   entreAtaques: [0.6, 1.6] as Intervalo, // segundos entre uma tentativa de ataque e outra
   guardarEspecial: 0.35, // chance de guardar o especial pronto numa tentativa, para variar
   erroMira: 10, // pixels, para cada lado
@@ -56,7 +77,7 @@ export interface CerebroSosia {
   espera: number; // segundos parado até escolher outro lugar
   ateOPulo: number; // segundos no chão até o próximo pulo
   segurando: number; // segundos que ainda segura o botão de pulo
-  forma: Forma; // a forma em que ele se viu da última vez
+  forma: Forma; // a forma em que ele se viu da última vez (o Anjo)
   ateTrocar: number; // segundos até trocar de forma
   ateAtacar: number; // segundos até a próxima tentativa de ataque
   ateDesviar: number; // segundos até poder decidir de novo se pula um coração
@@ -102,39 +123,57 @@ function escolherDestino(c: CerebroSosia, x: number): number {
   return c.casa;
 }
 
-// Até onde cada poder pega: o Impacto, até o fim da fileira.
-const ALCANCE: Record<IdPoder, number> = {
-  rajada: RAJADA.alcance - 10,
-  impacto: IMPACTO.alcance + IMPACTO.raio * 2 * (IMPACTO.explosoes - 1),
-  julgamento: JULGAMENTO.alcance,
+// Até onde cada poder pega.
+const ALCANCE: Record<IdPoder, number> = { ...ALCANCE_ANJO, ...ALCANCE_LESLIE };
+// O aviso de cada poder de área: a mira adianta o passo do oponente por parte dele.
+const AVISO: Partial<Record<IdPoder, number>> = {
+  impacto: IMPACTO.aviso,
+  julgamento: JULGAMENTO.aviso,
+  raizes: RAIZES.aviso,
+  furia: FURIA.aviso,
 };
 
 // Com qual poder atacar agora, se algum estiver pronto e alcançar: o mais forte primeiro, às
-// vezes guardando o especial.
+// vezes guardando o especial. Os da Leslie, só com a energia de cada um.
 function escolherPoder(corpo: Personagem, distancia: number): number | null {
-  const ordem = [2, 1, 0].filter((i) => corpo.poderes.recarga[i] <= 0 && distancia <= ALCANCE[PODERES[i]]);
+  const { lista, recarga } = corpo.poderes;
+  const pode = (i: number): boolean =>
+    recarga[i] <= 0 &&
+    distancia <= ALCANCE[lista[i]] &&
+    corpo.energia >= custoDeEnergia(corpo, lista[i]);
+  const ordem = [2, 1, 0].filter(pode);
   if (ordem[0] === 2 && ordem.length > 1 && Math.random() < SOSIA.guardarEspecial) ordem.shift();
   return ordem[0] ?? null;
 }
 
-// Mira onde você vai estar: o coração no peito, adiantado pelo tempo de voo; as áreas no chão,
-// adiantadas por parte do aviso (ele não adivinha tudo). Com um erro sorteado.
+// Mira onde você vai estar: o coração e o chicote no peito, adiantados pelo tempo até lá; as
+// áreas no chão, adiantadas por parte do aviso (ele não adivinha tudo). Com um erro sorteado.
 function mirar(corpo: Personagem, oponente: Personagem, poder: number): Mira {
   const erro = (): number => sortear([-SOSIA.erroMira, SOSIA.erroMira]);
-  if (PODERES[poder] === 'rajada') {
+  const id = corpo.poderes.lista[poder];
+  if (id === 'rajada') {
     const voo = Math.abs(oponente.x - corpo.x) / RAJADA.velocidade;
     return { poder, x: oponente.x + oponente.vx * voo * 0.7 + erro(), y: oponente.y - 16 + erro() };
   }
-  const aviso = PODERES[poder] === 'impacto' ? IMPACTO.aviso : JULGAMENTO.aviso;
-  return { poder, x: oponente.x + oponente.vx * aviso * sortear([0.2, 0.9]) + erro(), y: oponente.y };
+  if (id === 'chicote') {
+    const voo = (Math.abs(oponente.x - corpo.x) / CHICOTE.alcance) * CHICOTE.estica;
+    return { poder, x: oponente.x + oponente.vx * voo * 0.7 + erro(), y: oponente.y - 16 + erro() / 2 };
+  }
+  const aviso = AVISO[id] ?? 0.5;
+  const x = oponente.x + oponente.vx * aviso * sortear([0.2, 0.9]) + erro();
+  if (id === 'raizes') {
+    // Mira a fileira para a última roda, a que prende mais, cair nele.
+    const lado = oponente.x >= corpo.x ? 1 : -1;
+    return { poder, x: x - lado * RAIZES.raio * 2 * (RAIZES.rodas - 1), y: oponente.y };
+  }
+  return { poder, x, y: oponente.y };
 }
 
 // Uma marca embaixo dele, já percebida: para onde correr (para fora dela, do lado mais perto),
 // e se é baixa o bastante para pular por cima.
 function fugaDeMarca(corpo: Personagem, ameacas: Ameacas): { x: number; pular: boolean } | null {
   for (const a of ameacas.areas) {
-    const aviso = a.baixa ? IMPACTO.aviso : JULGAMENTO.aviso;
-    const percebeu = a.resta < aviso * (1 - SOSIA.reacao);
+    const percebeu = a.resta < a.aviso * (1 - SOSIA.reacao);
     if (!percebeu || Math.abs(corpo.x - a.x) > a.raio + 8) continue;
     const lado = corpo.x >= a.x ? 1 : -1;
     const fora = noMapa(a.x + lado * (a.raio + 18));
@@ -145,9 +184,9 @@ function fugaDeMarca(corpo: Personagem, ameacas: Ameacas): { x: number; pular: b
   return null;
 }
 
-// Um coração vindo na direção dele, perto de chegar e na altura do corpo.
+// Algo voando na direção dele (um coração, a ponta de um chicote), perto de chegar e na altura do corpo.
 function coracaoChegando(corpo: Personagem, ameacas: Ameacas): boolean {
-  return ameacas.rajadas.some((r) => {
+  return ameacas.projeteis.some((r) => {
     if (Math.abs(r.vx) < 1) return false;
     const t = (corpo.x - r.x) / r.vx;
     const y = r.y + r.vy * t;
@@ -211,21 +250,34 @@ export function pensarSosia(
   }
   // A casa acompanha você, do lado em que ele está.
   const lado = corpo.x >= oponente.x ? 1 : -1;
-  c.casa = noMapa(oponente.x + lado * SOSIA.distancia[forma]);
+  const longe = corpo.heroi === 'leslie' && corpo.modo === 'poderes' ? SOSIA.distanciaPoderes : SOSIA.distancia[forma];
+  c.casa = noMapa(oponente.x + lado * longe);
 
-  // Troca de forma só com os pés no chão, sem pulo em curso e, para virar anjo, com a energia e a
-  // recarga prontas. Aperta R por um quadro só: no seguinte o corpo já está transformando e o cérebro
-  // espera (e, se o aperto não pegou, solta o botão antes de apertar de novo).
-  if (forma === 'anjo' || podeVirarAnjo(corpo)) c.ateTrocar -= dt;
   const guardando = corpo.arma !== null && corpo.arma.durabilidade > SOSIA.guardarArma;
-  if (c.ateTrocar <= 0 && !guardando && corpo.noChao && c.segurando <= 0 && !corpo.transformarSegurado) {
-    controles.transformar = true;
-    return decisao;
+  const podeApertar = corpo.noChao && c.segurando <= 0 && !corpo.transformarSegurado;
+  if (corpo.heroi === 'leslie') {
+    // Com uma arma boa (ou sem energia nem para o chicote), o modo arma; senão, os poderes. Aperta
+    // R por um quadro só.
+    const semEnergia = corpo.energia < custoDeEnergia(corpo, 'chicote');
+    const quer: Modo = guardando || semEnergia ? 'arma' : 'poderes';
+    if (corpo.modo !== quer && podeApertar) {
+      controles.transformar = true;
+      return decisao;
+    }
+  } else {
+    // Troca de forma só com os pés no chão, sem pulo em curso e, para virar anjo, com a energia e
+    // a recarga prontas. Aperta R por um quadro só: no seguinte o corpo já está transformando e o
+    // cérebro espera (e, se o aperto não pegou, solta o botão antes de apertar de novo).
+    if (forma === 'anjo' || podeVirarAnjo(corpo)) c.ateTrocar -= dt;
+    if (c.ateTrocar <= 0 && !guardando && podeApertar) {
+      controles.transformar = true;
+      return decisao;
+    }
   }
 
   const fuga = fugaDeMarca(corpo, ameacas);
   const buscar = podePegarArma(corpo) ? armaParaBuscar(corpo, armas) : null;
-  const luta = corpo.arma && forma === 'base' ? lutarComArma(c, corpo, oponente, dt) : null;
+  const luta = corpo.arma && formaDo(corpo) === 'base' && !usaPoderes(corpo) ? lutarComArma(c, corpo, oponente, dt) : null;
   decisao.golpe = luta?.golpe ?? null;
   if (fuga) {
     c.alvo = fuga.x;
@@ -267,9 +319,11 @@ export function pensarSosia(
     }
   }
 
-  // De anjo, ataca quando você está no alcance.
+  // Com os poderes na mão (o Anjo de anjo, a Leslie no modo poderes), ataca quando você está no
+  // alcance.
   c.ateAtacar -= dt;
-  if (c.ateAtacar <= 0 && podeUsarPoderes(corpo) && oponente.vida > 0) {
+  const comPoderes = usaPoderes(corpo) && personagemLivre(corpo) && !corpo.encanto && corpo.vida > 0;
+  if (c.ateAtacar <= 0 && comPoderes && oponente.vida > 0) {
     c.ateAtacar = sortear(SOSIA.entreAtaques);
     const poder = escolherPoder(corpo, Math.abs(oponente.x - corpo.x));
     if (poder !== null) decisao.mira = mirar(corpo, oponente, poder);

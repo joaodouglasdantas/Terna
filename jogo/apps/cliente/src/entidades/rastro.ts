@@ -1,4 +1,4 @@
-// Efeitos do dash e do pulo duplo, nas duas formas: ficam no mapa (não seguem o corpo) e se
+// Efeitos do dash e do pulo duplo, em todos os personagens: ficam no mapa (não seguem o corpo) e se
 // desenham atrás dele.
 //
 // - Dash: enquanto dura, o corpo deixa cópias claras de si para trás, que somem rápido; se
@@ -6,8 +6,7 @@
 // - Pulo duplo: um anel de ar se abre sob os pés, com uns fiapos caindo dele.
 
 import { contexto2d, novoCanvas } from '../motor/imagens';
-import type { Forma } from './personagem';
-import type { Pose } from './anjo';
+import type { Pose } from './pose';
 
 interface Fantasma {
   imagem: HTMLCanvasElement; // já tingida
@@ -46,9 +45,15 @@ const FANTASMA = {
   vida: 0.22, // segundos até sumir
   alfa: 0.65, // a cópia recém-deixada
 };
-// A cor das cópias: azul-claro na forma base, dourado-claro no anjo. A tinta cobre o sprite
-// quase todo, deixando só um resto do sombreado para a silhueta ainda ler como o personagem.
-const TINTA: Record<Forma, string> = { base: 'rgba(200, 230, 255, 0.8)', anjo: 'rgba(255, 236, 170, 0.8)' };
+// A cor das cópias: verde-claro na Leslie; no Anjo, azul-claro na forma base e dourado-claro de
+// anjo. A tinta cobre o sprite quase todo, deixando só um resto do sombreado para a silhueta
+// ainda ler como o personagem.
+export type TintaRastro = 'leslie' | 'base' | 'anjo';
+const TINTA: Record<TintaRastro, string> = {
+  leslie: 'rgba(210, 250, 190, 0.8)',
+  base: 'rgba(200, 230, 255, 0.8)',
+  anjo: 'rgba(255, 236, 170, 0.8)',
+};
 const ANEL = { vida: 0.28, raio: [3, 12], altura: [1, 3], pontos: 18 };
 const COR_AR = '255, 255, 255';
 
@@ -56,28 +61,28 @@ export function criarRastro(): Rastro {
   return { fantasmas: [], graos: [], aneis: [], ateOFantasma: 0 };
 }
 
-// Uma cópia tingida por sprite e forma, feita uma vez.
-const tingidos = new Map<Forma, WeakMap<HTMLCanvasElement, HTMLCanvasElement>>();
+// Uma cópia tingida por sprite e tinta, feita uma vez.
+const tingidos = new Map<TintaRastro, WeakMap<HTMLCanvasElement, HTMLCanvasElement>>();
 
-function tingido(imagem: HTMLCanvasElement, forma: Forma): HTMLCanvasElement {
-  let daForma = tingidos.get(forma);
-  if (!daForma) tingidos.set(forma, (daForma = new WeakMap()));
-  const pronto = daForma.get(imagem);
+function tingido(imagem: HTMLCanvasElement, tinta: TintaRastro): HTMLCanvasElement {
+  let daTinta = tingidos.get(tinta);
+  if (!daTinta) tingidos.set(tinta, (daTinta = new WeakMap()));
+  const pronto = daTinta.get(imagem);
   if (pronto) return pronto;
 
   const canvas = novoCanvas(imagem.width, imagem.height);
   const ctx = contexto2d(canvas);
   ctx.drawImage(imagem, 0, 0);
   ctx.globalCompositeOperation = 'source-atop';
-  ctx.fillStyle = TINTA[forma];
+  ctx.fillStyle = TINTA[tinta];
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  daForma.set(imagem, canvas);
+  daTinta.set(imagem, canvas);
   return canvas;
 }
 
-function deixarFantasma(r: Rastro, pose: Pose, forma: Forma): void {
+function deixarFantasma(r: Rastro, pose: Pose, tinta: TintaRastro): void {
   const { imagem, eixo, x, topo, direcao } = pose;
-  r.fantasmas.push({ imagem: tingido(imagem, forma), eixo, x, topo, direcao, vida: FANTASMA.vida });
+  r.fantasmas.push({ imagem: tingido(imagem, tinta), eixo, x, topo, direcao, vida: FANTASMA.vida });
 }
 
 function soltarGrao(r: Rastro, x: number, y: number, vx: number, vy: number, total: number): void {
@@ -85,8 +90,8 @@ function soltarGrao(r: Rastro, x: number, y: number, vx: number, vy: number, tot
 }
 
 // O dash começou: a primeira cópia sai já, e no chão os pés chutam a poeira para trás.
-export function marcarDash(r: Rastro, pose: Pose, forma: Forma, xPes: number, yPes: number, noChao: boolean): void {
-  deixarFantasma(r, pose, forma);
+export function marcarDash(r: Rastro, pose: Pose, tinta: TintaRastro, xPes: number, yPes: number, noChao: boolean): void {
+  deixarFantasma(r, pose, tinta);
   r.ateOFantasma = FANTASMA.intervalo;
   if (!noChao) return;
   for (let i = 0; i < 6; i++) {
@@ -109,11 +114,11 @@ export function marcarPuloDuplo(r: Rastro, xPes: number, yPes: number): void {
   }
 }
 
-export function atualizarRastro(r: Rastro, dt: number, emDash: boolean, pose: Pose, forma: Forma): void {
+export function atualizarRastro(r: Rastro, dt: number, emDash: boolean, pose: Pose, tinta: TintaRastro): void {
   if (emDash) {
     r.ateOFantasma -= dt;
     if (r.ateOFantasma <= 0) {
-      deixarFantasma(r, pose, forma);
+      deixarFantasma(r, pose, tinta);
       r.ateOFantasma += FANTASMA.intervalo;
     }
   }

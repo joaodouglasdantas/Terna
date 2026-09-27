@@ -1,21 +1,32 @@
-// Uma partida: você e o outro no mapa, com o tempo correndo. Sozinho, o outro é a CPU (o sósia
-// de sempre) e o tempo é daqui — o menu pausa tudo. Online, o outro é o personagem de quem
-// entrou na sala: cada um simula o próprio e manda botões + posição; aqui o corpo dele anda com
-// os mesmos botões (pula, plana, vira anjo igual) e a posição é corrigida aos poucos. O tempo
-// online é do servidor: o fim chega por mensagem, ao mesmo tempo para os dois.
+// Uma partida: você e o outro no mapa, com o tempo correndo, cada um com o personagem que
+// escolheu. Sozinho, o outro é a CPU (o sósia, com o mesmo personagem que você) e o tempo é
+// daqui — o menu pausa tudo. Online, o outro é o personagem de quem entrou na sala: cada um
+// simula o próprio e manda botões + posição; aqui o corpo dele anda com os mesmos botões (pula,
+// troca de modo, vira anjo igual) e a posição é corrigida aos poucos. O tempo online é do
+// servidor: o fim chega por mensagem, ao mesmo tempo para os dois.
 //
-// Os poderes do anjo: o seu sai do clique (o botão direito troca o escolhido), o da CPU do
-// cérebro dela e o do outro online chega pela rede e é lançado no corpo dele aqui. Cada um
-// confere o dano que leva — online, a vida do outro chega com o estado dele. A vida de alguém
-// chegando a 0 acaba a partida, com o outro de vencedor.
+// Os poderes: o seu sai do clique (o botão direito troca o escolhido), o da CPU do cérebro dela
+// e o do outro online chega pela rede e é lançado no corpo dele aqui. Cada um confere o dano que
+// leva — online, a vida do outro chega com o estado dele. A vida de alguém chegando a 0 acaba a
+// partida, com o outro de vencedor.
 //
-// As armas: na forma base o clique esquerdo ataca com a arma da mão (se tiver). Encostou numa
-// arma no chão, pega — sozinho na hora; online pedindo ao servidor, que decide quem leva. Virando
-// anjo com ela, ela cai no chão; o tempo dela acabando, quebra; a tecla E joga fora e ela some.
-// Sozinho as quedas saem daqui; online, do servidor.
+// As armas: o clique esquerdo ataca com a arma da mão (se tiver) quando não está com os poderes
+// (a Leslie no modo arma; o Anjo na forma base). Encostou numa arma no chão, pega — sozinho na
+// hora; online pedindo ao servidor, que decide quem leva. O Anjo virando anjo com ela, ela cai no
+// chão; o tempo dela acabando, quebra; a tecla E joga fora e ela some. Sozinho as quedas saem
+// daqui; online, do servidor.
 
-import { DURACAO_PARTIDA_MS, MUNDO, type EstadoJogador, type Lado, type MotivoFim } from '@terna/compartilhado';
-import { alternarForma, transformando } from './entidades/anjo';
+import {
+  DURACAO_PARTIDA_MS,
+  ENERGIA_PIXY,
+  FURIA,
+  MUNDO,
+  VIDA_MAXIMA,
+  type EstadoJogador,
+  type Lado,
+  type MotivoFim,
+} from '@terna/compartilhado';
+import { alternarForma, transformando } from './entidades/anjo/anjo';
 import {
   armaAoAlcance,
   armasNoChao,
@@ -39,6 +50,7 @@ import {
   bloqueioDosPoderes,
   comecarDash,
   criarPersonagem,
+  custoDeEnergia,
   formaDo,
   ganharEnergia,
   gesticular,
@@ -46,6 +58,7 @@ import {
   peitoDo,
   podePegarArma,
   precisaLargarArma,
+  usaPoderes,
   type Controles,
   type Personagem,
 } from './entidades/personagem';
@@ -56,6 +69,7 @@ import {
   criarEfeitos,
   lancarPoder,
   avisar,
+  mostrarCura,
   mostrarDano,
   tentarUsar,
   trocarPoder,
@@ -140,10 +154,12 @@ export function criarPartida(
 ): Partida {
   const convidado = escolha.modo === 'online' && escolha.lado === 'convidado';
   const [meuX, meuLado, dele, ladoDele] = convidado ? [AO_LADO, -1, MEIO, 1] as const : [MEIO, 1, AO_LADO, -1] as const;
+  // A CPU é o seu sósia: o mesmo personagem que você.
+  const heroiDele = escolha.modo === 'online' ? escolha.heroiOponente : escolha.heroi;
   const p: Partida = {
     online: escolha.modo === 'online',
-    jogador: criarPersonagem(meuX, meuLado),
-    outro: criarPersonagem(dele, ladoDele),
+    jogador: criarPersonagem(escolha.heroi, meuX, meuLado),
+    outro: criarPersonagem(heroiDele, dele, ladoDele),
     eu: { texto: escolha.nome, ...AZUL },
     ele: { texto: escolha.modo === 'online' ? escolha.oponente : 'CPU', ...VERMELHO },
     efeitos: criarEfeitos(),
@@ -189,12 +205,18 @@ export function criarPartida(
             const dano = p.outro.vida - m.estado.vida;
             mostrarDano(p.efeitos, p.outro, dano);
             ganharEnergia(p.jogador, dano);
+          } else if (m.estado.vida > p.outro.vida && p.outro.vida > 0) {
+            mostrarCura(p.efeitos, p.outro, m.estado.vida - p.outro.vida); // a Fúria da Floresta
           }
           p.outro.vida = m.estado.vida;
           p.outro.energia = m.estado.energia;
+          p.outro.modo = m.estado.modo;
           p.outro.poderes.selecionado = m.estado.selecionado;
-          // O encanto dele também é ele quem decide; enfeitiçado, só pode ter sido por você.
+          // O encanto e as raízes dele também é ele quem decide; enfeitiçado, só pode ter sido
+          // por você.
           p.outro.encanto = m.estado.encanto > 0 ? { resta: m.estado.encanto, dono: p.jogador } : null;
+          p.outro.preso = m.estado.preso;
+          p.outro.veneno = m.estado.veneno;
         }
         if (m.tipo === 'poder' && !p.acabou) {
           gesticular(p.outro, { x: m.uso.alvoX, y: m.uso.alvoY }, m.uso.poder === 'julgamento');
@@ -248,12 +270,23 @@ function usarPoder(p: Partida, corpo: Personagem, alvo: { x: number; y: number }
   uso.x = Math.max(0, Math.min(MUNDO, mao.x));
   uso.y = mao.y;
   lancarPoder(p.efeitos, corpo, uso);
+  // Os poderes da Leslie gastam energia (mais, quanto mais forte), e a Fúria da Floresta cura. A
+  // do outro online chega pela rede, com a vida e a energia dele.
+  if (corpo.heroi === 'leslie' && !corpo.daRede) {
+    corpo.energia = Math.max(0, corpo.energia - custoDeEnergia(corpo, uso.poder));
+    if (uso.poder === 'furia') {
+      const cura = Math.min(FURIA.cura, VIDA_MAXIMA - corpo.vida);
+      corpo.vida += cura;
+      if (cura > 0) mostrarCura(p.efeitos, corpo, cura);
+    }
+  }
   if (corpo === p.jogador) p.remoto?.conexao.enviarPoder(uso);
 }
 
-// O clique esquerdo: na forma base, a arma da mão; de anjo, o poder escolhido.
+// O clique esquerdo: com os poderes na mão (a Leslie no modo poderes, o Anjo de anjo), o poder
+// escolhido; senão, a arma da mão.
 function usarAcao(p: Partida, corpo: Personagem, alvo: { x: number; y: number }): void {
-  if (formaDo(corpo) === 'anjo') return usarPoder(p, corpo, alvo);
+  if (usaPoderes(corpo)) return usarPoder(p, corpo, alvo);
   const bloqueio = bloqueioDaArma(corpo);
   if (bloqueio) return avisar(corpo.poderes, bloqueio);
   const uso = tentarAtacar(corpo, alvo);
@@ -412,10 +445,13 @@ function enviarEstado(r: Remoto, corpo: Personagem, segurados: Controles, agora 
     direcao: corpo.direcao,
     noChao: corpo.noChao,
     forma: formaDo(corpo),
+    modo: corpo.modo,
     ...controles,
     vida: corpo.vida,
     selecionado: corpo.poderes.selecionado,
     encanto: Math.min(10, corpo.encanto?.resta ?? 0),
+    preso: Math.min(10, corpo.preso),
+    veneno: Math.min(10, corpo.veneno),
     energia: corpo.energia,
   });
 }

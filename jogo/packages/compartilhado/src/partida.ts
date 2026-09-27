@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import { ARMAS } from './conteudo/armas';
-import { ENERGIA_PIXY, PODERES, VIDA_MAXIMA } from './conteudo/poderes';
+import { HEROIS } from './conteudo/herois';
+import { ENERGIA_PIXY, PODERES, PODERES_POR_HEROI, VIDA_MAXIMA } from './conteudo/poderes';
 import { MUNDO } from './mundo';
 
 // Partida: uma rodada com tempo marcado, sozinho (contra a CPU) ou 1v1 numa sala com código.
-// Na 1v1 o cronômetro é do servidor: ele manda o tempo que resta ao começar e avisa o fim.
+// Na 1v1, com os dois na sala, cada um escolhe o personagem; o cronômetro é do servidor e só
+// começa com as duas escolhas feitas: ele manda o tempo que resta ao começar e avisa o fim.
 
 export const DURACAO_PARTIDA_MS = 5 * 60 * 1000;
 
@@ -33,6 +35,8 @@ export const PedidoPartida = z.discriminatedUnion('acao', [
 ]);
 export type PedidoPartida = z.infer<typeof PedidoPartida>;
 
+export const IdHeroi = z.enum(HEROIS);
+
 // Os botões segurados e onde o corpo está. Quem recebe move o personagem do outro com os
 // mesmos botões (pula, plana e vira anjo igualzinho) e corrige a posição aos poucos.
 export const EstadoJogador = z.object({
@@ -42,15 +46,18 @@ export const EstadoJogador = z.object({
   vy: z.number().min(-3000).max(3000),
   direcao: z.union([z.literal(1), z.literal(-1)]),
   noChao: z.boolean(),
-  forma: z.enum(['base', 'anjo']),
+  forma: z.enum(['base', 'anjo']), // do Anjo; a Leslie está sempre na base
+  modo: z.enum(['arma', 'poderes']), // o que o clique esquerdo da Leslie usa (a tecla R troca)
   esquerda: z.boolean(),
   direita: z.boolean(),
   pular: z.boolean(),
   transformar: z.boolean(),
   // Cada um decide o dano que leva (quem desviou na própria tela, desviou) e manda a vida.
   vida: z.number().min(0).max(VIDA_MAXIMA),
-  selecionado: z.number().int().min(0).max(PODERES.length - 1), // o poder escolhido no painel
+  selecionado: z.number().int().min(0).max(PODERES_POR_HEROI - 1), // o poder escolhido no painel
   encanto: z.number().min(0).max(10), // segundos que ainda faltam do encanto da Rajada (0 = livre)
+  preso: z.number().min(0).max(10), // segundos que ainda faltam presos pelas Raízes (0 = livre)
+  veneno: z.number().min(0).max(10), // segundos que ainda faltam do veneno do Chicote (0 = limpo)
   energia: z.number().min(0).max(ENERGIA_PIXY.maxima), // a energia pixy, para o painel dele aqui
 });
 export type EstadoJogador = z.infer<typeof EstadoJogador>;
@@ -97,6 +104,8 @@ export const ArmaNoMapa = z.object({
 export type ArmaNoMapa = z.infer<typeof ArmaNoMapa>;
 
 export const MensagemPartidaDoCliente = z.discriminatedUnion('tipo', [
+  // Com os dois na sala, antes de começar: o personagem escolhido (só os liberados valem).
+  z.object({ tipo: z.literal('heroi'), heroi: IdHeroi }),
   z.object({ tipo: z.literal('estado'), estado: EstadoJogador }),
   z.object({ tipo: z.literal('poder'), uso: PoderUsado }),
   z.object({ tipo: z.literal('golpe'), uso: AtaqueUsado }),
@@ -119,8 +128,19 @@ export type MotivoFim = z.infer<typeof MotivoFim>;
 export const MensagemPartidaDoServidor = z.discriminatedUnion('tipo', [
   // Para quem criou: o código para passar ao outro jogador.
   z.object({ tipo: z.literal('sala-criada'), codigo: CodigoSala }),
-  // Os dois estão na sala: a partida começou e termina em `restanteMs`.
-  z.object({ tipo: z.literal('comecou'), lado: Lado, oponente: z.string(), restanteMs: z.number() }),
+  // Os dois estão na sala: cada um escolhe o personagem (e manda `heroi`).
+  z.object({ tipo: z.literal('escolher'), lado: Lado, oponente: z.string() }),
+  // Só para o outro: quem mandou já escolheu.
+  z.object({ tipo: z.literal('oponente-escolheu'), heroi: IdHeroi }),
+  // Os dois escolheram: a partida começou e termina em `restanteMs`.
+  z.object({
+    tipo: z.literal('comecou'),
+    lado: Lado,
+    oponente: z.string(),
+    restanteMs: z.number(),
+    heroi: IdHeroi,
+    heroiOponente: IdHeroi,
+  }),
   z.object({ tipo: z.literal('estado'), estado: EstadoJogador }),
   z.object({ tipo: z.literal('poder'), uso: PoderUsado }),
   z.object({ tipo: z.literal('golpe'), uso: AtaqueUsado }),

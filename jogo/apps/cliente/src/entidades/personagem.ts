@@ -1,14 +1,22 @@
-// Os quadros vêm de assets/personagem.png (forma base) e assets/personagem-anjo.png (forma de
-// anjo, com os quadros nos mesmos lugares), gerados a partir de fontes/SpriteBase.png por
-// ferramentas/gerar-personagem.cjs. Personagem desenhado virado para a direita.
+// O corpo dos personagens: física, animação e desenho. É o mesmo para você e para o sósia (e
+// para o outro jogador online): cada um recebe os seus `Controles` a cada quadro — os seus vêm
+// do teclado, os do sósia do cérebro dele.
 //
-// O corpo (física, animação e desenho) é o mesmo para você e para o sósia: cada um recebe os
-// seus `Controles` a cada quadro — os seus vêm do teclado, os do sósia do cérebro dele.
+// Os personagens (compartilhado/conteudo/herois.ts):
+// - Leslie, a dríade: sempre dríade. Pega as armas que caem do céu; a tecla R troca o que o
+//   clique esquerdo usa, a arma ou os poderes dela. Quadros em assets/leslie.png, gerados de
+//   fontes/leslie.png por ferramentas/gerar-leslie.cjs.
+// - Anjo (desligado por enquanto): luta com as armas e, com a tecla R, vira anjo por um tempo
+//   (anjo/). Quadros em assets/anjo/base.png e anjo/anjo.png (a forma de anjo, nos mesmos
+//   lugares), gerados de fontes/SpriteBase.png por ferramentas/gerar-anjo.cjs.
+// Os sprites são desenhados virados para a direita.
 
-import { ENERGIA_PIXY, MUNDO, RAJADA, VIDA_MAXIMA } from '@terna/compartilhado';
-import urlPersonagem from '../assets/personagem.png';
-import urlPersonagemAnjo from '../assets/personagem-anjo.png';
-import { QUADROS_PERSONAGEM } from '../gerado/personagem-quadros';
+import { ENERGIA_PIXY, MUNDO, RAJADA, VIDA_MAXIMA, type Heroi } from '@terna/compartilhado';
+import urlAnjoBase from '../assets/anjo/base.png';
+import urlAnjoAnjo from '../assets/anjo/anjo.png';
+import urlLeslie from '../assets/leslie.png';
+import { QUADROS_ANJO } from '../gerado/anjo-quadros';
+import { QUADROS_LESLIE } from '../gerado/leslie-quadros';
 import { carregarImagem, contexto2d, novoCanvas } from '../motor/imagens';
 import type { Luz, Sprite } from '../motor/tipos';
 import { desenharSombra } from '../mundo/cenario';
@@ -26,51 +34,71 @@ import {
   formaAtual,
   transformando,
   type Anjo,
-  type Pose,
-} from './anjo';
+} from './anjo/anjo';
+import { PAIRAR_NO_AR, criarVoo, decolar, voarNoAr, type Voo } from './anjo/voo';
 import { desenharArmaNaMao, type ArmaNaMao, type Ataque } from './armas';
-import { BRACO_ANJO, desenharBracoEsticado, desenharMao, ombroDe } from './braco';
-import { atualizarRecargas, avisar, criarPoderes, desenharEncanto, type Encanto, type Poderes } from './poderes';
-import { PAIRAR_NO_AR, criarVoo, decolar, voarNoAr, type Voo } from './voo-anjo';
-import { atualizarRastro, criarRastro, desenharRastro, marcarDash, marcarPuloDuplo, type Rastro } from './rastro';
+import { BRACO_ANJO, BRACO_BASE, BRACO_LESLIE, desenharBracoEsticado, desenharMao, ombroDe, type CoresBraco } from './braco';
+import {
+  atualizarRecargas,
+  avisar,
+  criarPoderes,
+  desenharEncanto,
+  desenharPreso,
+  desenharVeneno,
+  poderEscolhido,
+  type Encanto,
+  type Poderes,
+} from './poderes';
+import type { Pose, QuadroPersonagem } from './pose';
+import { atualizarRastro, criarRastro, desenharRastro, marcarDash, marcarPuloDuplo, type Rastro, type TintaRastro } from './rastro';
 
-export type NomeAnimacao = keyof typeof QUADROS_PERSONAGEM;
+export type { QuadroPersonagem };
+export type NomeAnimacao = keyof typeof QUADROS_ANJO & keyof typeof QUADROS_LESLIE;
 export type AnimacoesPersonagem = Record<NomeAnimacao, Sprite[]>;
 export type Forma = 'base' | 'anjo';
+// O que o clique esquerdo da Leslie usa: a arma da mão ou os poderes (a tecla R troca).
+export type Modo = 'arma' | 'poderes';
 
-// Âncoras da forma de anjo, em pixels dentro do recorte (ver o gerador).
-export interface QuadroPersonagem {
-  w: number;
-  h: number;
-  olhos: readonly (readonly number[])[];
-  ombro: readonly number[];
-  tarja: readonly number[]; // x, y, largura e altura do mosaico sobre o quadril
-  meio?: number; // de frente: eixo do corpo, a coluna x se espelha em meio − x
+// Os quadros da Leslie não têm as âncoras da forma de anjo: ficam neutras (nunca são lidas).
+const SEM_ANCORAS = { olhos: [], ombro: [0, 0], tarja: [0, 0, 0, 0] } as const;
+
+export function quadroPersonagem(heroi: Heroi, animacao: NomeAnimacao, quadro: number): QuadroPersonagem {
+  if (heroi === 'anjo') return QUADROS_ANJO[animacao][quadro];
+  const { w, h } = QUADROS_LESLIE[animacao][quadro];
+  return { w, h, ...SEM_ANCORAS };
 }
 
-export function quadroPersonagem(animacao: NomeAnimacao, quadro: number): QuadroPersonagem {
-  return QUADROS_PERSONAGEM[animacao][quadro];
-}
+type TabelaDeQuadros = Record<NomeAnimacao, readonly { x: number; y: number; w: number; h: number; ax: number; axAnjo?: number }[]>;
 
 // `anjo`: usa o eixo do sprite do anjo — de lado a cabeça dele recua, e o eixo recua junto para
 // a cabeça ficar no mesmo ponto do mapa nas duas formas.
-function recortar(folha: HTMLImageElement, anjo: boolean): AnimacoesPersonagem {
+function recortar(folha: HTMLImageElement, tabela: TabelaDeQuadros, anjo: boolean): AnimacoesPersonagem {
   const animacoes = {} as AnimacoesPersonagem;
-  (Object.entries(QUADROS_PERSONAGEM) as [NomeAnimacao, (typeof QUADROS_PERSONAGEM)[NomeAnimacao]][]).forEach(
-    ([nome, quadros]) => {
-      animacoes[nome] = quadros.map((q) => {
-        const canvas = novoCanvas(q.w, q.h);
-        contexto2d(canvas).drawImage(folha, q.x, q.y, q.w, q.h, 0, 0, q.w, q.h);
-        return { imagem: canvas, eixo: anjo ? q.axAnjo : q.ax };
-      });
-    },
-  );
+  (Object.keys(tabela) as NomeAnimacao[]).forEach((nome) => {
+    animacoes[nome] = tabela[nome].map((q) => {
+      const canvas = novoCanvas(q.w, q.h);
+      contexto2d(canvas).drawImage(folha, q.x, q.y, q.w, q.h, 0, 0, q.w, q.h);
+      return { imagem: canvas, eixo: anjo ? (q.axAnjo ?? q.ax) : q.ax };
+    });
+  });
   return animacoes;
 }
 
-export async function carregarAnimacoesPersonagem(): Promise<Record<Forma, AnimacoesPersonagem>> {
-  const [base, anjo] = await Promise.all([carregarImagem(urlPersonagem), carregarImagem(urlPersonagemAnjo)]);
-  return { base: recortar(base, false), anjo: recortar(anjo, true) };
+// Os sprites de cada personagem, por forma (a Leslie só tem a base: a "de anjo" dela é a mesma).
+export type SpritesDosHerois = Record<Heroi, Record<Forma, AnimacoesPersonagem>>;
+
+// O Anjo também carrega (a arte é pequena): a tela de seleção mostra a foto dele, "em breve".
+export async function carregarHerois(): Promise<SpritesDosHerois> {
+  const [leslie, anjoBase, anjoAnjo] = await Promise.all([
+    carregarImagem(urlLeslie),
+    carregarImagem(urlAnjoBase),
+    carregarImagem(urlAnjoAnjo),
+  ]);
+  const daLeslie = recortar(leslie, QUADROS_LESLIE, false);
+  return {
+    leslie: { base: daLeslie, anjo: daLeslie },
+    anjo: { base: recortar(anjoBase, QUADROS_ANJO, false), anjo: recortar(anjoAnjo, QUADROS_ANJO, true) },
+  };
 }
 
 // ---- Corpo ----
@@ -116,9 +144,18 @@ const ALTURA_DO_PEITO = 18;
 const PERTO_DO_DONO = 14;
 // O gesto de soltar um poder: o braço sai do ombro na direção da mira, fica um instante e volta.
 const GESTO = { duracao: 0.34, braco: 10 }; // segundos e pixels
-// De frente (o quadro "parado"), a mão da frente do próprio sprite: 5 px para o lado do eixo e na
-// linha 23 do quadro. Parado com uma arma, ela fica nessa mão, sem o braço esticado.
-const MAO_DE_FRENTE = { lado: 5, linha: 23 };
+// De frente (o quadro "parado"), a mão da frente do próprio sprite: px para o lado do eixo e a
+// linha do quadro. Parado com uma arma, ela fica nessa mão, sem o braço esticado.
+const MAO_DE_FRENTE: Record<Heroi, { lado: number; linha: number }> = {
+  anjo: { lado: 5, linha: 23 },
+  leslie: { lado: 3, linha: 17 },
+};
+// O braço que segura a arma: a manga do moletom do Anjo, a pele da Leslie.
+const BRACO_DA_ARMA: Record<Heroi, CoresBraco> = { anjo: BRACO_BASE, leslie: BRACO_LESLIE };
+const BRACO_DO_PODER: Record<Heroi, { cores: CoresBraco; brilho: string }> = {
+  anjo: { cores: BRACO_ANJO, brilho: '255, 95, 162' }, // rosa
+  leslie: { cores: BRACO_LESLIE, brilho: '143, 212, 90' }, // verde
+};
 
 // Os botões de um quadro: segurados ou não.
 export interface Controles {
@@ -130,6 +167,8 @@ export interface Controles {
 
 // `x` é o eixo do corpo e `y` a linha dos pés: os quadros variam de largura e altura, o apoio não.
 export interface Personagem {
+  heroi: Heroi;
+  modo: Modo; // só a Leslie: o que o clique esquerdo usa
   x: number;
   y: number;
   vx: number;
@@ -153,27 +192,37 @@ export interface Personagem {
   vida: number; // de 0 a VIDA_MAXIMA
   ferido: number; // segundos do piscar de quem acabou de apanhar
   encanto: Encanto | null; // enfeitiçado pela Rajada: só anda, devagar, até quem o acertou
+  preso: number; // segundos presos pelas Raízes da Leslie: não anda nem pula (0 = livre)
+  veneno: number; // segundos envenenado pelo Chicote da Leslie (0 = limpo)
+  venenoTique: number;
   gesto: { resta: number; angulo: number } | null; // o braço soltando um poder
   poderes: Poderes;
   arma: ArmaNaMao | null; // a espada ou o arco na mão (só a forma base)
   ataque: Ataque | null; // o golpe ou a flechada em curso
   energia: number; // energia pixy, de 0 a ENERGIA_PIXY.maxima: vem do dano dado, enche a barra do anjo
-  daRede: boolean; // o outro jogador online: a forma e a energia dele vêm da rede
-  voo: Voo; // o voo com pairada do anjo (voo-anjo.ts)
-  anjo: Anjo;
+  daRede: boolean; // o outro jogador online: a forma, o modo e a energia dele vêm da rede
+  voo: Voo; // o voo com pairada do anjo (anjo/voo.ts)
+  anjo: Anjo; // a transformação do Anjo (a Leslie tem uma parada, que nunca muda)
   rastro: Rastro; // os efeitos do dash e do pulo duplo
 }
 
-let ANIMACOES: Record<Forma, AnimacoesPersonagem>;
+let ANIMACOES: SpritesDosHerois;
 let yChao = 0;
 
-export function prepararPersonagens(animacoes: Record<Forma, AnimacoesPersonagem>, yDoChao: number): void {
+export function prepararPersonagens(animacoes: SpritesDosHerois, yDoChao: number): void {
   ANIMACOES = animacoes;
   yChao = yDoChao;
 }
 
-export function criarPersonagem(x: number, direcao: 1 | -1 = 1): Personagem {
+// Os quadros de um personagem, na forma dele.
+export function spritesDo(heroi: Heroi, forma: Forma = 'base'): AnimacoesPersonagem {
+  return ANIMACOES[heroi][forma];
+}
+
+export function criarPersonagem(heroi: Heroi, x: number, direcao: 1 | -1 = 1): Personagem {
   return {
+    heroi,
+    modo: 'arma',
     x,
     y: yChao,
     vx: 0,
@@ -197,8 +246,11 @@ export function criarPersonagem(x: number, direcao: 1 | -1 = 1): Personagem {
     vida: VIDA_MAXIMA,
     ferido: 0,
     encanto: null,
+    preso: 0,
+    veneno: 0,
+    venenoTique: 0,
     gesto: null,
-    poderes: criarPoderes(),
+    poderes: criarPoderes(heroi),
     arma: null,
     ataque: null,
     energia: 0,
@@ -210,19 +262,37 @@ export function criarPersonagem(x: number, direcao: 1 | -1 = 1): Personagem {
 }
 
 export function formaDo(p: Personagem): Forma {
-  return formaAtual(p.anjo);
+  return p.heroi === 'anjo' ? formaAtual(p.anjo) : 'base';
+}
+
+// Quanta energia pixy o poder escolhido da Leslie pede (e gasta). O Anjo não gasta nos poderes.
+export function custoDeEnergia(p: Personagem, poder = poderEscolhido(p.poderes)): number {
+  if (p.heroi !== 'leslie') return 0;
+  return ENERGIA_PIXY.custoLeslie[poder as keyof typeof ENERGIA_PIXY.custoLeslie] ?? 0;
+}
+
+// O clique esquerdo usa os poderes? O Anjo, de anjo; a Leslie, no modo poderes.
+export function usaPoderes(p: Personagem): boolean {
+  return p.heroi === 'anjo' ? formaDo(p) === 'anjo' : p.modo === 'poderes';
 }
 
 export function peitoDo(p: Personagem): { x: number; y: number } {
   return { x: p.x, y: p.y - ALTURA_DO_PEITO };
 }
 
-// Por que os poderes não saem agora (null = saem): só do anjo já transformado (não no meio da
-// luz), vivo e sem estar enfeitiçado.
+// Por que o poder escolhido não sai agora (null = sai): vivo e sem estar enfeitiçado; o Anjo, só
+// já transformado (não no meio da luz); a Leslie, no modo poderes e com a energia pixy do poder
+// escolhido (ela começa vazia: primeiro se ganha energia dando dano com as armas).
 export function bloqueioDosPoderes(p: Personagem): string | null {
   if (p.vida <= 0) return 'CAIU';
   if (p.encanto) return 'ENFEITICADO';
-  if (formaDo(p) !== 'anjo' || !personagemLivre(p)) return 'SO NA FORMA DE ANJO';
+  if (p.heroi === 'anjo') {
+    if (formaDo(p) !== 'anjo' || !personagemLivre(p)) return 'SO NA FORMA DE ANJO';
+    return null;
+  }
+  if (p.modo !== 'poderes') return 'APERTE R PARA OS PODERES';
+  const custo = custoDeEnergia(p);
+  if (p.energia < custo) return `ENERGIA PIXY: ${Math.floor(p.energia)} DE ${custo}`;
   return null;
 }
 
@@ -274,31 +344,38 @@ export function maoDo(p: Personagem): { x: number; y: number } {
 // asas abertas atrás dos ombros, os olhos de coração e a auréola. Em cima sobra o lugar da
 // auréola nas duas formas, para a cabeça ficar no mesmo ponto da foto quando ele se transforma;
 // dos lados, o das asas. Uma por forma, feita uma vez.
-const RETRATO_ATE = 21; // linhas do quadro de frente: do alto do cabelo ao começo do peito
+const RETRATO_ATE: Record<Heroi, number> = { anjo: 21, leslie: 18 }; // do alto do cabelo ao começo do peito
 export const LARGURA_RETRATO = 26; // a foto por dentro da moldura: sobra dos lados para as asas
-const retratos = new Map<Forma, HTMLCanvasElement>();
+const retratos = new Map<string, HTMLCanvasElement>();
 
 export function retratoDo(p: Personagem): HTMLCanvasElement {
-  const forma = formaDo(p);
-  const pronto = retratos.get(forma);
+  return retrato(p.heroi, formaDo(p));
+}
+
+export function retrato(heroi: Heroi, forma: Forma = 'base'): HTMLCanvasElement {
+  const chave = `${heroi}-${forma}`;
+  const pronto = retratos.get(chave);
   if (pronto) return pronto;
 
-  const { imagem, eixo } = ANIMACOES[forma].parado[0];
-  const retrato = novoCanvas(LARGURA_RETRATO, ALTURA_AUREOLA + RETRATO_ATE);
-  const ctx = contexto2d(retrato);
+  const { imagem, eixo } = ANIMACOES[heroi][forma].parado[0];
+  const ate = RETRATO_ATE[heroi];
+  const foto = novoCanvas(LARGURA_RETRATO, ALTURA_AUREOLA + ate);
+  const ctx = contexto2d(foto);
   const x = (LARGURA_RETRATO - imagem.width) >> 1;
-  const quadro = quadroPersonagem('parado', 0);
-  if (forma === 'anjo') desenharAsasDoRetrato(ctx, quadro, x, ALTURA_AUREOLA);
-  ctx.drawImage(imagem, 0, 0, imagem.width, RETRATO_ATE, x, ALTURA_AUREOLA, imagem.width, RETRATO_ATE);
-  if (forma === 'anjo') enfeitarRetratoDeAnjo(ctx, quadro, eixo, x, ALTURA_AUREOLA);
-  retratos.set(forma, retrato);
-  return retrato;
+  const quadro = quadroPersonagem(heroi, 'parado', 0);
+  // A Leslie desce para o pé da foto: sem auréola, o espaço dela em cima fica vazio.
+  const y = heroi === 'anjo' ? ALTURA_AUREOLA : ALTURA_AUREOLA + RETRATO_ATE.anjo - ate;
+  if (forma === 'anjo') desenharAsasDoRetrato(ctx, quadro, x, y);
+  ctx.drawImage(imagem, 0, 0, imagem.width, ate, x, y, imagem.width, ate);
+  if (forma === 'anjo') enfeitarRetratoDeAnjo(ctx, quadro, eixo, x, y);
+  retratos.set(chave, foto);
+  return foto;
 }
 
 // Quanto sobra em cima da cabeça além do corpo: a auréola do anjo (0 na forma base). O nome
 // em cima dele sobe este tanto.
 export function acimaDaCabeca(p: Personagem): number {
-  return alturaDaAureola(p.anjo);
+  return p.heroi === 'anjo' ? alturaDaAureola(p.anjo) : 0;
 }
 
 // Enquanto a luz da transformação sobe, o corpo não responde aos botões.
@@ -332,7 +409,7 @@ function avancarAnimacao(p: Personagem, dt: number): void {
   const passo = DURACAO_QUADRO[animacao];
   if (p.tempoQuadro >= passo) {
     p.tempoQuadro -= passo;
-    p.quadro = (p.quadro + 1) % ANIMACOES.base[animacao].length;
+    p.quadro = (p.quadro + 1) % ANIMACOES[p.heroi].base[animacao].length;
   }
 }
 
@@ -346,14 +423,17 @@ function quadroMostrado(p: Personagem): { animacao: NomeAnimacao; quadro: number
 
 function spriteAtual(p: Personagem): Sprite {
   const { animacao, quadro } = quadroMostrado(p);
-  return ANIMACOES[formaDo(p)][animacao][quadro];
+  return ANIMACOES[p.heroi][formaDo(p)][animacao][quadro];
 }
+
+// A tinta das cópias do dash: a da Leslie, ou a da forma do Anjo.
+const tintaDo = (p: Personagem): TintaRastro => (p.heroi === 'leslie' ? 'leslie' : formaDo(p));
 
 function poseDe(p: Personagem): Pose {
   const { imagem, eixo } = spriteAtual(p);
   const { animacao, quadro } = quadroMostrado(p);
   return {
-    quadro: quadroPersonagem(animacao, quadro),
+    quadro: quadroPersonagem(p.heroi, animacao, quadro),
     imagem,
     eixo,
     x: Math.round(p.x),
@@ -401,7 +481,7 @@ export function comecarDash(p: Personagem, lado: 1 | -1): void {
   p.ultimoToque = 0;
   p.janelaToque = 0;
   p.embalo = 0;
-  marcarDash(p.rastro, poseDe(p), formaDo(p), p.x, p.y, p.noChao);
+  marcarDash(p.rastro, poseDe(p), tintaDo(p), p.x, p.y, p.noChao);
 }
 
 // Enfeitiçado, os botões não mandam: ele anda até quem o acertou e para perto dele.
@@ -410,10 +490,15 @@ function controlesDoEncanto(p: Personagem, encanto: Encanto): Controles {
   return { esquerda: dx < -PERTO_DO_DONO, direita: dx > PERTO_DO_DONO, pular: false, transformar: false };
 }
 
-// Apertou R. Na forma base, só vira anjo com a barra de energia pixy cheia e a recarga pronta
-// (senão avisa o que falta) e a transformação gasta a energia. O outro online vira quando ele
-// virou lá: a energia dele vem da rede e já chega gasta.
+// Apertou R. A Leslie troca o clique esquerdo entre a arma e os poderes (a do outro online chega
+// pela rede, com o estado dele). O Anjo, na forma base, só vira anjo com a barra de energia pixy
+// cheia e a recarga pronta (senão avisa o que falta) e a transformação gasta a energia. O outro
+// online vira quando ele virou lá: a energia dele vem da rede e já chega gasta.
 function apertouTransformar(p: Personagem): void {
+  if (p.heroi === 'leslie') {
+    if (!p.daRede) p.modo = p.modo === 'arma' ? 'poderes' : 'arma';
+    return;
+  }
   const base = formaDo(p) === 'base' && !transformando(p.anjo);
   if (base && !p.daRede) {
     if (p.anjo.recarga > 0) return avisar(p.poderes, `ANJO EM RECARGA: ${Math.ceil(p.anjo.recarga)}S`);
@@ -424,9 +509,9 @@ function apertouTransformar(p: Personagem): void {
   if (alternarForma(p.anjo, p.daRede) && base && !p.daRede) p.energia -= ENERGIA_PIXY.custoAnjo;
 }
 
-// Pode virar anjo agora (para a CPU decidir): na forma base, com a recarga pronta e a energia.
+// Pode virar anjo agora (para a CPU decidir): o Anjo na forma base, com a recarga pronta e a energia.
 export function podeVirarAnjo(p: Personagem): boolean {
-  return anjoPronto(p.anjo) && p.energia >= ENERGIA_PIXY.custoAnjo;
+  return p.heroi === 'anjo' && anjoPronto(p.anjo) && p.energia >= ENERGIA_PIXY.custoAnjo;
 }
 
 // `p` tirou `dano` de vida do adversário: na forma base, carrega a energia pixy (de anjo, não).
@@ -437,7 +522,10 @@ export function ganharEnergia(p: Personagem, dano: number): void {
 
 export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: number, tempo: number): void {
   if (p.encanto && (p.encanto.resta -= dt) <= 0) p.encanto = null;
+  p.preso = Math.max(0, p.preso - dt);
   const encanto = p.encanto;
+  // Preso pelas Raízes: não anda, não pula e não dá dash (os poderes e a arma continuam).
+  const preso = p.preso > 0;
   const controles = encanto ? controlesDoEncanto(p, encanto) : recebidos;
   if (p.gesto && (p.gesto.resta -= dt) <= 0) p.gesto = null;
   // R alterna entre a forma base e a de anjo; durante a transformação o corpo não responde.
@@ -447,9 +535,9 @@ export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: num
   atualizarRecargas(p.poderes, dt);
   const livre = personagemLivre(p);
 
-  const esquerda = livre && controles.esquerda;
-  const direita = livre && controles.direita;
-  const pular = livre && controles.pular;
+  const esquerda = livre && !preso && controles.esquerda;
+  const direita = livre && !preso && controles.direita;
+  const pular = livre && !preso && controles.pular;
 
   // Enfeitiçado não dá dash: os passos dele até o dono não contam como toques.
   const toque = encanto ? 0 : esquerda && !p.esquerdaSegurada ? -1 : direita && !p.direitaSegurada ? 1 : 0;
@@ -535,8 +623,8 @@ export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: num
   p.x = Math.max(esquerdaDoEixo, Math.min(MUNDO - (imagem.width - esquerdaDoEixo), p.x));
 
   const pose = poseDe(p);
-  atualizarRastro(p.rastro, dt, p.dash > 0, pose, formaDo(p));
-  atualizarAnjo(p.anjo, dt, tempo, p, pose);
+  atualizarRastro(p.rastro, dt, p.dash > 0, pose, tintaDo(p));
+  if (p.heroi === 'anjo') atualizarAnjo(p.anjo, dt, tempo, p, pose);
 }
 
 // A sombra fica no chão durante o pulo, menor e mais fraca quanto mais alto ele está. Vem antes
@@ -553,7 +641,7 @@ export function desenharPersonagem(ctx: CanvasRenderingContext2D, p: Personagem,
   const pose = poseDe(p);
   const { imagem, eixo, x, topo } = pose;
   desenharRastro(ctx, p.rastro);
-  desenharAnjoAtras(ctx, p.anjo, tempo, pose);
+  if (p.heroi === 'anjo') desenharAnjoAtras(ctx, p.anjo, tempo, pose);
 
   // Caído (vida 0), fica meio apagado.
   const alfa = p.vida > 0 ? 1 : 0.45;
@@ -573,32 +661,36 @@ export function desenharPersonagem(ctx: CanvasRenderingContext2D, p: Personagem,
   // Acabou de apanhar: o corpo pisca em branco-rosado, duas vezes.
   if (p.ferido > 0 && Math.floor(p.ferido * 14) % 2 === 0) desenhar(tingido(imagem), 0.8 * alfa);
   if (p.gesto) desenharBraco(ctx, p, p.gesto);
-  const maoDeFrente = pose.deFrente
-    ? { x: x + p.direcao * MAO_DE_FRENTE.lado, y: topo + MAO_DE_FRENTE.linha }
-    : undefined;
-  desenharArmaNaMao(ctx, p, tempo, maoDeFrente);
-  desenharAnjoNaFrente(ctx, p.anjo, tempo, pose);
+  const mao = MAO_DE_FRENTE[p.heroi];
+  const maoDeFrente = pose.deFrente ? { x: x + p.direcao * mao.lado, y: topo + mao.linha } : undefined;
+  // No modo poderes, a arma da Leslie fica guardada (a mão é dos poderes).
+  if (!(p.heroi === 'leslie' && p.modo === 'poderes')) desenharArmaNaMao(ctx, p, tempo, maoDeFrente, BRACO_DA_ARMA[p.heroi]);
+  if (p.heroi === 'anjo') desenharAnjoNaFrente(ctx, p.anjo, tempo, pose);
   desenharEncanto(ctx, p, tempo);
+  desenharPreso(ctx, p, tempo);
+  desenharVeneno(ctx, p, tempo);
 }
 
 // O braço do gesto (entidades/braco.ts): sai do ombro da frente na direção da mira, com a mão
-// mais clara e um brilho rosa. Estica rápido, fica e recolhe no fim.
+// mais clara e um brilho na cor dos poderes (rosa no Anjo, verde na Leslie). Estica rápido, fica
+// e recolhe no fim.
 function desenharBraco(ctx: CanvasRenderingContext2D, p: Personagem, gesto: { resta: number; angulo: number }): void {
   const t = 1 - gesto.resta / GESTO.duracao; // 0 → 1
   const estica = t < 0.25 ? t / 0.25 : t > 0.75 ? (1 - t) / 0.25 : 1;
   const comprimento = Math.round(GESTO.braco * estica);
   if (comprimento < 2) return;
-  const mao = desenharBracoEsticado(ctx, ombroDe(p), gesto.angulo, comprimento, BRACO_ANJO);
+  const braco = BRACO_DO_PODER[p.heroi];
+  const mao = desenharBracoEsticado(ctx, ombroDe(p), gesto.angulo, comprimento, braco.cores);
   const [mx, my] = [mao.x, mao.y];
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   const brilho = ctx.createRadialGradient(mx, my, 0, mx, my, 6);
-  brilho.addColorStop(0, `rgba(255, 95, 162, ${0.7 * estica})`);
-  brilho.addColorStop(1, 'rgba(255, 95, 162, 0)');
+  brilho.addColorStop(0, `rgba(${braco.brilho}, ${0.7 * estica})`);
+  brilho.addColorStop(1, `rgba(${braco.brilho}, 0)`);
   ctx.fillStyle = brilho;
   ctx.fillRect(mx - 6, my - 6, 12, 12);
   ctx.restore();
-  desenharMao(ctx, mao, BRACO_ANJO);
+  desenharMao(ctx, mao, braco.cores);
 }
 
 const tingidos = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();

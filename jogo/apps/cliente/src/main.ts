@@ -8,13 +8,13 @@ import { desenharArmasNaFrente, desenharArmasNoChao, desenharPreviaDoArco, prepa
 import {
   acimaDaCabeca,
   armaPronta,
-  carregarAnimacoesPersonagem,
+  carregarHerois,
   desenharPersonagem,
   desenharSombraDoPersonagem,
-  formaDo,
   peitoDo,
   podeUsarPoderes,
   prepararPersonagens,
+  usaPoderes,
   type Controles,
 } from './entidades/personagem';
 import {
@@ -137,6 +137,8 @@ window.addEventListener('keydown', (evento) => {
   teclas[evento.code] = true;
   // E joga fora a arma da mão: uma vez por toque (segurar não repete).
   if (evento.code === 'KeyE' && !evento.repeat && partida) mouse.descartar = true;
+  // Um toque rápido em R (apertar e soltar entre dois quadros) não se perde.
+  if (evento.code === 'KeyR' && !evento.repeat) toqueR = true;
 });
 window.addEventListener('keyup', (evento) => {
   teclas[evento.code] = false;
@@ -148,12 +150,17 @@ function soltarTeclas(): void {
   for (const tecla of Object.keys(teclas)) teclas[tecla] = false;
 }
 
+let toqueR = false;
+
 function lerTeclado(): Controles {
+  const r = toqueR;
+  toqueR = false;
   return {
     esquerda: Boolean(teclas['ArrowLeft'] || teclas['KeyA']),
     direita: Boolean(teclas['ArrowRight'] || teclas['KeyD']),
     pular: Boolean(teclas['Space'] || teclas['ArrowUp'] || teclas['KeyW']),
-    transformar: Boolean(teclas['KeyR']), // R alterna entre a forma base e a de anjo
+    // R: a Leslie troca a arma pelos poderes (e volta); o Anjo alterna entre a forma base e a de anjo.
+    transformar: Boolean(teclas['KeyR']) || r,
   };
 }
 
@@ -196,10 +203,10 @@ canvas.addEventListener('pointerleave', () => {
 // A mira aparece na partida, com o cursor em cima do jogo e fora do menu.
 const mostrarMira = (p: Partida): boolean => cursor.dentro && !p.menuAberto && !p.acabou;
 
-// O clique sai agora? De anjo, o poder escolhido; na forma base, a arma da mão. (Pinta a mira de
-// verde e mostra a prévia.)
+// O clique sai agora? Com os poderes na mão (a Leslie no modo poderes, o Anjo de anjo), o poder
+// escolhido; senão, a arma da mão. (Pinta a mira de verde e mostra a prévia.)
 function acaoPronta(p: Partida): boolean {
-  if (formaDo(p.jogador) === 'base') return armaPronta(p.jogador);
+  if (!usaPoderes(p.jogador)) return armaPronta(p.jogador);
   const { poderes } = p.jogador;
   return podeUsarPoderes(p.jogador) && poderes.recarga[poderes.selecionado] <= 0;
 }
@@ -254,7 +261,7 @@ function desenharVista(tempo: number, luz: Luz, camX: number, x0: number, largur
     desenharArmasNaFrente(ctx, partida.arsenal);
     if (mostrarMira(partida) && acaoPronta(partida)) {
       const { jogador } = partida;
-      if (formaDo(jogador) === 'anjo') {
+      if (usaPoderes(jogador)) {
         desenharPreviaDoPoder(ctx, poderEscolhido(jogador.poderes), peitoDo(jogador), telaParaMapa(cursor), tempo);
       } else if (jogador.arma?.tipo === 'arco') {
         desenharPreviaDoArco(ctx, jogador, telaParaMapa(cursor), tempo);
@@ -399,10 +406,10 @@ function jogar(escolha: Escolha): Promise<void> {
 async function principal(): Promise<void> {
   const { cenario, herois, online } = await carregar({
     carregarCenario: carregarFolhaCenario,
-    carregarHerois: carregarAnimacoesPersonagem,
+    carregarHerois,
   });
   prepararPersonagens(herois, Y_CHAO);
-  prepararPoderes(Y_CHAO);
+  prepararPoderes(Y_CHAO, chao, FOLGA_TUFOS);
   prepararArmas(Y_CHAO);
   folhaCenario = cenario;
   prepararAnimais(cenario, Y_CHAO);

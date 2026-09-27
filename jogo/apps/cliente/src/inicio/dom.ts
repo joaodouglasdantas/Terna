@@ -1,7 +1,7 @@
 // Peças de DOM das telas por cima do jogo (carregamento, menus, multiplayer, pausa, fim).
 
 import '@fontsource/tiny5/400.css';
-import logoUrl from '../assets/logo.png';
+import logoUrl from '../assets/logo.webp';
 import './inicio.css';
 
 export function elemento<K extends keyof HTMLElementTagNameMap>(
@@ -30,7 +30,8 @@ export function imagemDaLogo(classe: string): HTMLImageElement {
   return logo;
 }
 
-// Onde as telas moram: um <div id="inicio"> que cobre a janela (some quando está vazio).
+// Onde as telas moram: um <div id="inicio"> do tamanho do quadro do jogo, dentro das margens
+// pretas (some quando está vazio).
 export function palco(): HTMLElement {
   const el = document.getElementById('inicio');
   if (!el) throw new Error('faltou o <div id="inicio"> na página');

@@ -21,7 +21,8 @@
     "db:gerar": "npm run db:gerar -w @terna/servidor",
     "db:migrar": "npm run db:migrar -w @terna/servidor",
     "arte:cenario": "node ferramentas/gerar-cenario.cjs",
-    "arte:personagem": "node ferramentas/gerar-personagem.cjs"
+    "arte:anjo": "node ferramentas/gerar-anjo.cjs",
+    "arte:leslie": "node ferramentas/gerar-leslie.cjs"
   },
   "devDependencies": {
     "concurrently": "^10.0.5",

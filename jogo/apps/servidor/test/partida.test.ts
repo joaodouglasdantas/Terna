@@ -28,6 +28,7 @@ const ESTADO = {
   direcao: 1,
   noChao: true,
   forma: 'base',
+  modo: 'poderes',
   esquerda: false,
   direita: true,
   pular: false,
@@ -35,26 +36,63 @@ const ESTADO = {
   vida: 1000,
   selecionado: 0,
   encanto: 0,
+  preso: 0,
+  veneno: 0,
   energia: 40,
 } as const;
 
 const RAJADA_USADA = { poder: 'rajada', x: 300, y: 180, alvoX: 420, alvoY: 170 } as const;
+
+// Os dois na sala escolhem a Leslie: a partida começa.
+function escolherLeslie(salas: Salas, ...participantes: NonNullable<ReturnType<Salas['criar']>>[]) {
+  for (const p of participantes) salas.receber(p, JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
+}
 
 describe('salas de partida', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('cria com código, o segundo entra e os dois começam com o tempo todo', () => {
+  it('cria com código, o segundo entra, os dois escolhem e começam com o tempo todo', () => {
     const salas = new Salas({ duracaoMs: 300_000, gerarCodigo: () => 'K7P2Q' });
     const a = conexaoFalsa();
     const b = conexaoFalsa();
-    salas.criar('Ana', a.conexao);
+    const anfitriao = salas.criar('Ana', a.conexao)!;
     expect(a.ultima()).toEqual({ tipo: 'sala-criada', codigo: 'K7P2Q' });
 
+    const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+    expect(a.ultima()).toEqual({ tipo: 'escolher', lado: 'anfitriao', oponente: 'Bia' });
+    expect(b.ultima()).toEqual({ tipo: 'escolher', lado: 'convidado', oponente: 'Ana' });
+
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
+    expect(b.ultima()).toEqual({ tipo: 'oponente-escolheu', heroi: 'leslie' });
+    salas.receber(convidado, JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
+    const comecou = { tipo: 'comecou', restanteMs: 300_000, heroi: 'leslie', heroiOponente: 'leslie' };
+    expect(a.ultima()).toEqual({ ...comecou, lado: 'anfitriao', oponente: 'Bia' });
+    expect(b.ultima()).toEqual({ ...comecou, lado: 'convidado', oponente: 'Ana' });
+  });
+
+  it('recusa personagem que ainda não foi liberado e ignora o jogo antes de começar', () => {
+    const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    const anfitriao = salas.criar('Ana', a.conexao)!;
     salas.entrar('K7P2Q', 'Bia', b.conexao);
-    expect(a.ultima()).toEqual({ tipo: 'comecou', lado: 'anfitriao', oponente: 'Bia', restanteMs: 300_000 });
-    expect(b.ultima()).toEqual({ tipo: 'comecou', lado: 'convidado', oponente: 'Ana', restanteMs: 300_000 });
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'heroi', heroi: 'anjo' }));
+    expect(a.ultima()).toEqual({ tipo: 'erro', erro: 'esse personagem ainda não está liberado' });
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'estado', estado: ESTADO }));
+    expect(b.ultima()?.tipo).toBe('escolher');
+  });
+
+  it('acabando o tempo de escolher, quem não escolheu fica com o padrão e a partida começa', () => {
+    vi.useFakeTimers();
+    const salas = new Salas({ escolhaMaxMs: 1000, gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    salas.criar('Ana', a.conexao);
+    salas.entrar('K7P2Q', 'Bia', b.conexao);
+    vi.advanceTimersByTime(1000);
+    expect(a.ultima()).toMatchObject({ tipo: 'comecou', heroi: 'leslie', heroiOponente: 'leslie' });
   });
 
   it('recusa código que não existe e sala cheia', () => {
@@ -79,7 +117,8 @@ describe('salas de partida', () => {
     salas.receber(anfitriao, JSON.stringify({ tipo: 'estado', estado: ESTADO }));
     expect(a.recebidas).toHaveLength(1); // só o sala-criada: sozinho, não há para quem mandar
 
-    salas.entrar('K7P2Q', 'Bia', b.conexao);
+    const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+    escolherLeslie(salas, anfitriao, convidado);
     salas.receber(anfitriao, JSON.stringify({ tipo: 'estado', estado: ESTADO }));
     expect(b.ultima()).toEqual({ tipo: 'estado', estado: ESTADO });
     expect(a.ultima()?.tipo).toBe('comecou');
@@ -93,7 +132,7 @@ describe('salas de partida', () => {
     const a = conexaoFalsa();
     const b = conexaoFalsa();
     const anfitriao = salas.criar('Ana', a.conexao)!;
-    salas.entrar('K7P2Q', 'Bia', b.conexao);
+    escolherLeslie(salas, anfitriao, salas.entrar('K7P2Q', 'Bia', b.conexao)!);
     salas.receber(anfitriao, JSON.stringify({ tipo: 'poder', uso: RAJADA_USADA }));
     expect(b.ultima()).toEqual({ tipo: 'poder', uso: RAJADA_USADA });
     expect(a.ultima()?.tipo).toBe('comecou');
@@ -106,8 +145,9 @@ describe('salas de partida', () => {
     const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
     const a = conexaoFalsa();
     const b = conexaoFalsa();
-    salas.criar('Ana', a.conexao);
+    const anfitriao = salas.criar('Ana', a.conexao)!;
     const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+    escolherLeslie(salas, anfitriao, convidado);
     salas.receber(convidado, JSON.stringify({ tipo: 'morri' }));
     expect(a.ultima()).toEqual({ tipo: 'fim', motivo: 'morte', vencedor: 'anfitriao' });
     expect(b.ultima()).toEqual({ tipo: 'fim', motivo: 'morte', vencedor: 'anfitriao' });
@@ -120,8 +160,7 @@ describe('salas de partida', () => {
     const salas = new Salas({ duracaoMs: 1000, gerarCodigo: () => 'K7P2Q' });
     const a = conexaoFalsa();
     const b = conexaoFalsa();
-    salas.criar('Ana', a.conexao);
-    salas.entrar('K7P2Q', 'Bia', b.conexao);
+    escolherLeslie(salas, salas.criar('Ana', a.conexao)!, salas.entrar('K7P2Q', 'Bia', b.conexao)!);
     vi.advanceTimersByTime(999);
     expect(b.ultima()?.tipo).toBe('comecou');
     vi.advanceTimersByTime(1);
@@ -152,6 +191,7 @@ describe('salas de partida', () => {
       const b = conexaoFalsa();
       const anfitriao = salas.criar('Ana', a.conexao)!;
       const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+      escolherLeslie(salas, anfitriao, convidado);
       const caidas = (c: typeof a) => c.recebidas.filter((m) => m.tipo === 'arma-caiu');
       // A mensagem vai como texto, como chega pela conexão.
       const receber = (p: typeof anfitriao, m: object) => salas.receber(p, JSON.stringify(m));
@@ -191,7 +231,7 @@ describe('salas de partida', () => {
       expect(caidas(a)).toHaveLength(6);
     });
 
-    it('largada ao virar anjo, volta para o chão com o tempo que tinha; quebrada, avisa o outro', () => {
+    it('largada (virou anjo com ela), volta para o chão com o tempo que tinha; quebrada, avisa o outro', () => {
       const { a, b, anfitriao, convidado, receber } = salaComArmas();
       vi.advanceTimersByTime(1000);
       receber(anfitriao, { tipo: 'pegar-arma', id: 1 });
@@ -295,7 +335,13 @@ describe('rota /api/partida', () => {
     const codigo = criada.tipo === 'sala-criada' ? criada.codigo : '';
 
     const b = await conectar(`acao=entrar&codigo=${codigo.toLowerCase()}&nome=${encodeURIComponent('Bia é')}`);
-    expect(await b.proxima()).toMatchObject({ tipo: 'comecou', lado: 'convidado', oponente: 'Ana' });
+    expect(await b.proxima()).toMatchObject({ tipo: 'escolher', lado: 'convidado', oponente: 'Ana' });
+    expect(await a.proxima()).toMatchObject({ tipo: 'escolher', lado: 'anfitriao', oponente: 'Bia é' });
+    a.socket.send(JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
+    expect(await b.proxima()).toEqual({ tipo: 'oponente-escolheu', heroi: 'leslie' });
+    b.socket.send(JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
+    expect(await b.proxima()).toMatchObject({ tipo: 'comecou', lado: 'convidado', oponente: 'Ana', heroi: 'leslie' });
+    expect(await a.proxima()).toEqual({ tipo: 'oponente-escolheu', heroi: 'leslie' });
     expect(await a.proxima()).toMatchObject({ tipo: 'comecou', lado: 'anfitriao', oponente: 'Bia é' });
 
     b.socket.send(JSON.stringify({ tipo: 'estado', estado: ESTADO }));

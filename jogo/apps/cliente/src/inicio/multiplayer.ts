@@ -1,11 +1,13 @@
 // Tela do Multiplayer: criar uma sala (o servidor dá um código para passar ao outro jogador) ou
-// entrar numa com o código. Termina quando os dois estão na sala — a partida começou — ou com
-// null, se a pessoa voltar.
+// entrar numa com o código. Com os dois na sala, abre a tela de seleção de personagem (a mesma do
+// Singleplayer), e termina quando os dois escolheram — a partida começou — ou com null, se a
+// pessoa voltar.
 
-import { CodigoSala, TAMANHO_CODIGO, type Lado, type PedidoPartida } from '@terna/compartilhado';
+import { CodigoSala, TAMANHO_CODIGO, type Heroi, type Lado, type PedidoPartida } from '@terna/compartilhado';
 import { conectarPartida, type ConexaoPartida } from '../rede/partida';
 import { anexarCena } from './cena';
 import { botao, elemento, palco, sairComEsmaecer } from './dom';
+import { telaSelecao } from './selecao';
 
 export interface EscolhaOnline {
   modo: 'online';
@@ -13,6 +15,8 @@ export interface EscolhaOnline {
   oponente: string;
   lado: Lado;
   restanteMs: number;
+  heroi: Heroi;
+  heroiOponente: Heroi;
   conexao: ConexaoPartida;
 }
 
@@ -40,16 +44,29 @@ export function telaMultiplayer(nome: string): Promise<EscolhaOnline | null> {
     };
     window.addEventListener('keydown', aoTeclar);
 
-    // Abre a conexão e espera a partida começar. `aoCriar` recebe o código (só quem cria).
+    // Os dois na sala: a seleção de personagem. Os dois escolheram, a partida começa; saiu da
+    // sala (ou ela acabou), volta para cá.
+    const selecionar = (c: ConexaoPartida, oponente: string): void => {
+      window.removeEventListener('keydown', aoTeclar);
+      void telaSelecao({ conexao: c, oponente }).then((r) => {
+        if (r.tipo === 'comecou') {
+          resolver({ modo: 'online', nome, ...r.partida, conexao: c });
+          return;
+        }
+        conexao = null;
+        window.addEventListener('keydown', aoTeclar);
+        escolher(r.tipo === 'caiu' ? primeiraMaiuscula(r.erro ?? SEM_SERVIDOR) : '');
+      });
+    };
+
+    // Abre a conexão e espera o outro jogador. `aoCriar` recebe o código (só quem cria).
     const conectar = (pedido: PedidoPartida, aoCriar: (codigo: string) => void, aoFalhar: (erro: string) => void): void => {
       const c = conectarPartida(pedido);
       conexao = c;
       c.ouvir(
         (m) => {
           if (m.tipo === 'sala-criada') aoCriar(m.codigo);
-          if (m.tipo === 'comecou') {
-            terminar({ modo: 'online', nome, oponente: m.oponente, lado: m.lado, restanteMs: m.restanteMs, conexao: c });
-          }
+          if (m.tipo === 'escolher') selecionar(c, m.oponente);
         },
         (erro) => {
           conexao = null;

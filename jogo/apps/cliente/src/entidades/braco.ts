@@ -1,5 +1,5 @@
-// O braço que o personagem estica por cima do sprite: soltando um poder (o anjo) e segurando ou
-// usando uma arma (a forma base). Sai do ombro da frente, de lado, e vai pixel a pixel na direção
+// O braço que o personagem estica por cima do sprite: soltando um poder e segurando ou usando
+// uma arma. Sai do ombro da frente, de lado, e vai pixel a pixel na direção
 // pedida, com 2 px de grossura: a cor de cima e a sombra embaixo, e a mão na ponta.
 
 // De lado, o ombro da frente fica 2 px à frente do eixo e 16 px acima dos pés.
@@ -13,7 +13,9 @@ export interface CoresBraco {
 
 // O anjo, sem roupa: pele clara e a mão branca (com o brilho rosa do poder, desenhado à parte).
 export const BRACO_ANJO: CoresBraco = { cima: '#f6d3bd', sombra: '#bf8872', mao: '#ffffff' };
-// A forma base: a manga do moletom preto e a mão, nas cores do próprio sprite.
+// A Leslie: o braço de pele, nas cores do próprio sprite dela.
+export const BRACO_LESLIE: CoresBraco = { cima: '#d8a37d', sombra: '#966548', mao: '#f3c69c' };
+// A forma base do Anjo: a manga do moletom preto e a mão, nas cores do próprio sprite.
 export const BRACO_BASE: CoresBraco = { cima: '#252228', sombra: '#100c0f', mao: '#ac7c69' };
 
 export interface Ponto {

@@ -33,7 +33,22 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 | `npm run db:gerar` | cria a migração do banco depois de mudar `schema.ts` |
 | `npm run db:migrar` | aplica as migrações (o servidor também aplica sozinho ao subir) |
 | `npm run arte:cenario` | regera o cenário a partir de `fontes/` |
-| `npm run arte:personagem` | regera o personagem a partir de `fontes/SpriteBase.png` |
+| `npm run arte:leslie` | regera a Leslie a partir de `fontes/leslie.png` |
+| `npm run arte:anjo` | regera o Anjo (desligado por enquanto) a partir de `fontes/SpriteBase.png` |
+
+## Personagens
+
+- **Leslie**, a dríade da floresta: pega as armas que caem do céu e, com **R**, troca o clique
+  esquerdo entre a arma e os poderes dela (Chicote de Espinhos, Raízes e Fúria da Floresta; o
+  botão direito troca o poder escolhido). Cada poder gasta energia pixy (mais, quanto mais forte), dar
+  dano enche, e a Fúria só sai com a barra cheia. Números em `packages/compartilhado/src/conteudo/leslie.ts`
+  e, os custos de energia, em `conteudo/poderes.ts`.
+- **Anjo**: pronto, mas desligado até a atualização dele. Aparece na seleção como "em breve".
+  Para ligar, `LIBERADO.anjo = true` em `packages/compartilhado/src/conteudo/herois.ts`. O código
+  dele mora em `apps/cliente/src/entidades/anjo/` e os números em `conteudo/anjo.ts`.
+
+A escolha é feita na tela de seleção, depois do Singleplayer (a CPU fica com o mesmo personagem)
+ou, no Multiplayer, com os dois já na sala: a partida só começa quando os dois escolhem.
 
 ## Como está organizado
 
@@ -48,7 +63,8 @@ jogo/
 │   │       │                 multiplayer (criar/entrar em sala), menu da engrenagem e fim
 │   │       ├── motor/        peças genéricas: carregar imagem, criar/reduzir sprite, sorteio
 │   │       ├── mundo/        céu, sol, nuvens, árvores, luz, chão e minhocas
-│   │       ├── entidades/    personagem e animais
+│   │       ├── entidades/    personagem (corpo comum), animais, armas e poderes;
+│   │       │                 leslie/ (poderes da dríade) e anjo/ (o Anjo, desligado)
 │   │       ├── rede/         API HTTP e conexão de tempo real com o servidor
 │   │       ├── save/         save local (navegador) ou na conta (servidor), mesmo jeito de usar
 │   │       ├── gerado/       recortes das folhas de sprite (saída das ferramentas; não editar)

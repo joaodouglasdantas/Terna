@@ -1,24 +1,37 @@
-/* Telas de carregamento e inicial. A interface é roxa e verde: verde na ação principal (jogar,
-   continuar, entrar) e no progresso, roxo no segundo modo e nas molduras. Azul e vermelho
-   continuam sendo só dos dois jogadores.
+/* Telas de carregamento e inicial. A interface é marrom e verde, as cores da floresta do
+   mapa: verde na ação principal (jogar, continuar, entrar) e no progresso, marrom de madeira no
+   segundo modo e nas molduras. Azul e vermelho continuam sendo só dos dois jogadores.
    A letra é a Tiny5: pixelada como a logo e como a fonte 3×5 do HUD, com acentos, e com 5/S,
    2/Z e C/O bem distintos (o código da sala mistura letras e números). Ela só tem um peso: o
    negrito falso borraria os pixels, então o destaque vem do tamanho e de uma sombra dura, como
    o contorno escuro das letras da logo. */
 
+/* As telas moram dentro do quadro do jogo (o mesmo 16:9 do #tela, no index.html): as margens
+   pretas em volta ficam livres, como nas telas menores dos jogos antigos. Em janela muito
+   estreita (celular em pé) o quadro cresce na altura até caber o menu. O `contain` faz o quadro
+   ser a referência até do que é `position: fixed` lá dentro e corta o que passar dele; como
+   container, as medidas de dentro (cqw, cqh) são do quadro, não da janela. */
 #inicio {
-  --fundo: #1b1b24;
-  --tinta: #f3ecff;
-  --suave: #a9a2c4;
+  --fundo: #1a140e;
+  --tinta: #fbf3e4;
+  --suave: #c9b89c;
   --azul: #5fb2ff;
   --vermelho: #ff5a67;
-  --roxo: #8a5cff;
+  --marrom: #9a6a3a;
+  --marrom-claro: #e6c9a0;
+  --marrom-escuro: #4e3016;
+  --contorno: #120c06;
   --verde: #7fd66b;
   --verde-claro: #c8f5b0;
   --verde-fundo: #2f7a3a; /* a sombra embaixo do botão verde */
-  --roxo-claro: #d8c8ff;
   position: fixed;
   inset: 0;
+  margin: auto;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, max(calc(100vw * 9 / 16), 400px));
+  overflow: hidden;
+  contain: layout paint;
+  container-type: size;
   z-index: 10;
   font-family: 'Tiny5', ui-monospace, monospace;
   font-synthesis: none;
@@ -51,7 +64,7 @@
 /* ---- carregamento ---- */
 
 .inicio-carregando {
-  background: radial-gradient(ellipse at 50% 40%, #2b2440 0%, var(--fundo) 70%);
+  background: radial-gradient(ellipse at 50% 40%, #33271a 0%, var(--fundo) 70%);
 }
 
 /* Em tela baixa o flexbox espremia a barra até sumir o recheio: sem encolher, o que não couber rola. */
@@ -59,15 +72,15 @@
   flex-shrink: 0;
 }
 
-/* Moldura roxa, como as caixas, e recheio verde com um brilho em cima, como o botão principal. */
+/* Moldura clara de madeira, como as caixas, e recheio verde com um brilho em cima, como o botão principal. */
 .inicio-barra {
   width: min(420px, 100%);
   height: 18px;
   box-sizing: border-box;
   padding: 3px;
-  background: #0e0a18;
-  border: 3px solid #d8c8ff;
-  box-shadow: 0 0 0 3px #0e0a18;
+  background: var(--contorno);
+  border: 3px solid var(--marrom-claro);
+  box-shadow: 0 0 0 3px var(--contorno);
 }
 
 .inicio-barra-cheia {
@@ -116,10 +129,10 @@
    maior que ela, fica deslocada para as letras caberem certinho. */
 .inicio-logo-simples {
   position: relative;
-  width: min(360px, 70vw);
+  width: min(360px, 70cqw);
   aspect-ratio: 1769 / 541;
   overflow: hidden;
-  filter: drop-shadow(0 0 14px rgba(138, 92, 255, 0.55));
+  filter: drop-shadow(0 0 14px rgba(255, 196, 92, 0.45));
 }
 
 .inicio-logo-simples img {
@@ -134,7 +147,7 @@
 
 /* O cenário roda atrás: o escurecido só garante que a logo e o botão se leiam. */
 .inicio-titulo-tela {
-  background: radial-gradient(ellipse at 50% 50%, rgba(16, 12, 28, 0.35) 0%, rgba(16, 12, 28, 0.78) 100%);
+  background: radial-gradient(ellipse at 50% 50%, rgba(20, 14, 8, 0.3) 0%, rgba(20, 14, 8, 0.75) 100%);
   gap: 1rem;
 }
 
@@ -143,7 +156,8 @@
 .inicio-logo-palco {
   position: relative;
   flex-shrink: 0;
-  width: min(680px, 88vw, 92vh);
+  /* Cabe com o nome e os dois botões embaixo (uns 290 px) na altura do quadro. */
+  width: min(680px, 88cqw, max(200px, (100cqh - 290px) * 2));
   aspect-ratio: 1774 / 887;
   animation: inicio-flutua 4s ease-in-out infinite;
 }
@@ -157,12 +171,35 @@
   filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.6));
 }
 
-/* Luz roxa atrás do pico e do cristal, respirando. */
+/* Luz dourada do sol do verão atrás do cristal do pico (em 51,1% × 11,8% da arte), respirando. */
 .inicio-logo-aura {
   position: absolute;
-  inset: 0 22% 5%;
-  background: radial-gradient(closest-side, rgba(138, 92, 255, 0.5), rgba(138, 92, 255, 0));
+  left: calc(51.1% - 22%);
+  top: calc(11.8% - 44%);
+  width: 44%;
+  aspect-ratio: 1;
+  background: radial-gradient(closest-side, rgba(255, 206, 90, 0.55), rgba(255, 170, 60, 0.18) 55%, rgba(255, 170, 60, 0));
   animation: inicio-aura 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Raios de sol girando devagar atrás do cristal: só aparecem no céu em volta do pico, porque a
+   arte fica por cima. A máscara apaga as pontas. */
+.inicio-logo-raios {
+  position: absolute;
+  left: calc(51.1% - 32%);
+  top: calc(11.8% - 64%);
+  width: 64%;
+  aspect-ratio: 1;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(255, 214, 110, 0) 0deg 9deg,
+    rgba(255, 214, 110, 0.32) 13deg,
+    rgba(255, 214, 110, 0) 17deg 30deg
+  );
+  -webkit-mask: radial-gradient(closest-side, #000 12%, rgba(0, 0, 0, 0.5) 45%, transparent 100%);
+  mask: radial-gradient(closest-side, #000 12%, rgba(0, 0, 0, 0.5) 45%, transparent 100%);
+  animation: inicio-gira 60s linear infinite;
   pointer-events: none;
 }
 
@@ -198,8 +235,8 @@
 
 /* ---- cena da frente (cena.ts) ---- */
 
-/* Árvores do jogo, grandes, nas beiradas: por cima do cenário escurecido e por baixo do resto.
-   Posição e tamanho de cada planta vêm do cena.ts, pela janela. */
+/* Árvores do jogo, grandes, nas beiradas do quadro: por cima do cenário escurecido e por baixo
+   do resto. Posição e tamanho de cada planta vêm do cena.ts, pelo tamanho do quadro. */
 .inicio-cena {
   position: fixed;
   inset: 0;
@@ -222,7 +259,7 @@
 
 /* Na frente, quase na luz do cenário; atrás, mais escuras, para dar profundidade. */
 .inicio-planta {
-  filter: brightness(0.85) drop-shadow(0 0 18px rgba(8, 6, 16, 0.55));
+  filter: brightness(0.85) drop-shadow(0 0 18px rgba(10, 6, 2, 0.55));
 }
 
 .inicio-planta-atras {
@@ -262,7 +299,7 @@
   text-shadow: 0 2px 0 var(--b-tinta-sombra);
   background: var(--b-fundo);
   border: 3px solid var(--b-borda);
-  box-shadow: var(--b-relevo), 0 5px 0 var(--b-degrau), 0 0 0 3px #0e0a18;
+  box-shadow: var(--b-relevo), 0 5px 0 var(--b-degrau), 0 0 0 3px var(--contorno);
   cursor: pointer;
   transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.15s ease;
 }
@@ -273,22 +310,24 @@
 
 .inicio-botao:active {
   transform: translateY(4px);
-  box-shadow: var(--b-relevo), 0 1px 0 var(--b-degrau), 0 0 0 3px #0e0a18;
+  box-shadow: var(--b-relevo), 0 1px 0 var(--b-degrau), 0 0 0 3px var(--contorno);
 }
 
+/* O contorno claro marca o botão sob o mouse e o botão com foco do teclado. */
+.inicio-botao:hover:not(:disabled),
 .inicio-botao:focus-visible {
-  outline: 3px solid var(--roxo-claro);
+  outline: 3px solid var(--marrom-claro);
   outline-offset: 4px;
 }
 
 /* Voltar, cancelar, sair: escuro e discreto. */
 .inicio-botao-claro {
-  --b-fundo: #3a3358;
-  --b-hover: #4a426c;
+  --b-fundo: #4a3a28;
+  --b-hover: #5a4832;
   --b-borda: var(--suave);
-  --b-degrau: #1f1a33;
+  --b-degrau: #2a1f13;
   --b-tinta: var(--tinta);
-  --b-tinta-sombra: #1f1a33;
+  --b-tinta-sombra: #2a1f13;
 }
 
 /* Os modos de jogo, um embaixo do outro, com a mesma largura. */
@@ -301,7 +340,7 @@
 }
 
 /* Os dois modos são o mesmo botão, grande e pulsando com o brilho da própria cor: o
-   Singleplayer verde, o Multiplayer roxo. */
+   Singleplayer verde, o Multiplayer marrom. */
 .inicio-jogar,
 .inicio-multiplayer {
   display: flex;
@@ -314,29 +353,25 @@
 }
 
 .inicio-multiplayer {
-  /* Um tom abaixo do --roxo: com o texto branco dá 5,6:1 (no --roxo ficava em 4,15:1). O
-     hover clareia só até onde o branco ainda fica em 4,5:1. */
-  --b-fundo: #7548e0;
-  --b-hover: #7f52f5;
-  --b-borda: var(--roxo-claro);
-  --b-degrau: #4a2fa0;
-  --b-brilho: rgba(150, 110, 255, 0.75);
+  /* Madeira: com o texto branco dá 5,9:1; o hover clareia só até onde o branco ainda fica
+     acima de 4,5:1. */
+  --b-fundo: #8a5a2b;
+  --b-hover: #9a6632;
+  --b-borda: var(--marrom-claro);
+  --b-degrau: var(--marrom-escuro);
+  --b-brilho: rgba(222, 160, 86, 0.75);
   --b-tinta: #ffffff;
-  --b-tinta-sombra: #3a2380;
-}
-
-.inicio-multiplayer:focus-visible {
-  outline-color: var(--verde);
+  --b-tinta-sombra: #3a2410;
 }
 
 /* Apagado: sem conexão com o servidor não dá para jogar com outras pessoas. */
 .inicio-multiplayer:disabled,
 .inicio-multiplayer:disabled:hover {
-  --b-fundo: #2a2540;
-  --b-borda: #4a4466;
-  --b-degrau: #17132a;
-  --b-tinta: #8d86a8;
-  --b-tinta-sombra: #17132a;
+  --b-fundo: #2e261d;
+  --b-borda: #54483a;
+  --b-degrau: #1a140d;
+  --b-tinta: #9a8c78;
+  --b-tinta-sombra: #1a140d;
   --b-relevo: inset 0 0 0 transparent;
   background: var(--b-fundo);
   cursor: not-allowed;
@@ -367,14 +402,14 @@
   font: inherit;
   font-size: 1.3rem;
   color: var(--tinta);
-  background: rgba(14, 10, 24, 0.88);
+  background: rgba(20, 14, 8, 0.88);
   border: 3px solid var(--suave);
-  box-shadow: 0 0 0 3px #0e0a18;
+  box-shadow: 0 0 0 3px var(--contorno);
   outline: none;
 }
 
 .inicio-entrada::placeholder {
-  color: #7d7699;
+  color: #8f7f68;
   font-weight: 400;
 }
 
@@ -404,11 +439,11 @@
 /* O multiplayer tem o fundo da tela inicial (o cenário e as árvores continuam à vista); a
    pausa escurece mais, porque a partida está atrás. */
 .inicio-multi-tela {
-  background: radial-gradient(ellipse at 50% 50%, rgba(16, 12, 28, 0.45) 0%, rgba(16, 12, 28, 0.8) 100%);
+  background: radial-gradient(ellipse at 50% 50%, rgba(20, 14, 8, 0.4) 0%, rgba(20, 14, 8, 0.78) 100%);
 }
 
 .inicio-pausa {
-  background: rgba(16, 12, 28, 0.72);
+  background: rgba(20, 14, 8, 0.72);
 }
 
 .inicio-caixa {
@@ -420,9 +455,9 @@
   padding: 1.5rem;
   box-sizing: border-box;
   text-align: center;
-  background: rgba(18, 14, 30, 0.94);
-  border: 3px solid var(--roxo);
-  box-shadow: 0 0 0 3px #0e0a18, 0 0 28px rgba(138, 92, 255, 0.35), 0 12px 40px rgba(0, 0, 0, 0.5);
+  background: rgba(26, 18, 10, 0.94);
+  border: 3px solid var(--marrom);
+  box-shadow: 0 0 0 3px var(--contorno), 0 0 28px rgba(222, 160, 86, 0.28), 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
 .inicio-titulo {
@@ -430,7 +465,7 @@
   font-size: 2rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  text-shadow: 0 3px 0 #4a2fa0;
+  text-shadow: 0 3px 0 var(--marrom-escuro);
 }
 
 .inicio-sub,
@@ -484,13 +519,177 @@
   text-indent: 0.35em; /* compensa o espaço depois da última letra */
   color: #ffd966;
   text-shadow: 0 3px 0 #6b4a10;
-  background: #0e0a18;
-  border: 3px dashed #4a4466;
+  background: var(--contorno);
+  border: 3px dashed #54483a;
   user-select: all;
 }
 
 .inicio-copiado {
   min-height: 1.4em;
+}
+
+/* ---- seleção de personagem (selecao.ts) ---- */
+
+/* O fundo da tela inicial: o cenário e as árvores continuam à vista. */
+.inicio-selecao-tela {
+  background: radial-gradient(ellipse at 50% 50%, rgba(20, 14, 8, 0.45) 0%, rgba(20, 14, 8, 0.82) 100%);
+  gap: 0.8rem;
+}
+
+.inicio-selecao-tela > * {
+  flex-shrink: 0;
+}
+
+.inicio-cartoes {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1rem;
+  max-width: 100%;
+}
+
+/* Cada personagem: o sprite grande à esquerda e o texto à direita, numa caixa de madeira. */
+.inicio-cartao {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto auto 1fr;
+  column-gap: 0.9rem;
+  align-items: start;
+  width: min(23rem, 100%);
+  padding: 0.8rem 0.9rem;
+  box-sizing: border-box;
+  font: inherit;
+  text-align: left;
+  color: var(--tinta);
+  background: rgba(26, 18, 10, 0.92);
+  border: 3px solid var(--marrom);
+  box-shadow: 0 0 0 3px var(--contorno), 0 10px 30px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease, opacity 0.2s ease;
+}
+
+.inicio-cartao:hover:not(.inicio-cartao-bloqueado) {
+  transform: translateY(-2px);
+}
+
+.inicio-cartao:focus-visible {
+  outline: 3px solid var(--marrom-claro);
+  outline-offset: 4px;
+}
+
+/* O escolhido: borda verde, com o brilho da ação principal. */
+.inicio-cartao-escolhido {
+  border-color: var(--verde);
+  box-shadow: 0 0 0 3px var(--contorno), 0 0 24px rgba(127, 214, 107, 0.45), 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+/* Ainda não liberado: apagado, sem cor, com o selo "Em breve". */
+.inicio-cartao-bloqueado {
+  cursor: not-allowed;
+  opacity: 0.6;
+  filter: grayscale(0.9);
+}
+
+/* Online, depois de confirmar: os outros cartões recuam. */
+.inicio-cartao-travado {
+  opacity: 0.35;
+}
+
+.inicio-cartao-palco {
+  position: relative;
+  grid-row: 1 / 5;
+  display: grid;
+  place-items: end center;
+  padding: 0.3rem 0.4rem 0.2rem;
+  background: radial-gradient(ellipse at 50% 90%, rgba(127, 214, 107, 0.18), rgba(0, 0, 0, 0) 70%),
+    rgba(0, 0, 0, 0.25);
+  border: 2px solid rgba(230, 201, 160, 0.18);
+}
+
+.inicio-cartao-sprite {
+  display: block;
+  width: 120px; /* 40 px do sprite × 3 */
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.inicio-cartao-selo {
+  position: absolute;
+  top: 0.35rem;
+  left: 50%;
+  transform: translateX(-50%) rotate(-4deg);
+  padding: 0.15rem 0.45rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #1b1b24;
+  background: #ffd966;
+  box-shadow: 0 0 0 2px var(--contorno);
+}
+
+.inicio-cartao-nome {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-shadow: 0 3px 0 var(--marrom-escuro);
+}
+
+.inicio-cartao-titulo {
+  margin: 0 0 0.3rem;
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--verde);
+}
+
+.inicio-cartao-frase {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  color: var(--suave);
+}
+
+.inicio-cartao-poderes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inicio-cartao-poder {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.inicio-cartao-poder strong {
+  display: block;
+  font-weight: 400;
+  color: var(--tinta);
+}
+
+.inicio-cartao-poder span > span {
+  color: var(--suave);
+}
+
+.inicio-cartao-icone {
+  flex-shrink: 0;
+  width: 22px; /* 11 px × 2 */
+  height: 22px;
+  image-rendering: pixelated;
+  background: rgba(26, 10, 22, 0.85);
+  box-shadow: 0 0 0 1px rgba(255, 250, 240, 0.32);
+}
+
+.inicio-selecao-estado:empty {
+  display: none;
 }
 
 /* ---- dentro da partida ---- */
@@ -552,7 +751,7 @@
 
 @keyframes inicio-pulsa {
   50% {
-    box-shadow: var(--b-relevo), 0 5px 0 var(--b-degrau), 0 0 0 3px #0e0a18, 0 0 24px 4px var(--b-brilho);
+    box-shadow: var(--b-relevo), 0 5px 0 var(--b-degrau), 0 0 0 3px var(--contorno), 0 0 24px 4px var(--b-brilho);
   }
 }
 
@@ -574,6 +773,12 @@
   }
 }
 
+@keyframes inicio-gira {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
 @keyframes inicio-sobe {
   from {
     transform: translateY(105%);
@@ -583,6 +788,7 @@
 @media (prefers-reduced-motion: reduce) {
   .inicio-logo-palco,
   .inicio-logo-aura,
+  .inicio-logo-raios,
   .inicio-logo-reluz::before,
   .inicio-jogar,
   .inicio-multiplayer,
@@ -591,11 +797,27 @@
   }
 }
 
-@media (max-height: 480px) {
-  .inicio-logo-palco {
-    width: min(680px, 88vw, 64vh);
-  }
+@container (max-height: 480px) {
   .inicio-titulo-tela {
     gap: 0.6rem;
+  }
+  /* Quadro baixo: a seleção fica mais compacta (sem a frase dos cartões). */
+  .inicio-selecao-tela {
+    gap: 0.5rem;
+  }
+  .inicio-selecao-tela .inicio-titulo {
+    font-size: 1.5rem;
+  }
+  .inicio-cartao-frase {
+    display: none;
+  }
+  .inicio-cartao-sprite {
+    width: 96px;
+  }
+}
+
+@container (min-height: 760px) {
+  .inicio-cartao-sprite {
+    width: 160px; /* × 4 */
   }
 }

@@ -1,7 +1,7 @@
 // A mira do mouse dentro da partida, no lugar da seta do sistema: uma cruz de pixels de braços
 // claros com contorno escuro, que lê sobre o céu, as árvores e o chão, e um miolo que diz se o
-// clique sai: verde (o da interface) quando o poder escolhido (de anjo) ou a arma da mão (na
-// forma base) sai se clicar agora, cinza quando não sai (sem arma, em recarga, enfeitiçado).
+// clique sai: verde (o da interface) quando o poder escolhido (com os poderes na mão) ou a arma da mão (na
+// Leslie no modo arma) sai se clicar agora, cinza quando não sai (sem arma, em recarga, sem energia).
 //
 // Ela vira o próprio cursor do sistema (CSS `cursor: url(...)`), ampliada no tamanho dos pixels
 // do jogo: quem desenha é o sistema, na hora em que o mouse mexe e no ponto exato dele. Desenhada

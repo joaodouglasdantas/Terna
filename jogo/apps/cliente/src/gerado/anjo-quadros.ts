@@ -1,9 +1,9 @@
-// Gerado por ferramentas/gerar-personagem.cjs a partir de fontes/SpriteBase.png — não editar à mão.
-// x/y/w/h: recorte em assets/personagem.png (e em personagem-anjo.png, no mesmo lugar);
+// Gerado por ferramentas/gerar-anjo.cjs a partir de fontes/SpriteBase.png — não editar à mão.
+// x/y/w/h: recorte em assets/anjo/base.png (e em anjo/anjo.png, no mesmo lugar);
 // ax: eixo do corpo (os pés ficam na base do recorte). Âncoras da forma de anjo, dentro do
 // recorte: axAnjo (o eixo do sprite do anjo: de lado a cabeça recua), olhos (centro de cada
 // olho), ombro (onde nascem as asas) e tarja (x, y, largura e altura do mosaico no quadril).
-export const QUADROS_PERSONAGEM = {
+export const QUADROS_ANJO = {
   "parado": [
     {
       "x": 0,

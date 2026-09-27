@@ -1,78 +1,39 @@
-// Os três poderes do anjo, na ordem dos quadrinhos do painel: 1 o básico, 2 o intermediário e
-// 3 o especial. Só o anjo usa; o botão direito do mouse passa para o próximo e o esquerdo usa
-// o escolhido, mirando onde o cursor está. Distâncias em pixels, tempos em segundos,
-// velocidades em px/s.
-//
-// Cada um se desvia de um jeito:
-// - 1 · Impacto Angelical: uma fileira de três explosões no chão correndo rápido em linha reta,
-//   a primeira na direção do cursor e as outras duas logo em seguida, cada uma depois de onde a
-//   anterior acaba — em pouca altura: pulando alto (o pulo duplo ou o do anjo) ou saindo da
-//   fileira, escapa.
-// - 2 · Rajada de Amor: dois corações flutuando rápido na direção do cursor, um de alcance curto
-//   e outro longo — pula-se por cima ou sai da linha. O que acerta enfeitiça: o enfeitiçado só
-//   anda, devagar, até quem o acertou; os dois acertando, o dobro do tempo.
-// - 3 · Julgamento Celestial: marca uma área grande e desce um pilar do céu — pular não adianta,
-//   só saindo de baixo.
+// A vida, a energia pixy e os poderes de cada personagem (os números de cada poder ficam no
+// arquivo do personagem: anjo.ts e leslie.ts). Cada personagem tem três poderes, na ordem dos
+// quadrinhos do painel: 1 o básico, 2 o intermediário e 3 o especial.
+
+import { IMPACTO, JULGAMENTO, PODERES_ANJO, RAJADA } from './anjo';
+import type { Heroi } from './herois';
+import { CHICOTE, FURIA, PODERES_LESLIE, RAIZES } from './leslie';
+
+export * from './anjo';
+export * from './leslie';
 
 export const VIDA_MAXIMA = 1000;
 
-// A forma de anjo: dura DURACAO_ANJO (acabou, volta sozinho) e, de volta à base, espera
-// RECARGA_ANJO até poder virar de novo. Para virar, a barra de energia pixy tem que estar cheia:
-// a energia vem do dano que o personagem dá no adversário na forma base (de anjo não carrega,
-// para uma forma de anjo não emendar na outra), e virar anjo gasta `custoAnjo`. Com 0,3 por
-// ponto de dano, enche com ~333 de dano dado — um terço da vida do outro, uns 10 golpes de
-// espada. A energia é do personagem e vai servir para outras coisas depois.
-export const DURACAO_ANJO = 25;
-export const RECARGA_ANJO = 10;
+// A energia pixy vem do dano que o personagem dá no adversário (com poder ou com arma): com 0,3
+// por ponto de dano, enche com ~333 de dano dado — um terço da vida do outro, uns 10 golpes de
+// espada. Ela começa vazia. O Anjo a gasta para virar anjo (e de anjo ela não carrega, para uma
+// forma de anjo não emendar na outra). Cada poder da Leslie só sai com a energia dele, e a gasta:
+// o 1 pede pouco (um golpe de espada dá), o 2 mais e a Fúria da Floresta a barra cheia.
 export const ENERGIA_PIXY = {
   maxima: 100,
-  porDano: 0.3, // por ponto de dano dado no adversário, na forma base
+  porDano: 0.3, // por ponto de dano dado no adversário
   custoAnjo: 100,
+  custoLeslie: { chicote: 10, raizes: 25, furia: 100 },
 };
 
-export const PODERES = ['impacto', 'rajada', 'julgamento'] as const;
+// Todos os poderes do jogo (o formato das mensagens aceita qualquer um); cada personagem usa os seus.
+export const PODERES = [...PODERES_ANJO, ...PODERES_LESLIE] as const;
 export type IdPoder = (typeof PODERES)[number];
 
-export const IMPACTO = {
-  nome: 'Impacto Angelical',
-  dano: 50, // por explosão da fileira
-  recarga: 4,
-  alcance: 150, // do anjo até o centro da primeira explosão, na horizontal
-  perto: 30, // a primeira nunca fica mais perto que isto do anjo
-  explosoes: 3,
-  entre: 0.1, // segundos entre uma explosão da fileira e a seguinte: a fileira corre ~520 px/s
-  aviso: 0.35, // o círculo no chão antes de cada explosão: andando, dá para sair ~30 px
-  raio: 26, // cada explosão; a seguinte começa onde a anterior acaba
-  altura: 40, // a explosão só pega quem está com os pés até esta altura do chão
-  duracao: 0.45, // a luz da explosão na tela (o dano é no primeiro instante)
+export const PODERES_DO_HEROI: Record<Heroi, readonly IdPoder[]> = {
+  anjo: PODERES_ANJO,
+  leslie: PODERES_LESLIE,
 };
+export const PODERES_POR_HEROI = 3;
 
-export const RAJADA = {
-  nome: 'Rajada de Amor',
-  dano: 40, // por coração: os dois acertando, 80
-  recarga: 8,
-  alcanceCurto: 110, // até onde o primeiro coração vai antes de sumir
-  alcance: 220, // e o segundo
-  atraso: 0.12, // o segundo sai logo depois do primeiro
-  velocidade: 300, // o longo chega aos 220 px em ~0,7 s
-  ondulacao: 4, // pixels para cada lado da linha: o coração flutua enquanto voa
-  raio: 3, // do coração, para o acerto
-  encanto: 1.5, // segundos de encanto por coração que acerta (os dois: 3 s)
-  andarEncantado: 35, // px/s do enfeitiçado andando até quem o acertou (o normal é 90)
-};
+const DADOS = { impacto: IMPACTO, rajada: RAJADA, julgamento: JULGAMENTO, chicote: CHICOTE, raizes: RAIZES, furia: FURIA };
 
-export const JULGAMENTO = {
-  nome: 'Julgamento Celestial',
-  dano: 230,
-  recarga: 22,
-  alcance: 280,
-  aviso: 1.1, // a marca no chão antes de o pilar descer: andando, dá para sair ~100 px
-  raio: 45, // metade da largura do pilar
-  duracao: 0.7,
-};
-
-export const RECARGA_PODER: Record<IdPoder, number> = {
-  impacto: IMPACTO.recarga,
-  rajada: RAJADA.recarga,
-  julgamento: JULGAMENTO.recarga,
-};
+export const RECARGA_PODER = Object.fromEntries(PODERES.map((p) => [p, DADOS[p].recarga])) as Record<IdPoder, number>;
+export const NOME_PODER = Object.fromEntries(PODERES.map((p) => [p, DADOS[p].nome])) as Record<IdPoder, string>;

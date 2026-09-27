@@ -1,6 +1,6 @@
 // As armas (números em compartilhado/conteudo/armas.ts): a espada e o arco que caem do céu de vez
 // em quando, com uma coluna de luz dourada marcando onde vão cair e um brilho em volta enquanto
-// esperam no chão; a arma na mão da forma base, com o braço segurando; o golpe da espada, que varre
+// esperam no chão; a arma na mão, com o braço segurando; o golpe da espada, que varre
 // de cima para a frente, e a flecha do arco; a arma quebrando quando o tempo dela acaba, e a
 // jogada fora (tecla E), que cai e some.
 //
@@ -26,6 +26,7 @@ import {
 import {
   BRACO_BASE,
   anguloNoMapa,
+  type CoresBraco,
   desenharBracoEsticado,
   desenharMao,
   ombroDe,
@@ -625,12 +626,13 @@ export function desenharArmasNaFrente(ctx: CanvasRenderingContext2D, a: Arsenal)
 // sprite), só a arma nessa mão: a espada de pé e o arco ao lado do corpo. De lado, o braço saindo
 // do ombro da frente com a arma na mão; atacando, a espada varrendo (com o risco de luz da ponta)
 // ou o arco esticado na direção da mira, com a corda voltando depois de soltar a flecha. Acabando,
-// pisca.
+// pisca. `braco`: as cores do braço de quem segura (a manga do Anjo, a pele da Leslie).
 export function desenharArmaNaMao(
   ctx: CanvasRenderingContext2D,
   c: CorpoArmado,
   tempo: number,
   maoDeFrente?: Ponto,
+  braco: CoresBraco = BRACO_BASE,
 ): void {
   const arma = c.arma;
   if (!arma) return;
@@ -641,33 +643,33 @@ export function desenharArmaNaMao(
   if (maoDeFrente && !ataque) {
     if (arma.tipo === 'espada') desenharEspada(ctx, maoDeFrente, anguloNoMapa(POSE.espadaEmPe, c.direcao));
     else desenharArco(ctx, maoDeFrente, anguloNoMapa(0, c.direcao), 0);
-    desenharMao(ctx, maoDeFrente, BRACO_BASE);
+    desenharMao(ctx, maoDeFrente, braco);
   } else if (arma.tipo === 'espada') {
     if (ataque) {
       const t = ataque.idade / ESPADA.golpe;
       desenharRisco(ctx, c, ombro, ataque.mira, Math.min(1, t));
       const ang = anguloNoMapa(anguloDoGolpe(ataque.mira, t), c.direcao);
-      const mao = desenharBracoEsticado(ctx, ombro, ang, POSE.bracoGolpe, BRACO_BASE);
+      const mao = desenharBracoEsticado(ctx, ombro, ang, POSE.bracoGolpe, braco);
       desenharEspada(ctx, mao, ang);
-      desenharMao(ctx, mao, BRACO_BASE);
+      desenharMao(ctx, mao, braco);
     } else {
-      const mao = desenharBracoEsticado(ctx, ombro, anguloNoMapa(POSE.descanso.espada, c.direcao), POSE.braco, BRACO_BASE);
+      const mao = desenharBracoEsticado(ctx, ombro, anguloNoMapa(POSE.descanso.espada, c.direcao), POSE.braco, braco);
       desenharEspada(ctx, mao, anguloNoMapa(POSE.espadaEmPe, c.direcao));
-      desenharMao(ctx, mao, BRACO_BASE);
+      desenharMao(ctx, mao, braco);
     }
   } else if (ataque) {
     // Mirando: estica rápido, fica, e a corda treme de volta depois da flecha sair.
     const t = ataque.idade / DURACAO_ATAQUE.arco;
     const estica = t < 0.15 ? 0.6 + (t / 0.15) * 0.4 : t > 0.8 ? 1 - ((t - 0.8) / 0.2) * 0.4 : 1;
     const ang = anguloNoMapa(ataque.mira, c.direcao);
-    const mao = desenharBracoEsticado(ctx, ombro, ang, Math.round(POSE.bracoArco * estica), BRACO_BASE);
+    const mao = desenharBracoEsticado(ctx, ombro, ang, Math.round(POSE.bracoArco * estica), braco);
     const treme = t < 0.35 ? Math.abs(Math.sin(t * 60)) * (1 - t / 0.35) * 0.6 : 0;
     desenharArco(ctx, mao, ang, treme);
-    desenharMao(ctx, mao, BRACO_BASE);
+    desenharMao(ctx, mao, braco);
   } else {
-    const mao = desenharBracoEsticado(ctx, ombro, anguloNoMapa(POSE.descanso.arco, c.direcao), POSE.braco, BRACO_BASE);
+    const mao = desenharBracoEsticado(ctx, ombro, anguloNoMapa(POSE.descanso.arco, c.direcao), POSE.braco, braco);
     desenharArco(ctx, mao, anguloNoMapa(0, c.direcao), 0);
-    desenharMao(ctx, mao, BRACO_BASE);
+    desenharMao(ctx, mao, braco);
   }
   ctx.restore();
 }

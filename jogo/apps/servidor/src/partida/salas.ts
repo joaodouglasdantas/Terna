@@ -2,7 +2,9 @@ import { randomInt } from 'node:crypto';
 import {
   DADOS_ARMA,
   DURACAO_PARTIDA_MS,
+  HEROI_PADRAO,
   LETRAS_DO_CODIGO,
+  LIBERADO,
   MensagemPartidaDoCliente,
   QUEDA_DE_ARMAS,
   TAMANHO_CODIGO,
@@ -10,6 +12,7 @@ import {
   sortearArma,
   sortearIntervaloDeArma,
   type ArmaNoMapa,
+  type Heroi,
   type Lado,
   type TipoArma,
   type MensagemPartidaDoServidor,
@@ -17,9 +20,11 @@ import {
 } from '@terna/compartilhado';
 import type { Conexao } from '../tempo-real/sala';
 
-// Salas de partida 1v1, sem conta: quem cria recebe um código; quem entra com ele começa a
-// partida. O servidor marca o tempo (a partida acaba para os dois ao mesmo tempo) e só repassa
-// o estado de um jogador para o outro — cada um simula o próprio personagem.
+// Salas de partida 1v1, sem conta: quem cria recebe um código; quem entra com ele completa a
+// sala. Com os dois lá, cada um escolhe o personagem (`escolher` → `heroi`); com as duas escolhas
+// (ou acabando o tempo de escolher: quem não escolheu fica com o padrão) a partida começa. O
+// servidor marca o tempo (a partida acaba para os dois ao mesmo tempo) e só repassa o estado de
+// um jogador para o outro — cada um simula o próprio personagem.
 //
 // As armas também são daqui: o servidor sorteia quando e onde cada uma cai (as mesmas para os
 // dois) e decide quem pega — os dois encostando juntos numa, só o primeiro pedido leva.
@@ -33,6 +38,8 @@ export interface OpcoesSalas {
   duracaoMs: number;
   // Quanto tempo uma sala espera o segundo jogador antes de fechar.
   esperaMaxMs: number;
+  // Quanto tempo os dois têm para escolher o personagem.
+  escolhaMaxMs: number;
   // Salas abertas ao mesmo tempo (protege a memória do servidor grátis).
   maxSalas: number;
   gerarCodigo: () => string;
@@ -48,6 +55,7 @@ export function codigoAleatorio(): string {
 const PADRAO: OpcoesSalas = {
   duracaoMs: DURACAO_PARTIDA_MS,
   esperaMaxMs: 10 * 60 * 1000,
+  escolhaMaxMs: 90 * 1000,
   maxSalas: 500,
   gerarCodigo: codigoAleatorio,
   primeiraArmaMs: QUEDA_DE_ARMAS.primeira * 1000,
@@ -66,8 +74,10 @@ interface SalaPartida {
   codigo: string;
   anfitriao: Participante;
   convidado: Participante | null;
-  timer: ReturnType<typeof setTimeout>; // espera o convidado; depois, o fim do tempo
+  timer: ReturnType<typeof setTimeout>; // espera o convidado; depois, a escolha; depois, o fim do tempo
   armas: ArmasDaSala;
+  herois: Record<Lado, Heroi | null>; // a escolha de cada um, antes de começar
+  comecou: boolean;
 }
 
 // Uma conexão dentro de uma sala. A rota guarda e devolve em `receber` e `sair`.
@@ -103,6 +113,8 @@ export class Salas {
       codigo,
       convidado: null,
       armas: { chao: new Map(), mao: { anfitriao: null, convidado: null }, proximoId: 1, timer: null },
+      herois: { anfitriao: null, convidado: null },
+      comecou: false,
     } as SalaPartida;
     sala.anfitriao = { nome, conexao, sala, janela: 0, mensagens: 0 };
     sala.timer = setTimeout(() => this.fechar(sala, 'ninguém entrou na sala a tempo'), this.opcoes.esperaMaxMs);
@@ -119,12 +131,41 @@ export class Salas {
     const convidado: Participante = { nome, conexao, sala, janela: 0, mensagens: 0 };
     sala.convidado = convidado;
     clearTimeout(sala.timer);
+    sala.timer = setTimeout(() => this.comecar(sala), this.opcoes.escolhaMaxMs);
+    this.mandar(sala.anfitriao.conexao, { tipo: 'escolher', lado: 'anfitriao', oponente: nome });
+    this.mandar(conexao, { tipo: 'escolher', lado: 'convidado', oponente: sala.anfitriao.nome });
+    return convidado;
+  }
+
+  // Os dois escolheram (ou o tempo de escolher acabou): a partida começa, com o relógio todo.
+  private comecar(sala: SalaPartida): void {
+    const convidado = sala.convidado;
+    if (sala.comecou || !convidado || this.salas.get(sala.codigo) !== sala) return;
+    sala.comecou = true;
+    const herois: Record<Lado, Heroi> = {
+      anfitriao: sala.herois.anfitriao ?? HEROI_PADRAO,
+      convidado: sala.herois.convidado ?? HEROI_PADRAO,
+    };
+    clearTimeout(sala.timer);
     sala.timer = setTimeout(() => this.encerrar(sala, 'tempo'), this.opcoes.duracaoMs);
     const restanteMs = this.opcoes.duracaoMs;
-    this.mandar(sala.anfitriao.conexao, { tipo: 'comecou', lado: 'anfitriao', oponente: nome, restanteMs });
-    this.mandar(conexao, { tipo: 'comecou', lado: 'convidado', oponente: sala.anfitriao.nome, restanteMs });
+    this.mandar(sala.anfitriao.conexao, {
+      tipo: 'comecou',
+      lado: 'anfitriao',
+      oponente: convidado.nome,
+      restanteMs,
+      heroi: herois.anfitriao,
+      heroiOponente: herois.convidado,
+    });
+    this.mandar(convidado.conexao, {
+      tipo: 'comecou',
+      lado: 'convidado',
+      oponente: sala.anfitriao.nome,
+      restanteMs,
+      heroi: herois.convidado,
+      heroiOponente: herois.anfitriao,
+    });
     this.agendarArma(sala, this.opcoes.primeiraArmaMs);
-    return convidado;
   }
 
   receber(p: Participante, texto: string): void {
@@ -149,6 +190,16 @@ export class Salas {
     const lado: Lado = p === sala.anfitriao ? 'anfitriao' : 'convidado';
     const { armas } = sala;
     const m = mensagem.data;
+    // Antes de começar, só vale a escolha do personagem; depois de começar, ela não vale mais.
+    if (m.tipo === 'heroi') {
+      if (sala.comecou) return;
+      if (!LIBERADO[m.heroi]) return this.mandar(p.conexao, { tipo: 'erro', erro: 'esse personagem ainda não está liberado' });
+      sala.herois[lado] = m.heroi;
+      this.mandar(outro.conexao, { tipo: 'oponente-escolheu', heroi: m.heroi });
+      if (sala.herois.anfitriao && sala.herois.convidado) this.comecar(sala);
+      return;
+    }
+    if (!sala.comecou) return;
     switch (m.tipo) {
       case 'estado':
         return this.mandar(outro.conexao, { tipo: 'estado', estado: m.estado });

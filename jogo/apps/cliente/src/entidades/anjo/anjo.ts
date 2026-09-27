@@ -1,14 +1,18 @@
-// Forma de anjo do personagem (tecla R). O sprite já vem redesenhado do gerador (pele clara e
+// Forma de anjo do Anjo (tecla R) — o Anjo está desligado por enquanto (ver
+// compartilhado/conteudo/herois.ts). O sprite já vem redesenhado do gerador (pele clara e
 // lisa, descalço, sem roupa, cabelo mais longo); aqui fica o que vai por cima e em volta dele: a
 // tarja de mosaico no quadril, o brilho que toma o corpo na transformação, as asas batendo, os
 // corações na frente dos olhos e os corações pequenos que flutuam dos lados e seguem o
 // personagem. Tarja, olhos e asas saem das âncoras do quadro atual, então acompanham cada pose.
 
 import { DURACAO_ANJO, ENERGIA_PIXY, RECARGA_ANJO } from '@terna/compartilhado';
-import { contexto2d, criarSprite, novoCanvas } from '../motor/imagens';
-import { suavizar } from '../motor/matematica';
-import type { Paleta } from '../motor/tipos';
-import type { Forma, QuadroPersonagem } from './personagem';
+import { contexto2d, criarSprite, novoCanvas } from '../../motor/imagens';
+import { suavizar } from '../../motor/matematica';
+import type { Paleta } from '../../motor/tipos';
+import type { Forma } from '../personagem';
+import type { Pose, QuadroPersonagem } from '../pose';
+
+export type { Pose };
 
 // O personagem, como o laço principal o guarda: `x` é o eixo do corpo e `y` a linha dos pés.
 export interface CorpoAnjo {
@@ -21,24 +25,13 @@ export interface CorpoAnjo {
   planando: boolean; // descendo devagar com o botão de pulo segurado
 }
 
-// O quadro que vai para a tela e onde: `x` e `topo` já arredondados, como no desenho do sprite.
-export interface Pose {
-  quadro: QuadroPersonagem;
-  imagem: HTMLCanvasElement;
-  eixo: number;
-  x: number;
-  topo: number;
-  direcao: 1 | -1;
-  deFrente: boolean; // parado, o desenho olha para a tela
-}
-
 // ---- Transformação ----
 // Acendendo: a luz nasce no peito e toma o corpo todo. No pico a forma troca e a luz apaga,
 // revelando a outra forma. Para virar anjo demora mais (é o momento bonito); para voltar, menos.
 const ACENDER: Record<Forma, number> = { anjo: 0.9, base: 0.55 };
 const APAGAR: Record<Forma, number> = { anjo: 0.6, base: 0.4 };
 const COR_LUZ = '255, 246, 222';
-// A forma de anjo dura DURACAO_ANJO (em compartilhado/conteudo/poderes.ts, com a recarga e a
+// A forma de anjo dura DURACAO_ANJO (em compartilhado/conteudo/anjo.ts, com a recarga e a
 // energia pixy): acabado o tempo, ele volta sozinho à forma base — mesmo no ar, e aí despenca. O
 // R desfaz antes, se quiser. De volta à forma base, espera RECARGA_ANJO e precisa da barra de
 // energia cheia de novo para virar anjo.

@@ -3,14 +3,17 @@
 // o nome e os modos de jogo. São páginas comuns por cima do canvas: a logo é uma imagem grande
 // e o texto precisa ficar nítido, o que o canvas de 480×270 ampliado não daria.
 
-import { Apelido } from '@terna/compartilhado';
+import { Apelido, type Heroi } from '@terna/compartilhado';
 import logoSimplesUrl from '../assets/logo-simples.webp';
+import logoUrl from '../assets/logo.webp';
+import { carregarImagem } from '../motor/imagens';
 import { checarBanco, checarServidor } from '../rede/saude';
 import { guardarNome, lerNome } from '../save/nome';
 import { anexarCena } from './cena';
-import { botao, digitandoEm, elemento, palco, sairComEsmaecer } from './dom';
+import { botao, digitandoEm, elemento, palco } from './dom';
 import { logoViva } from './logo-viva';
 import { telaMultiplayer, type EscolhaOnline } from './multiplayer';
+import { telaSelecao } from './selecao';
 
 // Cada etapa da barra é uma checagem de verdade, com um nome do mundo do jogo no lugar do nome
 // técnico. A barra anda por elas em ordem, mas as checagens correm todas ao mesmo tempo.
@@ -31,8 +34,8 @@ interface Opcoes<C, H> {
   carregarHerois: () => Promise<H>;
 }
 
-// O que a pessoa escolheu na tela inicial.
-export type Escolha = { modo: 'solo'; nome: string } | EscolhaOnline;
+// O que a pessoa escolheu na tela inicial (e na seleção de personagem).
+export type Escolha = { modo: 'solo'; nome: string; heroi: Heroi } | EscolhaOnline;
 
 // A logo simples (só as letras, em branco) do carregamento. A imagem tem margem vazia em volta
 // das letras: a moldura tem a proporção só das letras e corta o resto (ver inicio.css).
@@ -47,6 +50,19 @@ function logoSimples(): HTMLElement {
 }
 
 const esperar = (ms: number): Promise<void> => new Promise((resolver) => setTimeout(resolver, ms));
+
+// A logo grande e a letra da tela inicial, baixadas e já decodificadas antes de a tela abrir:
+// sem isso ela aparecia com as árvores subindo e a logo chegava segundos depois. A imagem fica
+// guardada aqui para o navegador não descartar a versão decodificada.
+let logoPronta: HTMLImageElement | undefined;
+async function prepararTelaInicial(): Promise<void> {
+  const [logo] = await Promise.all([
+    carregarImagem(logoUrl),
+    document.fonts.load('1rem "Tiny5"'),
+  ]);
+  await logo.decode().catch(() => undefined); // já carregou: se o decode falhar, o navegador decodifica ao mostrar
+  logoPronta = logo;
+}
 
 // Guarda o valor carregado e transforma o sucesso/erro em Resultado.
 function carregarArte<T>(carregador: () => Promise<T>, guardar: (valor: T) => void): Promise<Resultado> {
@@ -93,6 +109,7 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
       const etapas: Etapa[] = [
         { frase: 'Colocando grama no chão', resultado: carregarArte(opcoes.carregarCenario, (v) => (cenario = v)) },
         { frase: 'Chamando os heróis', resultado: carregarArte(opcoes.carregarHerois, (v) => (herois = v)) },
+        { frase: 'Acendendo o cristal do verão', resultado: carregarArte(prepararTelaInicial, () => undefined) },
         { frase: 'Afiando as armas', resultado: servidor.then((r) => (r.ok ? r : { ok: false, falha: 'rede' })) },
         {
           frase: 'Abrindo o baú de memórias',
@@ -139,14 +156,14 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
       frase.textContent = 'Tudo pronto!';
       barra.setAttribute('aria-valuetext', 'Tudo pronto');
       await esperar(PAUSA_PRONTO);
-      // As duas primeiras etapas são a arte: chegando aqui, as duas carregaram.
+      // As três primeiras etapas são a arte: chegando aqui, todas carregaram.
       resolver({ cenario: cenario as C, herois: herois as H, online: true });
     };
 
     const falhou = (falha: Falha): void => {
       tela.dataset.estado = 'falhou';
       const tentarDeNovo = botao('Tentar de novo', 'inicio-botao inicio-botao-claro', () => void rodar());
-      if (falha === 'rede' && cenario !== undefined && herois !== undefined) {
+      if (falha === 'rede' && cenario !== undefined && herois !== undefined && logoPronta) {
         // Só o online falhou: o jogo roda sozinho, então dá para seguir sem ele.
         const [c, h] = [cenario, herois];
         frase.textContent = 'O mundo online não respondeu';
@@ -168,9 +185,10 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
 }
 
 // A tela inicial: a logo (viva, com partículas), o nome e os modos de jogo, com as árvores da
-// frente subindo nas beiradas. Termina quando a pessoa escolhe um modo — Singleplayer direto;
-// Multiplayer depois de criar ou entrar numa sala (a tela dele volta para cá se ela desistir).
-// Sem conexão com o servidor, o Multiplayer fica apagado.
+// frente subindo nas beiradas. Termina quando a pessoa escolhe um modo e o personagem —
+// Singleplayer, depois da seleção de personagem; Multiplayer, depois de criar ou entrar numa sala
+// e dos dois escolherem (as telas deles voltam para cá se ela desistir). Sem conexão com o
+// servidor, o Multiplayer fica apagado.
 export function escolherModo(online: boolean): Promise<Escolha> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-titulo-tela');
@@ -210,14 +228,23 @@ export function escolherModo(online: boolean): Promise<Escolha> {
       return null;
     };
 
-    const terminar = (escolha: Escolha): void => {
-      window.removeEventListener('keydown', aoTeclar);
-      void sairComEsmaecer(tela).then(() => resolver(escolha));
+    // Desistiu numa das telas seguintes: a tela inicial volta como estava.
+    const voltarParaCa = (foco: HTMLElement): void => {
+      anexarCena(tela);
+      palco().replaceChildren(tela);
+      logo.ligar();
+      window.addEventListener('keydown', aoTeclar);
+      foco.focus();
     };
 
     const solo = botao('Singleplayer', 'inicio-botao inicio-jogar', () => {
       const nome = nomeValido();
-      if (nome) terminar({ modo: 'solo', nome });
+      if (!nome) return;
+      window.removeEventListener('keydown', aoTeclar);
+      void telaSelecao().then((r) => {
+        if (r.tipo === 'escolheu') resolver({ modo: 'solo', nome, heroi: r.heroi });
+        else voltarParaCa(solo);
+      });
     });
 
     const multiplayer = botao('Multiplayer', 'inicio-botao inicio-multiplayer', () => {
@@ -226,12 +253,7 @@ export function escolherModo(online: boolean): Promise<Escolha> {
       window.removeEventListener('keydown', aoTeclar);
       void telaMultiplayer(nome).then((escolha) => {
         if (escolha) return resolver(escolha);
-        // Desistiu: a tela inicial volta como estava.
-        anexarCena(tela);
-        palco().replaceChildren(tela);
-        logo.ligar();
-        window.addEventListener('keydown', aoTeclar);
-        multiplayer.focus();
+        voltarParaCa(multiplayer);
       });
     });
     if (!online) {
@@ -257,7 +279,8 @@ export function escolherModo(online: boolean): Promise<Escolha> {
     anexarCena(tela, true);
     palco().replaceChildren(tela);
     logo.ligar();
-    // Quem já tem nome vai direto para o botão; quem não tem, para o campo.
-    (entrada.value ? solo : entrada).focus();
+    // Quem não tem nome começa no campo. Quem já tem não começa com foco em nada: o contorno
+    // do foco no Singleplayer parecia um botão já escolhido. O Enter joga do mesmo jeito.
+    if (!entrada.value) entrada.focus();
   });
 }

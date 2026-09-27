@@ -1,20 +1,24 @@
 // Painel de cada personagem, num canto de cima da tela: o seu à esquerda e o do sósia à
 // direita, espelhado. Fica sempre no mesmo canto, com a tela dividida ou não. Cada um tem a
 // borda na cor do jogador (a mesma do nome em cima da cabeça) e, do canto para dentro: a foto
-// do personagem, a barra de vida, a barra de transformação (na forma base, a energia pixy, que
-// brilha quando dá para virar anjo; de anjo, o tempo que resta) e, embaixo, na forma base o
-// quadrinho da arma da mão e de anjo os três dos poderes, com o escolhido em destaque. Em pixels da tela do jogo, desenhado por
-// último, por cima da luz. Tudo sai do canto para dentro: as barras se esvaziam em direção à
-// borda da tela, dos dois lados.
+// do personagem, a barra de vida, a barra de energia pixy e, embaixo, os quadrinhos:
+// - Leslie: o da arma da mão e os três dos poderes, lado a lado; o que o clique esquerdo usa
+//   agora (a tecla R troca) fica aceso e o outro lado, apagado. A energia pixy é verde e brilha
+//   quando a Fúria da Floresta está pronta.
+// - Anjo: na forma base, a energia pixy (brilha quando dá para virar anjo) e o quadrinho da arma;
+//   de anjo, o tempo que resta e os três poderes.
+// O escolhido fica em destaque. Em pixels da tela do jogo, desenhado por último, por cima da luz.
+// Tudo sai do canto para dentro: as barras se esvaziam em direção à borda da tela, dos dois lados.
 
-import { DADOS_ARMA, PODERES, RECARGA_PODER, type IdPoder, type TipoArma } from '@terna/compartilhado';
-import { barraDoAnjo } from '../entidades/anjo';
+import { DADOS_ARMA, ENERGIA_PIXY, RECARGA_PODER, type IdPoder, type TipoArma } from '@terna/compartilhado';
+import { barraDoAnjo } from '../entidades/anjo/anjo';
 import { DESENHO_ICONE, PALETA_ICONE, type ArmaNaMao } from '../entidades/armas';
 import {
   LARGURA_RETRATO,
   VIDA_MAXIMA,
-  formaDo,
-  podeUsarPoderes,
+  usaPoderes,
+  custoDeEnergia,
+  personagemLivre,
   retratoDo,
   type Personagem,
 } from '../entidades/personagem';
@@ -49,6 +53,8 @@ const FUNDO = { x: -4, y: -4, w: BARRA_X + BARRA + 2 + 8, h: FOTO.h + 8 };
 const PALETA_ICONES: Paleta = { r: '#e8445e', c: '#ffb3c0', e: '#a8283e', y: '#ffd966', w: '#fff4c2' };
 const CORACAO = criarSprite(['.rr.rr.', 'rcrrrrr', 'rrrrrrr', '.rrrrr.', '..rre..', '...e...'], PALETA_ICONES);
 const AUREOLA = criarSprite(['.wyyyy.', 'y.....y', '.yyyyy.'], PALETA_ICONES);
+// A folha da energia pixy da Leslie.
+const FOLHA = criarSprite(['...gg..', '.gcggg.', 'tggge..'], { g: '#8fd45a', c: '#d4f7a8', e: '#4f9a38', t: '#6b4424' });
 
 interface CoresBarra {
   fundo: string;
@@ -61,8 +67,10 @@ const MOLDURA = '#1a1428';
 const VIDA: CoresBarra = { fundo: '#3b1622', cheio: '#e8445e', brilho: '#ff9aaa', sombra: '#a8283e' };
 const ANJO: CoresBarra = { fundo: '#2a2442', cheio: '#ffd966', brilho: '#fff4c2', sombra: '#d9a53a' };
 const ANJO_PISCANDO: CoresBarra = { fundo: '#2a2442', cheio: '#fff4c2', brilho: '#ffffff', sombra: '#ffd966' };
-// Na forma base, a barra é a energia pixy, no lilás da interface; cheia, ganha o brilho que corre.
+// Na forma base do Anjo, a barra é a energia pixy, no lilás; cheia, ganha o brilho que corre.
 const ENERGIA: CoresBarra = { fundo: '#2a2442', cheio: '#b48cff', brilho: '#e6d9ff', sombra: '#7c52e8' };
+// A energia pixy da Leslie, no verde da floresta.
+const ENERGIA_LESLIE: CoresBarra = { fundo: '#1c2a18', cheio: '#8fd45a', brilho: '#d4f7a8', sombra: '#4f9a38' };
 
 // Desenha no espaço do painel: `x` é a distância do canto para dentro da tela.
 interface Pincel {
@@ -134,7 +142,67 @@ const PALETA_PODERES: Paleta = {
   w: '#ffe3f1',
   W: '#ffffff',
 };
+// Os da Leslie, nos verdes e marrons da floresta: a vinha do chicote com espinhos, as raízes saindo da
+// terra e a trepadeira da Fúria.
+const PALETA_LESLIE: Paleta = {
+  t: '#3c2412',
+  m: '#6b4424',
+  c: '#9c6a3a',
+  e: '#efe3b8',
+  s: '#2f6b2a',
+  g: '#4f9a38',
+  v: '#8fd45a',
+  w: '#d4f7a8',
+};
 const ICONES: Record<IdPoder, HTMLCanvasElement> = {
+  chicote: criarSprite(
+    [
+      '........e.c',
+      '.......e.cm',
+      '.......gs.e',
+      '......gs...',
+      '....wsg.e..',
+      '...egs.....',
+      '..vgs......',
+      '.eg.s.e....',
+      'vg.........',
+      'gs.........',
+      's..........',
+    ],
+    PALETA_LESLIE,
+  ),
+  raizes: criarSprite(
+    [
+      '.....e.....',
+      '..e..c.....',
+      '..c..m..e..',
+      '..m.cm..c..',
+      '.cm.m...m.e',
+      '.m..mc.cm.c',
+      '.mc..m.m..m',
+      'ttmttmtmttm',
+      'tmtttmmtttt',
+      '.tt.t..tt.t',
+      '...........',
+    ],
+    PALETA_LESLIE,
+  ),
+  furia: criarSprite(
+    [
+      '....wv.....',
+      '...vgs..vw.',
+      '....gs.vgs.',
+      '.wv.sg..s..',
+      'vgs..sg.s..',
+      '.s...gs.g..',
+      '.gs.egsgs..',
+      '..gsg.gse..',
+      '...gs.gs...',
+      '..tmsmgmt..',
+      '.ttmtmtmtt.',
+    ],
+    PALETA_LESLIE,
+  ),
   rajada: criarSprite(
     [
       '.....rr.rr.',
@@ -198,22 +266,22 @@ const MOLDURA_ESPACO = 'rgba(255, 250, 240, 0.32)';
 const COR_SEGUNDOS = '#ffffff';
 const COR_AVISO = '#fff4dc';
 
-// Um quadrinho de poder. Fora da forma de anjo, o ícone fica apagado. Em recarga, uma sombra
-// cobre o ícone e desce, sumindo de cima para baixo conforme o tempo passa, com os segundos
-// que faltam por cima.
+// Um quadrinho de poder. Sem os poderes na mão (o Anjo fora da forma de anjo, a Leslie no modo
+// arma) ou sem a energia da Fúria, o ícone fica apagado. Em recarga, uma sombra cobre o ícone e
+// desce, sumindo de cima para baixo conforme o tempo passa, com os segundos que faltam por cima.
 function desenharEspaco(
   p: Pincel,
   x: number,
   y: number,
   icone: HTMLCanvasElement,
   escolhido: boolean,
-  anjo: boolean,
+  ativo: boolean,
   falta: number,
   total: number,
 ): void {
-  p.arredondado(x, y, ESPACO, ESPACO, escolhido ? MOLDURA_ESCOLHIDO : MOLDURA_ESPACO);
+  p.arredondado(x, y, ESPACO, ESPACO, escolhido && ativo ? MOLDURA_ESCOLHIDO : MOLDURA_ESPACO);
   p.retangulo(x + 1, y + 1, ESPACO - 2, ESPACO - 2, 'rgba(26, 10, 22, 0.85)');
-  p.imagem(icone, x + 1, y + 1, anjo ? (falta > 0 ? 0.55 : 1) : 0.3);
+  p.imagem(icone, x + 1, y + 1, ativo ? (falta > 0 ? 0.55 : 1) : 0.3);
   if (falta <= 0) return;
   const coberto = Math.ceil((ESPACO - 2) * (falta / total));
   p.retangulo(x + 1, y + 1 + (ESPACO - 2 - coberto), ESPACO - 2, coberto, 'rgba(10, 4, 12, 0.6)');
@@ -222,15 +290,16 @@ function desenharEspaco(
 }
 
 // O quadrinho da arma: vazio e apagado sem arma; com ela, o ícone e, embaixo, a barrinha do tempo
-// que ela ainda dura, que se esvazia até quebrar.
-function desenharEspacoDaArma(p: Pincel, arma: ArmaNaMao | null, tempo: number): void {
-  const ARMA_X = BARRA_X; // na forma base os poderes somem: a arma abre a fileira
+// que ela ainda dura, que se esvazia até quebrar. `ativo`: o clique esquerdo usa a arma agora
+// (a Leslie no modo poderes a deixa apagada).
+function desenharEspacoDaArma(p: Pincel, arma: ArmaNaMao | null, tempo: number, ativo = true): void {
+  const ARMA_X = BARRA_X; // a arma abre a fileira
   const acabando = arma !== null && arma.durabilidade < ACABANDO;
   const apaga = acabando && Math.floor(tempo * 8) % 2 === 0;
-  p.arredondado(ARMA_X, ESPACOS_Y, ESPACO, ESPACO, arma ? MOLDURA_ARMA : MOLDURA_ESPACO);
+  p.arredondado(ARMA_X, ESPACOS_Y, ESPACO, ESPACO, arma && ativo ? MOLDURA_ARMA : MOLDURA_ESPACO);
   p.retangulo(ARMA_X + 1, ESPACOS_Y + 1, ESPACO - 2, ESPACO - 2, 'rgba(26, 10, 22, 0.85)');
   if (!arma) return;
-  p.imagem(ICONES_ARMAS[arma.tipo], ARMA_X + 1, ESPACOS_Y + 1, apaga ? 0.45 : 1);
+  p.imagem(ICONES_ARMAS[arma.tipo], ARMA_X + 1, ESPACOS_Y + 1, !ativo ? 0.3 : apaga ? 0.45 : 1);
   const largura = ESPACO - 2;
   const cheia = Math.ceil(largura * Math.min(1, arma.durabilidade / DADOS_ARMA[arma.tipo].durabilidade));
   p.retangulo(ARMA_X + 1, ESPACOS_Y + ESPACO - 2, largura, 1, DURABILIDADE.fundo);
@@ -265,17 +334,31 @@ export function desenharPainel(
   p.imagem(CORACAO, ICONE_X, VIDA_Y);
   desenharBarra(p, VIDA_Y, 5, personagem.vida / VIDA_MAXIMA, VIDA);
 
-  const anjo = barraDoAnjo(personagem.anjo, personagem.energia);
-  const piscando = anjo.ativa && anjo.resta <= ALERTA_ANJO && Math.floor(tempo * PISCADAS) % 2 === 0;
   const pulso = 0.5 + 0.5 * Math.sin(tempo * 5);
-  p.imagem(AUREOLA, ICONE_X, ANJO_Y + 1, anjo.ativa ? 1 : anjo.disponivel ? 0.7 + 0.3 * pulso : 0.5);
-  desenharBarra(p, ANJO_Y, 3, anjo.cheia, !anjo.ativa ? ENERGIA : piscando ? ANJO_PISCANDO : ANJO);
-  if (anjo.disponivel) desenharBrilho(p, ANJO_Y, 3, tempo);
-
-  // Os poderes só aparecem de anjo; na forma base, só a arma (menos coisa na tela).
   const { poderes } = personagem;
-  if (formaDo(personagem) === 'base') desenharEspacoDaArma(p, personagem.arma, tempo);
-  else desenharPoderes(p, personagem);
+  if (personagem.heroi === 'leslie') {
+    // A energia pixy, que enche para a Fúria; e a arma e os poderes lado a lado.
+    const cheia = personagem.energia >= ENERGIA_PIXY.maxima;
+    p.imagem(FOLHA, ICONE_X, ANJO_Y + 1, cheia ? 0.7 + 0.3 * pulso : 0.6);
+    desenharBarra(p, ANJO_Y, 3, personagem.energia / ENERGIA_PIXY.maxima, ENERGIA_LESLIE);
+    // Marquinhas na barra onde o 1 e o 2 já saem.
+    for (const poder of ['chicote', 'raizes'] as const) {
+      const x = Math.round((BARRA * ENERGIA_PIXY.custoLeslie[poder]) / ENERGIA_PIXY.maxima);
+      p.retangulo(BARRA_X + 1 + x, ANJO_Y + 1, 1, 3, personagem.energia >= ENERGIA_PIXY.custoLeslie[poder] ? 'rgba(20, 40, 16, 0.55)' : 'rgba(212, 247, 168, 0.55)');
+    }
+    if (cheia) desenharBrilho(p, ANJO_Y, 3, tempo);
+    desenharEspacoDaArma(p, personagem.arma, tempo, personagem.modo === 'arma');
+    desenharPoderes(p, personagem, ESPACO + ENTRE_ESPACOS);
+  } else {
+    const anjo = barraDoAnjo(personagem.anjo, personagem.energia);
+    const piscando = anjo.ativa && anjo.resta <= ALERTA_ANJO && Math.floor(tempo * PISCADAS) % 2 === 0;
+    p.imagem(AUREOLA, ICONE_X, ANJO_Y + 1, anjo.ativa ? 1 : anjo.disponivel ? 0.7 + 0.3 * pulso : 0.5);
+    desenharBarra(p, ANJO_Y, 3, anjo.cheia, !anjo.ativa ? ENERGIA : piscando ? ANJO_PISCANDO : ANJO);
+    if (anjo.disponivel) desenharBrilho(p, ANJO_Y, 3, tempo);
+    // Os poderes só aparecem de anjo; na forma base, só a arma (menos coisa na tela).
+    if (!usaPoderes(personagem)) desenharEspacoDaArma(p, personagem.arma, tempo);
+    else desenharPoderes(p, personagem);
+  }
   if (comAviso && poderes.aviso) desenharAviso(p, poderes.aviso.texto, poderes.aviso.resta);
   ctx.restore();
 }
@@ -303,14 +386,22 @@ function desenharBrilho(p: Pincel, y: number, altura: number, tempo: number): vo
   }
 }
 
-function desenharPoderes(p: Pincel, personagem: Personagem): void {
+// Os três quadrinhos de poder, a partir de `desde` px depois do começo da fileira.
+function desenharPoderes(p: Pincel, personagem: Personagem, desde = 0): void {
   const { poderes } = personagem;
-  const anjoPronto = podeUsarPoderes(personagem);
-  PODERES.forEach((poder, i) => {
+  const prontos = usaPoderes(personagem) && personagemLivre(personagem) && !personagem.encanto && personagem.vida > 0;
+  poderes.lista.forEach((poder, i) => {
     const escolhido = i === poderes.selecionado;
     // Tentou usar e não saiu: o quadrinho escolhido treme de lado.
     const tremor = escolhido && poderes.tremor > 0 ? Math.round(Math.sin(poderes.tremor * 70)) : 0;
-    const x = BARRA_X + i * (ESPACO + ENTRE_ESPACOS) + tremor;
-    desenharEspaco(p, x, ESPACOS_Y, ICONES[poder], escolhido, anjoPronto, poderes.recarga[i], RECARGA_PODER[poder]);
+    const x = BARRA_X + desde + i * (ESPACO + ENTRE_ESPACOS) + tremor;
+    const semEnergia = personagem.energia < custoDeEnergia(personagem, poder);
+    const ativo = prontos && !semEnergia;
+    desenharEspaco(p, x, ESPACOS_Y, ICONES[poder], escolhido, ativo, poderes.recarga[i], RECARGA_PODER[poder]);
   });
+}
+
+// O ícone de um poder (11×11), para a tela de seleção mostrar os poderes de cada personagem.
+export function iconeDoPoder(poder: IdPoder): HTMLCanvasElement {
+  return ICONES[poder];
 }

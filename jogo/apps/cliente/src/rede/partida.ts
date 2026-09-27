@@ -1,5 +1,6 @@
 // Conexão de uma partida 1v1 (WebSocket em /api/partida, sem conta). Quem cria a sala recebe o
-// código; quem entra com ele faz a partida começar para os dois. Durante a partida, cada um
+// código; quem entra com ele completa a sala, os dois escolhem o personagem e a partida começa
+// para os dois. Durante a partida, cada um
 // manda o próprio estado (e os poderes e golpes que usa) e recebe os do outro. As armas do mapa
 // são do servidor: ele avisa as que caem e quem pega; daqui só se pede.
 
@@ -7,6 +8,7 @@ import {
   MensagemPartidaDoServidor,
   type AtaqueUsado,
   type EstadoJogador,
+  type Heroi,
   type MensagemPartidaDoCliente,
   type PedidoPartida,
   type PoderUsado,
@@ -17,12 +19,14 @@ export interface ConexaoPartida {
   // Troca quem recebe as mensagens (a tela de espera, depois o jogo). `aoFechar` recebe o
   // último erro que o servidor mandou, se mandou algum.
   ouvir(aoReceber: (mensagem: MensagemPartidaDoServidor) => void, aoFechar?: (erro: string | null) => void): void;
+  // Com os dois na sala: o personagem escolhido.
+  escolherHeroi(heroi: Heroi): void;
   enviar(estado: EstadoJogador): void;
   enviarPoder(uso: PoderUsado): void;
   enviarGolpe(uso: AtaqueUsado): void;
   // Encostou na arma `id`: o servidor responde aos dois com `arma-pega`, se ela ainda estiver lá.
   pedirArma(id: number): void;
-  // Virou anjo com ela na mão: cai no chão em `x` (o servidor avisa os dois com `arma-caiu`).
+  // O Anjo virou anjo com ela na mão: cai no chão em `x` (o servidor avisa os dois com `arma-caiu`).
   largarArma(x: number, durabilidade: number): void;
   avisarArmaQuebrou(): void;
   // Jogou fora a arma da mão (tecla E): o servidor avisa o outro com `arma-descartada`.
@@ -67,6 +71,9 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
     ouvir(aoReceber, aoFechar) {
       receber = aoReceber;
       fechou = aoFechar;
+    },
+    escolherHeroi(heroi) {
+      mandar({ tipo: 'heroi', heroi });
     },
     enviar(estado) {
       mandar({ tipo: 'estado', estado });
