@@ -101,10 +101,10 @@ PGlite só é usado no seu computador).
   leva ~1 min. O jogo já pede para ele acordar assim que abre, então quando o jogador chegar
   na parte online ele costuma estar de pé. Isso é espera, não queda. Um jogador conectado no
   multiplayer mantém o servidor acordado.
-- **Multiplayer consumindo os 5 GB:** cada posição enviada é repassada a todos os outros. Com o
-  cliente mandando no máximo 10 posições por segundo, e só quando o personagem se mexe, 4
-  pessoas jogando juntas gastam ~40 a 70 MB por hora: dá ~70 a 120 h de partida a 4 por mês. Se o jogo
-  crescer, é o primeiro limite a olhar.
+- **Multiplayer consumindo os 5 GB:** cada estado enviado é repassado ao outro jogador. Na 1v1,
+  cada um manda até ~20 estados por segundo andando e ~5 parado, de ~300 bytes: uma partida gasta
+  ~30 a 45 MB por hora de saída (os pings do batimento são poucos bytes): dá ~110 a 160 h de
+  partida por mês. Se o jogo crescer, é o primeiro limite a olhar.
 - **Neon com muita gente:** 400 h acordado por mês são ~13 h por dia com alguém salvando ou
   entrando. Salve em momentos do jogo (ao sair, ao passar de fase), não a cada poucos segundos.
 - **Regras dos provedores mudam.** Os limites acima foram conferidos em setembro de 2026.

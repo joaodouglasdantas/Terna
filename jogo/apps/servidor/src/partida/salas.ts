@@ -26,15 +26,25 @@ import type { Conexao } from '../tempo-real/sala';
 // sala. Com os dois lá, cada um escolhe o personagem (`escolher` → `heroi`); com as duas escolhas
 // (ou acabando o tempo de escolher: quem não escolheu fica com o padrão) a partida começa. O
 // servidor marca o tempo (a partida acaba para os dois ao mesmo tempo) e só repassa o estado de
-// um jogador para o outro — cada um simula o próprio personagem.
+// um jogador para o outro — cada um simula o próprio personagem —, dizendo quanto ele demorou
+// para chegar (o ping de cada um vem do batimento: batimento.ts).
 //
 // As armas também são daqui: o servidor sorteia quando e onde cada uma cai (as mesmas para os
 // dois) e decide quem pega — os dois encostando juntos numa, só o primeiro pedido leva.
 
-// Mensagens por segundo que um jogador pode mandar; o excesso é ignorado. O cliente manda ~10
-// estados (até 15, com botões mudando), uns poucos golpes de arma e, raramente, um poder ou um
-// pedido de arma — a folga é para ele não se perder.
-const LIMITE_POR_SEGUNDO = 30;
+// Mensagens por segundo que um jogador pode mandar; o excesso é ignorado. O cliente manda até ~20
+// estados (5 parado), uns poucos golpes de arma e, raramente, um poder ou um pedido de arma — a
+// folga é para ele não se perder.
+const LIMITE_POR_SEGUNDO = 60;
+
+// Bytes esperando para sair na conexão de quem recebe a partir dos quais um estado novo não entra
+// na fila: a conexão dele está engasgada, e o próximo estado (50 ms depois) já é mais novo que
+// este. Poderes, golpes e armas sempre entram: esses não se repetem.
+const FILA_MAXIMA = 16 * 1024;
+
+// Quanto cada medida nova do ping pesa no atraso guardado (o resto é o que já se sabia): um ping
+// mais lento de vez em quando não sacode o boneco do outro.
+const PESO_DO_PING = 0.3;
 
 export interface OpcoesSalas {
   duracaoMs: number;
@@ -99,6 +109,7 @@ export interface Participante {
   sala: SalaPartida;
   janela: number; // segundo atual (para o limite)
   mensagens: number; // mensagens neste segundo
+  latencia: number; // ms daqui até ele: metade da ida e volta do ping, suavizada (0 = sem medida ainda)
 }
 
 export class Salas {
@@ -129,7 +140,7 @@ export class Salas {
       fase: 'esperando',
       revanche: { anfitriao: false, convidado: false },
     } as SalaPartida;
-    sala.anfitriao = { nome, conexao, sala, janela: 0, mensagens: 0 };
+    sala.anfitriao = { nome, conexao, sala, janela: 0, mensagens: 0, latencia: 0 };
     sala.timer = setTimeout(() => this.fechar(sala, 'ninguém entrou na sala a tempo'), this.opcoes.esperaMaxMs);
     this.salas.set(codigo, sala);
     this.mandar(conexao, { tipo: 'sala-criada', codigo });
@@ -141,7 +152,7 @@ export class Salas {
     if (!sala) return this.recusar(conexao, 'não achei essa sala; confira o código');
     if (sala.convidado) return this.recusar(conexao, 'essa sala já está cheia');
 
-    const convidado: Participante = { nome, conexao, sala, janela: 0, mensagens: 0 };
+    const convidado: Participante = { nome, conexao, sala, janela: 0, mensagens: 0, latencia: 0 };
     sala.convidado = convidado;
     this.abrirEscolha(sala);
     return convidado;
@@ -196,6 +207,12 @@ export class Salas {
     this.agendarArma(sala, this.opcoes.contagemMs + this.opcoes.primeiraArmaMs);
   }
 
+  // O batimento (batimento.ts) mediu a ida e a volta até ele.
+  medirPing(p: Participante, idaEVoltaMs: number): void {
+    const ida = idaEVoltaMs / 2;
+    p.latencia = p.latencia ? p.latencia + (ida - p.latencia) * PESO_DO_PING : ida;
+  }
+
   receber(p: Participante, texto: string): void {
     const { sala } = p;
     if (this.salas.get(sala.codigo) !== sala || !sala.convidado) return;
@@ -236,7 +253,10 @@ export class Salas {
     if (sala.fase !== 'jogando') return;
     switch (m.tipo) {
       case 'estado':
-        return this.mandar(outro.conexao, { tipo: 'estado', estado: m.estado });
+        if ((outro.conexao.bufferedAmount ?? 0) > FILA_MAXIMA) return;
+        // `atraso`: quanto tempo o estado levou de lá até o outro (a ida de quem mandou mais a de
+        // quem recebe): o outro adianta a posição por isso.
+        return this.mandar(outro.conexao, { tipo: 'estado', estado: m.estado, atraso: Math.min(5000, Math.round(p.latencia + outro.latencia)) });
       case 'poder':
         return this.mandar(outro.conexao, { tipo: 'poder', uso: m.uso });
       case 'golpe':

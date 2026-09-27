@@ -108,11 +108,14 @@ const VERMELHO = { cor: '#ff5a67', clara: '#ffd8dc' };
 const MEIO = MUNDO / 2;
 const AO_LADO = MUNDO / 2 + 70;
 
-const ENVIO_MS = 100; // manda o estado ~10 vezes por segundo…
-const ENVIO_MINIMO_MS = 67; // …e na hora em que um botão muda, mas nunca mais de ~15 por segundo
-const CORRIGIR = 8; // quanto maior, mais rápido o corpo do outro alcança a posição recebida
+const ENVIO_MS = 50; // manda o estado ~20 vezes por segundo enquanto se mexe…
+const ENVIO_PARADO_MS = 200; // …~5 parado (nada a contar: economiza a banda do servidor)…
+const ENVIO_MINIMO_MS = 33; // …e na hora em que um botão muda, mas nunca mais de ~30 por segundo
+const CORRIGIR = 10; // quanto maior, mais rápido o corpo do outro alcança a posição recebida
 const TELEPORTE = 64; // pixels de diferença a partir dos quais pula direto para lá
-const EXTRAPOLAR_ATE = 0.25; // segundos: até quanto adivinha para onde ele andou depois do estado
+// Segundos: até quanto adivinha para onde ele andou desde que mandou o estado (a viagem pela
+// rede, que o servidor mede, mais o tempo desde que chegou).
+const EXTRAPOLAR_ATE = 0.3;
 const FORMA_DIVERGE = 0.6; // segundos numa forma diferente da recebida até trocar
 const REPEDIR_ARMA = 0.5; // segundos: pediu uma arma e o servidor não deu, pede de novo depois disso
 
@@ -137,9 +140,11 @@ interface Remoto {
   controles: Controles;
   alvo: EstadoJogador | null;
   idadeAlvo: number; // segundos desde que o último estado chegou
+  atraso: number; // segundos que o último estado levou de lá até aqui (medido pelo servidor)
   formaDiverge: number;
   ultimoEnvio: number; // performance.now() do último estado mandado
   enviados: Controles;
+  vidaEnviada: number; // a vida no último estado mandado (mudou: manda sem esperar o intervalo parado)
   // Pulo e R apertados desde o último envio: um toque mais rápido que o intervalo entre dois
   // estados não se perde — vai como apertado no próximo.
   apertados: { pular: boolean; transformar: boolean };
@@ -212,9 +217,11 @@ export function criarPartida(
       controles: { ...PARADO },
       alvo: null,
       idadeAlvo: 0,
+      atraso: 0,
       formaDiverge: 0,
       ultimoEnvio: 0,
       enviados: { ...PARADO },
+      vidaEnviada: VIDA_MAXIMA,
       apertados: { pular: false, transformar: false },
       lado: escolha.lado,
       morteEnviada: false,
@@ -228,6 +235,7 @@ export function criarPartida(
           remoto.controles = { esquerda, direita, pular, transformar };
           remoto.alvo = m.estado;
           remoto.idadeAlvo = 0;
+          remoto.atraso = (m.atraso ?? 0) / 1000;
           // Os dois toques de um dash podem ser rápidos demais para chegar como botões; a
           // velocidade dele chega, e aí o dash (com o rastro) começa aqui também.
           if (Math.abs(m.estado.vx) >= VELOCIDADE_DASH) comecarDash(p.outro, m.estado.vx > 0 ? 1 : -1);
@@ -477,7 +485,9 @@ function atualizarRemoto(r: Remoto, corpo: Personagem, dt: number, tempo: number
   r.idadeAlvo += dt;
   // No Salto e na Investida o corpo segue o caminho do golpe (o mesmo lá e aqui): sem correção.
   if (corpo.manobra) return;
-  const alvoX = Math.max(0, Math.min(MUNDO, a.x + (a.vx + a.empurrao) * Math.min(r.idadeAlvo, EXTRAPOLAR_ATE)));
+  // Onde ele está agora: o estado é de quando saiu de lá; anda o que ele andou desde então.
+  const adiantar = Math.min(r.idadeAlvo + r.atraso, EXTRAPOLAR_ATE);
+  const alvoX = Math.max(0, Math.min(MUNDO, a.x + (a.vx + a.empurrao) * adiantar));
   if (corpo.levado > 0 || a.levado > 0) {
     // Carregado pela Revoada: a altura também vem de lá.
     const k = Math.min(1, dt * CORRIGIR * 1.5);
@@ -512,6 +522,23 @@ function atualizarRemoto(r: Remoto, corpo: Personagem, dt: number, tempo: number
 const mudou = (a: Controles, b: Controles): boolean =>
   a.esquerda !== b.esquerda || a.direita !== b.direita || a.pular !== b.pular || a.transformar !== b.transformar;
 
+// Os números vão arredondados: décimos de pixel e centésimos de segundo bastam, e a mensagem
+// fica ~1/4 menor (é a banda do servidor que paga cada estado repassado).
+const arredondar = (v: number, por: number): number => Math.round(v * por) / por;
+
+// Parado no chão, sem botão nem empurrão e sem ter apanhado desde o último: nada de novo a contar.
+const quieto = (corpo: Personagem, controles: Controles, vidaEnviada: number): boolean =>
+  corpo.noChao &&
+  corpo.vx === 0 &&
+  corpo.empurrao === 0 &&
+  !corpo.manobra &&
+  !corpo.canalizando &&
+  !controles.esquerda &&
+  !controles.direita &&
+  !controles.pular &&
+  !controles.transformar &&
+  corpo.vida === vidaEnviada;
+
 // `agora`: manda já, sem esperar o intervalo (a vida chegou a 0 e vai junto com o aviso).
 function enviarEstado(r: Remoto, corpo: Personagem, segurados: Controles, agora = false): void {
   r.apertados.pular ||= segurados.pular;
@@ -519,15 +546,17 @@ function enviarEstado(r: Remoto, corpo: Personagem, segurados: Controles, agora 
   const controles = { ...segurados, ...r.apertados };
   const instante = performance.now();
   const passou = instante - r.ultimoEnvio;
-  if (!agora && passou < ENVIO_MS && !(mudou(controles, r.enviados) && passou >= ENVIO_MINIMO_MS)) return;
+  const intervalo = quieto(corpo, controles, r.vidaEnviada) ? ENVIO_PARADO_MS : ENVIO_MS;
+  if (!agora && passou < intervalo && !(mudou(controles, r.enviados) && passou >= ENVIO_MINIMO_MS)) return;
   r.ultimoEnvio = instante;
   r.enviados = controles;
+  r.vidaEnviada = corpo.vida;
   r.apertados = { pular: false, transformar: false };
   r.conexao.enviar({
-    x: Math.max(0, Math.min(MUNDO, corpo.x)),
-    y: corpo.y,
-    vx: corpo.vx,
-    vy: Math.max(-3000, Math.min(3000, corpo.vy)),
+    x: arredondar(Math.max(0, Math.min(MUNDO, corpo.x)), 10),
+    y: arredondar(corpo.y, 10),
+    vx: arredondar(corpo.vx, 10),
+    vy: arredondar(Math.max(-3000, Math.min(3000, corpo.vy)), 10),
     direcao: corpo.direcao,
     noChao: corpo.noChao,
     forma: formaDo(corpo),
@@ -535,12 +564,12 @@ function enviarEstado(r: Remoto, corpo: Personagem, segurados: Controles, agora 
     ...controles,
     vida: corpo.vida,
     selecionado: corpo.poderes.selecionado,
-    encanto: Math.min(10, corpo.encanto?.resta ?? 0),
-    preso: Math.min(10, corpo.preso),
-    veneno: Math.min(10, corpo.veneno),
-    levado: Math.min(10, corpo.levado),
-    empurrao: Math.max(-1000, Math.min(1000, corpo.empurrao)),
+    encanto: arredondar(Math.min(10, corpo.encanto?.resta ?? 0), 100),
+    preso: arredondar(Math.min(10, corpo.preso), 100),
+    veneno: arredondar(Math.min(10, corpo.veneno), 100),
+    levado: arredondar(Math.min(10, corpo.levado), 100),
+    empurrao: arredondar(Math.max(-1000, Math.min(1000, corpo.empurrao)), 10),
     canalizando: corpo.canalizando,
-    energia: corpo.energia,
+    energia: arredondar(corpo.energia, 10),
   });
 }

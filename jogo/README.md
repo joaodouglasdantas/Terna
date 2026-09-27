@@ -176,8 +176,11 @@ em cima da cabeça sem acento, porque a fonte de pixels não tem acentos.
   Esc) pausa tudo.
 - **Multiplayer 1v1:** um cria a sala e passa o código de 5 caracteres; o outro entra com ele.
   O servidor marca o tempo e avisa o fim aos dois ao mesmo tempo. Cada cliente simula o próprio
-  personagem e manda ~10 vezes por segundo os botões segurados e a posição; o outro lado move o
-  corpo com os mesmos botões e corrige a posição aos poucos. A engrenagem só abre o menu: a
+  personagem e manda os botões segurados e a posição ~20 vezes por segundo andando (~5 parado); o
+  outro lado move o corpo com os mesmos botões e corrige a posição aos poucos, adiantada pelo
+  atraso da viagem. O servidor mede esse atraso com um ping a cada 2 s em cada conexão
+  (`apps/servidor/src/partida/batimento.ts`), que também mantém viva a conexão das telas paradas
+  e derruba em ~10 s a que caiu sem avisar (o outro recebe o fim na hora). A engrenagem só abre o menu: a
   partida continua, e o seu personagem fica parado enquanto isso. Sair da partida encerra para
   os dois.
 

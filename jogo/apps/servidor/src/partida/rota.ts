@@ -1,11 +1,13 @@
 import { PedidoPartida } from '@terna/compartilhado';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import { vigiarConexao } from './batimento';
 import { Salas } from './salas';
 
 // WebSocket da partida 1v1, sem conta:
 //   /api/partida?acao=criar&nome=Ana              → recebe `sala-criada` com o código
 //   /api/partida?acao=entrar&codigo=K7P2Q&nome=Bia → a partida começa para os dois
-// O pedido é validado antes do upgrade: nome ou código inválido nem abre a conexão (400).
+// O pedido é validado antes do upgrade: nome ou código inválido nem abre a conexão (400). Cada
+// conexão aberta ganha o batimento (batimento.ts): mede o atraso dela e derruba a que morreu.
 export function rotaPartida(app: FastifyInstance, salas = new Salas()): Salas {
   const pedidos = new WeakMap<FastifyRequest, PedidoPartida>();
 
@@ -27,8 +29,12 @@ export function rotaPartida(app: FastifyInstance, salas = new Salas()): Salas {
       const participante =
         pedido.acao === 'criar' ? salas.criar(pedido.nome, socket) : salas.entrar(pedido.codigo, pedido.nome, socket);
       if (!participante) return;
+      const parar = vigiarConexao(socket, (idaEVoltaMs) => salas.medirPing(participante, idaEVoltaMs));
       socket.on('message', (dados) => salas.receber(participante, dados.toString()));
-      socket.on('close', () => salas.sair(participante));
+      socket.on('close', () => {
+        parar();
+        salas.sair(participante);
+      });
     },
   );
   return salas;

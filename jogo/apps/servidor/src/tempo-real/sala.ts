@@ -1,9 +1,11 @@
 import { MUNDO, MensagemDoCliente, type JogadorNoMundo, type MensagemDoServidor } from '@terna/compartilhado';
 
-// O que a sala precisa de uma conexão: mandar texto e fechar. (O WebSocket do `ws` serve.)
+// O que a sala precisa de uma conexão: mandar texto e fechar; e, quando houver, quantos bytes
+// ainda esperam para sair (a fila de uma conexão lenta). (O WebSocket do `ws` serve.)
 export interface Conexao {
   send(dados: string): void;
   close(codigo?: number, motivo?: string): void;
+  readonly bufferedAmount?: number;
 }
 
 // Mensagens por segundo que um jogador pode mandar; o excesso é ignorado. Cada posição

@@ -123,11 +123,42 @@ describe('salas de partida', () => {
     const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
     escolherLeslie(salas, anfitriao, convidado);
     salas.receber(anfitriao, JSON.stringify({ tipo: 'estado', estado: ESTADO }));
-    expect(b.ultima()).toEqual({ tipo: 'estado', estado: ESTADO });
+    expect(b.ultima()).toEqual({ tipo: 'estado', estado: ESTADO, atraso: 0 });
     expect(a.ultima()?.tipo).toBe('comecou');
 
     salas.receber(anfitriao, JSON.stringify({ tipo: 'estado', estado: { ...ESTADO, x: 99999 } }));
     expect(a.ultima()).toEqual({ tipo: 'erro', erro: 'mensagem inválida' });
+  });
+
+  it('diz quanto o estado demorou: a ida de quem mandou mais a de quem recebe, pelo ping', () => {
+    const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    const anfitriao = salas.criar('Ana', a.conexao)!;
+    const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+    escolherLeslie(salas, anfitriao, convidado);
+    salas.medirPing(anfitriao, 100); // ida de 50 ms
+    salas.medirPing(convidado, 60); // ida de 30 ms
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'estado', estado: ESTADO }));
+    expect(b.ultima()).toEqual({ tipo: 'estado', estado: ESTADO, atraso: 80 });
+    // Um ping lento de vez em quando pesa só uma parte: a ida dela vai de 50 para 50 + (150 − 50) × 0,3.
+    salas.medirPing(anfitriao, 300);
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'estado', estado: ESTADO }));
+    expect(b.ultima()).toEqual({ tipo: 'estado', estado: ESTADO, atraso: 110 });
+  });
+
+  it('não empilha estado na conexão engasgada de quem recebe, mas o poder sempre vai', () => {
+    const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    const lenta = Object.assign(b.conexao, { bufferedAmount: 64 * 1024 });
+    const anfitriao = salas.criar('Ana', a.conexao)!;
+    escolherLeslie(salas, anfitriao, salas.entrar('K7P2Q', 'Bia', lenta)!);
+    const antes = b.recebidas.length;
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'estado', estado: ESTADO }));
+    expect(b.recebidas).toHaveLength(antes);
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'poder', uso: RAJADA_USADA }));
+    expect(b.ultima()).toEqual({ tipo: 'poder', uso: RAJADA_USADA });
   });
 
   it('repassa o poder usado só para o outro', () => {
@@ -415,7 +446,7 @@ describe('rota /api/partida', () => {
     expect(await a.proxima()).toMatchObject({ tipo: 'comecou', lado: 'anfitriao', oponente: 'Bia é' });
 
     b.socket.send(JSON.stringify({ tipo: 'estado', estado: ESTADO }));
-    expect(await a.proxima()).toEqual({ tipo: 'estado', estado: ESTADO });
+    expect(await a.proxima()).toMatchObject({ tipo: 'estado', estado: ESTADO });
 
     b.socket.terminate();
     expect(await a.proxima()).toEqual({ tipo: 'fim', motivo: 'oponente-saiu' });

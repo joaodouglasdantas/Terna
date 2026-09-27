@@ -150,7 +150,9 @@ export const MensagemPartidaDoServidor = z.discriminatedUnion('tipo', [
     heroi: IdHeroi,
     heroiOponente: IdHeroi,
   }),
-  z.object({ tipo: z.literal('estado'), estado: EstadoJogador }),
+  // O estado do outro. `atraso`: ms que ele levou de lá até aqui (a ida dele até o servidor mais
+  // a sua, medidas pelo ping): o boneco do outro é adiantado por isso.
+  z.object({ tipo: z.literal('estado'), estado: EstadoJogador, atraso: z.number().min(0).max(5000).optional() }),
   z.object({ tipo: z.literal('poder'), uso: PoderUsado }),
   z.object({ tipo: z.literal('golpe'), uso: AtaqueUsado }),
   // Para os dois: uma arma apareceu no mapa (do céu, ou largada por alguém), alguém pegou uma.

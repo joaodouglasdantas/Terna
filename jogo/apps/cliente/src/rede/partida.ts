@@ -15,12 +15,17 @@ import {
 } from '@terna/compartilhado';
 import { BASE_API } from './endereco';
 
+// Bytes esperando para sair a partir dos quais um estado novo não entra na fila: a rede está
+// engasgada, e o próximo estado (50 ms depois) já é mais novo. Poderes, golpes e armas sempre vão.
+const FILA_MAXIMA = 8 * 1024;
+
 export interface ConexaoPartida {
   // Troca quem recebe as mensagens (a tela de espera, depois o jogo). `aoFechar` recebe o
   // último erro que o servidor mandou, se mandou algum.
   ouvir(aoReceber: (mensagem: MensagemPartidaDoServidor) => void, aoFechar?: (erro: string | null) => void): void;
   // Com os dois na sala: o personagem escolhido.
   escolherHeroi(heroi: Heroi): void;
+  // O próprio estado; com a rede engasgada, fica de fora (o próximo o substitui).
   enviar(estado: EstadoJogador): void;
   enviarPoder(uso: PoderUsado): void;
   enviarGolpe(uso: AtaqueUsado): void;
@@ -78,6 +83,7 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
       mandar({ tipo: 'heroi', heroi });
     },
     enviar(estado) {
+      if (socket.bufferedAmount > FILA_MAXIMA) return;
       mandar({ tipo: 'estado', estado });
     },
     enviarPoder(uso) {
