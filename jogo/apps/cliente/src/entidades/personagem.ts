@@ -629,7 +629,8 @@ function poseDe(p: Personagem): Pose {
     x: Math.round(p.x),
     topo: Math.round(p.y) - imagem.height + AFUNDAR_NA_GRAMA,
     direcao: p.direcao,
-    deFrente: animacao === 'parado' && !morto,
+    // O golem, parado, fica de lado (como andando); os outros olham para a tela.
+    deFrente: animacao === 'parado' && !morto && formaDo(p) !== 'golem',
   };
 }
 

@@ -176,6 +176,67 @@ function limpar(red, paleta) {
   return red;
 }
 
+// Tapa as frestas do corpo (depois de limpar): o vazio de um pixel entre duas partes — cheio dos
+// dois lados, na horizontal ou na vertical — e os bolsões de vazio fechados por dentro da
+// silhueta. Reduzido, o vão entre uma pedra e outra (ou entre o braço e o tronco) virava um buraco
+// por onde o cenário aparecia. Tapa com a cor dos vizinhos escurecida, na paleta: fica a sombra
+// entre as partes, não um remendo claro. Repete até não sobrar (tapar uma fecha a do lado).
+const SOMBRA_DA_FRESTA = 0.45;
+function taparFrestas(red, paleta) {
+  const { lw, lh, px } = red;
+  const tapar = (x, y) => {
+    const media = [0, 0, 0];
+    let n = 0;
+    for (const [xx, yy] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+      if (!opacoEm(red, xx, yy)) continue;
+      for (let c = 0; c < 3; c++) media[c] += px[(yy * lw + xx) * 4 + c];
+      n++;
+    }
+    const cor = paleta[maisProxima(paleta, media.map((v) => (v / n) * SOMBRA_DA_FRESTA))];
+    px.set([...cor, 255], (y * lw + x) * 4);
+  };
+  for (let volta = 0; volta < 4; volta++) {
+    const frestas = [];
+    for (let y = 0; y < lh; y++) {
+      for (let x = 0; x < lw; x++) {
+        if (opacoEm(red, x, y)) continue;
+        const deLado = opacoEm(red, x - 1, y) && opacoEm(red, x + 1, y);
+        const emPe = opacoEm(red, x, y - 1) && opacoEm(red, x, y + 1);
+        if (deLado || emPe) frestas.push([x, y]);
+      }
+    }
+    // Os bolsões: o vazio que não chega à borda do quadro andando por vazio (nem na diagonal).
+    const fora = new Uint8Array(lw * lh);
+    const pilha = [];
+    for (let y = 0; y < lh; y++) {
+      for (let x = 0; x < lw; x++) {
+        if ((x === 0 || y === 0 || x === lw - 1 || y === lh - 1) && !opacoEm(red, x, y)) {
+          fora[y * lw + x] = 1;
+          pilha.push(y * lw + x);
+        }
+      }
+    }
+    while (pilha.length) {
+      const p = pilha.pop();
+      const x = p % lw;
+      const y = (p / lw) | 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= lw || ny >= lh || fora[ny * lw + nx] || opacoEm(red, nx, ny)) continue;
+          fora[ny * lw + nx] = 1;
+          pilha.push(ny * lw + nx);
+        }
+      }
+    }
+    for (let y = 0; y < lh; y++) for (let x = 0; x < lw; x++) if (!opacoEm(red, x, y) && !fora[y * lw + x]) frestas.push([x, y]);
+    if (!frestas.length) break;
+    for (const [x, y] of frestas) if (!opacoEm(red, x, y)) tapar(x, y);
+  }
+  return red;
+}
+
 function kmeans(amostras, k) {
   const ordenadas = [...amostras].sort((a, b) => a[0] + a[1] + a[2] - (b[0] + b[1] + b[2]));
   let centros = Array.from({ length: k }, (_, i) => [...ordenadas[Math.floor(((i + 0.5) * ordenadas.length) / k)]]);
@@ -224,4 +285,4 @@ function ancoraX(red, modo) {
   return soma / n;
 }
 
-module.exports = { OPACO, recortarQuadro, reduzir, afiar, contornar, limpar, kmeans, maisProxima, ancoraX };
+module.exports = { OPACO, recortarQuadro, reduzir, afiar, contornar, limpar, taparFrestas, kmeans, maisProxima, ancoraX };

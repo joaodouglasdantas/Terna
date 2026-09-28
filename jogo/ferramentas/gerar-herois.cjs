@@ -12,7 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const { lerPng, escreverPng } = require('./png.cjs');
-const { recortarQuadro, reduzir, afiar, contornar, limpar, kmeans, maisProxima, ancoraX } = require('./recorte-sprite.cjs');
+const { recortarQuadro, reduzir, afiar, contornar, limpar, taparFrestas, kmeans, maisProxima, ancoraX } = require('./recorte-sprite.cjs');
 
 const RAIZ = path.join(__dirname, '..');
 const CLIENTE = path.join(RAIZ, 'apps', 'cliente', 'src');
@@ -132,8 +132,14 @@ const FOLHAS = {
     alturaEmPe: 46,
     cores: 36, // a pedra e o musgo: muitos tons de bege, marrom e verde
     mediana: 0,
+    // Reduzido, o vão entre as pedras (e entre o braço e o tronco) virava buraco: tapados com a
+    // sombra (taparFrestas).
+    taparFrestas: true,
     animacoes: {
-      parado: { alturaRef: 104, ancora: 'cabeca', quadros: 1, pontos: [[1079, 258], [1080, 375]] },
+      // Parado, de lado como no andar (a fileira IDLE, na mesma escala): de frente (a coluna
+      // FRENTE) ele parecia outro golem ao parar. Um quadro só: os da fileira mudam o musgo de
+      // lugar de um para o outro, e alternados ele tremia.
+      parado: { alturaRef: 91, ancora: 'cabeca', pontos: [[167, 70]] },
       // Fileira WALK (não a RUN): o golem é pesado e anda; na corrida da folha a cabeça ia na
       // frente do corpo e, reduzida, parecia solta dele.
       andando: {
@@ -376,6 +382,7 @@ function gerar(nome) {
         red.px.set(cor, i * 4);
       }
       limpar(red, paleta);
+      if (folhaRef.taparFrestas) taparFrestas(red, paleta);
       for (let y = 0; y < red.lh; y++) {
         for (let x = 0; x < red.lw; x++) {
           const i = (y * red.lw + x) * 4;
