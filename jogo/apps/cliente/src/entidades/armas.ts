@@ -32,6 +32,7 @@ import {
   type CoresBraco,
   desenharBracoEsticado,
   desenharMao,
+  maisBraco,
   ombroDe,
   type Ponto,
 } from './braco';
@@ -56,6 +57,7 @@ export interface Ataque {
 // O que as armas precisam de um personagem (o corpo é de entidades/personagem.ts).
 export interface CorpoArmado extends CorpoAlvo {
   direcao: 1 | -1;
+  maoLivreAtras?: boolean; // a mão da frente segura outra coisa (o cajado do Grow): o braço é o de trás
   dash: number; // no dash o lado já está decidido: o ataque não vira o corpo
   arma: ArmaNaMao | null;
   ataque: Ataque | null;
@@ -118,7 +120,8 @@ function anguloDaMira(c: CorpoArmado, alvo: Ponto, limite: number): number {
 function maoMirando(c: CorpoArmado, alvo: Ponto): Ponto {
   const ombro = ombroDe(c);
   const a = anguloNoMapa(anguloDaMira(c, alvo, POSE.miraArco), c.direcao);
-  return { x: ombro.x + Math.cos(a) * POSE.bracoArco, y: ombro.y + Math.sin(a) * POSE.bracoArco };
+  const braco = POSE.bracoArco + maisBraco(c);
+  return { x: ombro.x + Math.cos(a) * braco, y: ombro.y + Math.sin(a) * braco };
 }
 
 // O braço do golpe da espada, `t` de 0 a 1: rápido no começo, freando no fim.
@@ -395,8 +398,8 @@ function golpear(e: Efeitos, a: Arsenal, c: CorpoArmado, ataque: Ataque, alvos: 
   for (const alvo of vivos(alvos, c)) {
     if (ataque.atingidos.includes(alvo.corpo)) continue;
     for (let k = 0; k <= LAMINA.ate; k += 3) {
-      const x = ombro.x + cos * (POSE.bracoGolpe + k);
-      const y = ombro.y + sin * (POSE.bracoGolpe + k);
+      const x = ombro.x + cos * (POSE.bracoGolpe + maisBraco(c) + k);
+      const y = ombro.y + sin * (POSE.bracoGolpe + maisBraco(c) + k);
       if (!acertaCorpo(alvo.corpo, x, y, 2)) continue;
       ataque.atingidos.push(alvo.corpo);
       const zona = zonaDoGolpe(c, ataque, alvo.corpo);
@@ -414,7 +417,7 @@ const esticadoDoSoco = (t: number): number => (t < 0.4 ? 1 - (1 - t / 0.4) ** 2 
 function pontaDoPunho(c: CorpoArmado, mira: number, esticado: number): Ponto {
   const ombro = ombroDoSoco(c);
   const ang = anguloNoMapa(mira, c.direcao);
-  const comprimento = POSE.punhoRecolhido + (SOCO.alcance - POSE.punhoRecolhido) * esticado;
+  const comprimento = POSE.punhoRecolhido + maisBraco(c) + (SOCO.alcance - POSE.punhoRecolhido) * esticado;
   return { x: ombro.x + Math.cos(ang) * comprimento, y: ombro.y + Math.sin(ang) * comprimento };
 }
 
@@ -698,11 +701,11 @@ export function desenharArmaNaMao(
       const t = ataque.idade / ESPADA.golpe;
       desenharRisco(ctx, c, ombro, ataque.mira, Math.min(1, t));
       const ang = anguloNoMapa(anguloDoGolpe(ataque.mira, t), c.direcao);
-      const mao = desenharBracoEsticado(ctx, ombro, ang, POSE.bracoGolpe, braco);
+      const mao = desenharBracoEsticado(ctx, ombro, ang, POSE.bracoGolpe + maisBraco(c), braco);
       desenharEspada(ctx, mao, ang);
       desenharMao(ctx, mao, braco);
     } else {
-      const mao = desenharBracoEsticado(ctx, ombro, anguloNoMapa(POSE.descanso.espada, c.direcao), POSE.braco, braco);
+      const mao = desenharBracoEsticado(ctx, ombro, anguloNoMapa(POSE.descanso.espada, c.direcao), POSE.braco + maisBraco(c), braco);
       desenharEspada(ctx, mao, anguloNoMapa(POSE.espadaEmPe, c.direcao));
       desenharMao(ctx, mao, braco);
     }
@@ -711,12 +714,12 @@ export function desenharArmaNaMao(
     const t = ataque.idade / DURACAO_ATAQUE.arco;
     const estica = t < 0.15 ? 0.6 + (t / 0.15) * 0.4 : t > 0.8 ? 1 - ((t - 0.8) / 0.2) * 0.4 : 1;
     const ang = anguloNoMapa(ataque.mira, c.direcao);
-    const mao = desenharBracoEsticado(ctx, ombro, ang, Math.round(POSE.bracoArco * estica), braco);
+    const mao = desenharBracoEsticado(ctx, ombro, ang, Math.round((POSE.bracoArco + maisBraco(c)) * estica), braco);
     const treme = t < 0.35 ? Math.abs(Math.sin(t * 60)) * (1 - t / 0.35) * 0.6 : 0;
     desenharArco(ctx, mao, ang, treme);
     desenharMao(ctx, mao, braco);
   } else {
-    const mao = desenharBracoEsticado(ctx, ombro, anguloNoMapa(POSE.descanso.arco, c.direcao), POSE.braco, braco);
+    const mao = desenharBracoEsticado(ctx, ombro, anguloNoMapa(POSE.descanso.arco, c.direcao), POSE.braco + maisBraco(c), braco);
     desenharArco(ctx, mao, anguloNoMapa(0, c.direcao), 0);
     desenharMao(ctx, mao, braco);
   }
@@ -761,7 +764,7 @@ export function desenharSoco(ctx: CanvasRenderingContext2D, c: CorpoArmado, brac
   const esticado = esticadoDoSoco(t);
   const ombro = ombroDoSoco(c);
   const ang = anguloNoMapa(ataque.mira, c.direcao);
-  const comprimento = Math.round(POSE.punhoRecolhido + (SOCO.alcance - POSE.punhoRecolhido) * esticado);
+  const comprimento = Math.round(POSE.punhoRecolhido + maisBraco(c) + (SOCO.alcance - POSE.punhoRecolhido) * esticado);
   const ponta = desenharBracoDoSoco(ctx, ombro, ang, comprimento, braco);
   const px = Math.round(ponta.x);
   const py = Math.round(ponta.y) - 1;
@@ -786,7 +789,7 @@ export function desenharSoco(ctx: CanvasRenderingContext2D, c: CorpoArmado, brac
 
 // O risco de luz que a ponta da espada deixa no golpe: um arco que se apaga para trás.
 function desenharRisco(ctx: CanvasRenderingContext2D, c: CorpoArmado, ombro: Ponto, mira: number, t: number): void {
-  const raio = POSE.bracoGolpe + LAMINA.ate;
+  const raio = POSE.bracoGolpe + maisBraco(c) + LAMINA.ate;
   const de = Math.max(0, t - 0.55);
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';

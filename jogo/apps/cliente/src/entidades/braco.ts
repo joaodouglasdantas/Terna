@@ -5,6 +5,18 @@
 // De lado, o ombro da frente fica 2 px à frente do eixo e 16 px acima dos pés.
 export const OMBRO = { frente: 2, altura: 16 };
 
+// Quem já tem a mão da frente ocupada no próprio sprite (o Grow, de gente, segura o cajado com
+// ela): o braço desenhado — a arma, o soco, o gesto dos poderes — é o de trás, a mão livre. Ele
+// sai do ombro de trás, passa por trás do corpo (é desenhado antes do sprite) e aparece na frente
+// do peito; para alcançar o mesmo ponto, fica `maisBraco` mais comprido.
+export interface ComOmbro {
+  x: number;
+  y: number;
+  direcao: 1 | -1;
+  maoLivreAtras?: boolean;
+}
+export const maisBraco = (c: ComOmbro): number => (c.maoLivreAtras ? 2 * OMBRO.frente : 0);
+
 export interface CoresBraco {
   cima: string;
   sombra: string;
@@ -32,9 +44,11 @@ export interface Ponto {
   y: number;
 }
 
-// O ombro da frente, em pixels inteiros do mapa.
-export function ombroDe(c: { x: number; y: number; direcao: 1 | -1 }): Ponto {
-  return { x: Math.round(c.x) + c.direcao * OMBRO.frente, y: Math.round(c.y) - OMBRO.altura };
+// O ombro do braço desenhado, em pixels inteiros do mapa: o da frente (ou o de trás, com a mão da
+// frente ocupada).
+export function ombroDe(c: ComOmbro): Ponto {
+  const frente = c.maoLivreAtras ? -OMBRO.frente : OMBRO.frente;
+  return { x: Math.round(c.x) + c.direcao * frente, y: Math.round(c.y) - OMBRO.altura };
 }
 
 // O ângulo no mapa de um ângulo "do corpo": 0 = para a frente, positivo = para baixo. Assim uma

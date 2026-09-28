@@ -56,7 +56,7 @@ import {
 } from './anjo/anjo';
 import { PAIRAR_NO_AR, criarVoo, decolar, voarNoAr, type Voo } from './anjo/voo';
 import { desenharArmaNaMao, desenharSoco, type ArmaNaMao, type Ataque } from './armas';
-import { BRACO_ANJO, BRACO_BASE, BRACO_GROW, BRACO_LESLIE, desenharBracoEsticado, desenharMao, ombroDe, type CoresBraco } from './braco';
+import { BRACO_ANJO, BRACO_BASE, BRACO_GROW, BRACO_LESLIE, desenharBracoEsticado, desenharMao, maisBraco, ombroDe, type CoresBraco } from './braco';
 import { CORPO, manobraAcabou, pontoDaManobra, type Manobra, type Medida } from './efeitos';
 import { carregarAguias } from './grow/aguia';
 import {
@@ -249,6 +249,9 @@ export interface Personagem {
   arma: ArmaNaMao | null; // a espada ou o arco na mão (só a forma base)
   ataque: Ataque | null; // o golpe, a flechada ou o soco em curso
   recargaSoco: number; // segundos até o próximo soco (sem arma)
+  // O Grow, de gente, segura o cajado com a mão da frente: a arma, o soco e o gesto dos poderes
+  // são da mão de trás (braco.ts).
+  maoLivreAtras: boolean;
   energia: number; // energia pixy, de 0 a ENERGIA_PIXY.maxima: vem do dano dado, enche a barra do anjo
   daRede: boolean; // o outro jogador online: a forma, o modo e a energia dele vêm da rede
   voo: Voo; // o voo com pairada do anjo (anjo/voo.ts)
@@ -313,6 +316,7 @@ export function criarPersonagem(heroi: Heroi, x: number, direcao: 1 | -1 = 1): P
     arma: null,
     ataque: null,
     recargaSoco: 0,
+    maoLivreAtras: heroi === 'grow',
     energia: 0,
     daRede: false,
     voo: criarVoo(),
@@ -386,6 +390,8 @@ export function bloqueioDaArma(p: Personagem): string | null {
   if (p.vida <= 0) return 'CAIU';
   if (p.encanto) return 'ENFEITICADO';
   if (!personagemLivre(p)) return 'TRANSFORMANDO';
+  // O golem não pega arma nem soca: as mãos de pedra são dos poderes dele.
+  if (formaDo(p) !== 'base') return 'SO PODERES'; // (a fonte do painel não tem acento)
   return null;
 }
 
@@ -429,7 +435,8 @@ export function gesticular(p: Personagem, alvo: { x: number; y: number }, paraCi
 export function maoDo(p: Personagem): { x: number; y: number } {
   if (!p.gesto || formaDo(p) === 'golem') return peitoDo(p);
   const ombro = ombroDe(p);
-  return { x: ombro.x + Math.cos(p.gesto.angulo) * GESTO.braco, y: ombro.y + Math.sin(p.gesto.angulo) * GESTO.braco };
+  const braco = GESTO.braco + maisBraco(p);
+  return { x: ombro.x + Math.cos(p.gesto.angulo) * braco, y: ombro.y + Math.sin(p.gesto.angulo) * braco };
 }
 
 // Foto do painel: a pose de frente na forma atual, do alto da cabeça (com uma folguinha em cima)
@@ -828,6 +835,7 @@ export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: num
   }
 
   avancarAnimacao(p, dt);
+  p.maoLivreAtras = p.heroi === 'grow' && formaDo(p) === 'base';
   const { imagem, eixo } = spriteAtual(p);
   const esquerdaDoEixo = p.direcao === 1 ? eixo : imagem.width - eixo;
   p.x = Math.max(esquerdaDoEixo, Math.min(MUNDO - (imagem.width - esquerdaDoEixo), p.x));
@@ -871,18 +879,26 @@ export function desenharPersonagem(ctx: CanvasRenderingContext2D, p: Personagem,
     }
     ctx.restore();
   };
+  const golem = formaDo(p) === 'golem';
+  const mao = MAO_DE_FRENTE[p.heroi];
+  const maoDeFrente = pose.deFrente ? { x: x + p.direcao * mao.lado, y: topo + mao.linha } : undefined;
+  // O braço do gesto, a arma na mão e o soco. No modo poderes, a arma da Leslie e do Grow fica
+  // guardada (a mão é dos poderes).
+  const bracos = (): void => {
+    if (p.gesto && !golem) desenharBraco(ctx, p, p.gesto);
+    if (p.vida > 0 && !(p.heroi !== 'anjo' && p.modo === 'poderes') && !golem) {
+      desenharArmaNaMao(ctx, p, tempo, maoDeFrente, BRACO_DA_ARMA[p.heroi]);
+      desenharSoco(ctx, p, BRACO_DA_ARMA[p.heroi]); // sem arma na mão
+    }
+  };
+  // Com a mão da frente no cajado (o Grow), o braço é o de trás: vem antes do corpo, que o cobre
+  // até ele sair na frente do peito. De frente, a arma fica na mão do próprio sprite, na frente.
+  const bracoAtras = p.maoLivreAtras && !pose.deFrente;
+  if (bracoAtras) bracos();
   desenhar(imagem, alfa);
   // Acabou de apanhar: o corpo pisca em branco-rosado, duas vezes.
   if (p.ferido > 0 && Math.floor(p.ferido * 14) % 2 === 0) desenhar(tingido(imagem), 0.8 * alfa);
-  const golem = formaDo(p) === 'golem';
-  if (p.gesto && !golem) desenharBraco(ctx, p, p.gesto);
-  const mao = MAO_DE_FRENTE[p.heroi];
-  const maoDeFrente = pose.deFrente ? { x: x + p.direcao * mao.lado, y: topo + mao.linha } : undefined;
-  // No modo poderes, a arma da Leslie e do Grow fica guardada (a mão é dos poderes).
-  if (p.vida > 0 && !(p.heroi !== 'anjo' && p.modo === 'poderes') && !golem) {
-    desenharArmaNaMao(ctx, p, tempo, maoDeFrente, BRACO_DA_ARMA[p.heroi]);
-    desenharSoco(ctx, p, BRACO_DA_ARMA[p.heroi]); // sem arma na mão
-  }
+  if (!bracoAtras) bracos();
   if (p.heroi === 'anjo') desenharAnjoNaFrente(ctx, p.anjo, tempo, pose);
   if (p.heroi === 'grow') desenharGolemNaFrente(ctx, p.golem, tempo, pose);
   desenharEncanto(ctx, p, tempo);
@@ -896,7 +912,7 @@ export function desenharPersonagem(ctx: CanvasRenderingContext2D, p: Personagem,
 function desenharBraco(ctx: CanvasRenderingContext2D, p: Personagem, gesto: { resta: number; angulo: number }): void {
   const t = 1 - gesto.resta / GESTO.duracao; // 0 → 1
   const estica = t < 0.25 ? t / 0.25 : t > 0.75 ? (1 - t) / 0.25 : 1;
-  const comprimento = Math.round(GESTO.braco * estica);
+  const comprimento = Math.round((GESTO.braco + maisBraco(p)) * estica);
   if (comprimento < 2) return;
   const braco = BRACO_DO_PODER[p.heroi];
   const mao = desenharBracoEsticado(ctx, ombroDe(p), gesto.angulo, comprimento, braco.cores);

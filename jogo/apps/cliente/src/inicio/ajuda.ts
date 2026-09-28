@@ -97,7 +97,7 @@ function dicasDo(heroi: Heroi): { dicas: string[]; outra?: { titulo: string; pod
       dicas: [
         'Vendaval: segure o clique esquerdo para soprar; soltando, o vento para.',
         `Golem: com a barra cheia, o 3 vira golem por ${DURACAO_GOLEM} s (o R desfaz antes).`,
-        `De golem: os poderes não gastam energia, a pele de pedra segura ${Math.round(DEFESA_GOLEM * 100)}% do dano (DEF), e ele não pega arma nem dá pulo duplo.`,
+        `De golem: os poderes não gastam energia, a pele de pedra segura ${Math.round(DEFESA_GOLEM * 100)}% do dano (DEF), e ele não pega arma, não dá soco nem pulo duplo.`,
       ],
       outra: { titulo: 'De golem', poderes: PODERES_GOLEM },
     };
