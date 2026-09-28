@@ -146,9 +146,15 @@
 }
 
 /* A cortina preta por cima do jogo (inicio/dom.ts): fecha e abre nas trocas de tela. */
+/* Do tamanho do quadro, por cima do jogo e da arte do menu (.inicio-cena-palco) e por baixo das
+   telas (#inicio). */
 #cortina {
-  position: absolute;
+  position: fixed;
   inset: 0;
+  margin: auto;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, max(calc(100vw * 9 / 16), 400px));
+  z-index: 9;
   background: #000;
   opacity: 0;
   pointer-events: none;
@@ -409,7 +415,7 @@
   width: min(100vw, calc(100vh * 16 / 9));
   height: min(100vh, max(calc(100vw * 9 / 16), 400px));
   overflow: hidden;
-  z-index: 9;
+  z-index: 8; /* por baixo da cortina (#cortina, 9) e das telas (#inicio, 10) */
   pointer-events: none;
 }
 
@@ -489,7 +495,12 @@
   image-rendering: pixelated;
 }
 
-/* Abrindo a tela inicial, a arte chega: clareia e se aproxima. */
+/* Abrindo a tela inicial, a arte chega: clareia e se aproxima. Até a chegada começar ela fica
+   escondida (senão aparecia inteira por dois quadros e sumia). */
+.inicio-cena-escondida .inicio-cena-arte {
+  opacity: 0;
+}
+
 .inicio-cena-entrando .inicio-cena-arte {
   animation: inicio-cena-chega 1.4s cubic-bezier(0.2, 0.8, 0.3, 1) both, inicio-cena-respira 26s ease-in-out 1.4s infinite alternate;
 }

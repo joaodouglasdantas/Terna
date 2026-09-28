@@ -11,7 +11,7 @@ import { checarBanco, checarServidor } from '../rede/saude';
 import { guardarNome, lerNome } from '../save/nome';
 import { VERSAO } from '../versao';
 import { anexarCena } from './cena';
-import { botao, digitandoEm, elemento, palco } from './dom';
+import { botao, digitandoEm, elemento, mostrarTela, sairComEsmaecer } from './dom';
 import { logoViva } from './logo-viva';
 import { botaoDaMusica } from './musica';
 import { telaMultiplayer, type EscolhaOnline } from './multiplayer';
@@ -99,7 +99,10 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
     const aviso = elemento('p', 'inicio-aviso');
     const acoes = elemento('div', 'inicio-acoes');
     tela.append(logoSimples(), barra, frase, aviso, acoes);
-    palco().replaceChildren(tela);
+    mostrarTela(tela);
+    // Pronto: o carregamento esmaece até o escuro e a tela inicial aparece dele (cruzando as duas,
+    // a logo pequena e a grande ficavam uma por cima da outra).
+    const concluir = (fim: { cenario: C; herois: H; online: boolean }): void => void sairComEsmaecer(tela).then(() => resolver(fim));
 
     let cenario: C | undefined;
     let herois: H | undefined;
@@ -161,7 +164,7 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
       barra.setAttribute('aria-valuetext', 'Tudo pronto');
       await esperar(PAUSA_PRONTO);
       // As três primeiras etapas são a arte: chegando aqui, todas carregaram.
-      resolver({ cenario: cenario as C, herois: herois as H, online: true });
+      concluir({ cenario: cenario as C, herois: herois as H, online: true });
     };
 
     const falhou = (falha: Falha): void => {
@@ -173,7 +176,7 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
         frase.textContent = 'O mundo online não respondeu';
         aviso.textContent = 'Dá para jogar mesmo assim, mas sem salvar na conta nem jogar com outras pessoas.';
         acoes.append(
-          botao('Jogar offline', 'inicio-botao', () => resolver({ cenario: c, herois: h, online: false })),
+          botao('Jogar offline', 'inicio-botao', () => concluir({ cenario: c, herois: h, online: false })),
           tentarDeNovo,
         );
       } else {
@@ -235,7 +238,7 @@ export function escolherModo(online: boolean): Promise<Escolha> {
     // Desistiu numa das telas seguintes: a tela inicial volta como estava.
     const voltarParaCa = (foco: HTMLElement): void => {
       anexarCena(tela);
-      palco().replaceChildren(tela);
+      mostrarTela(tela);
       logo.ligar();
       window.addEventListener('keydown', aoTeclar);
       foco.focus();
@@ -281,7 +284,7 @@ export function escolherModo(online: boolean): Promise<Escolha> {
     const logo = logoViva();
     tela.append(logo.palco, modos, elemento('p', 'inicio-versao', VERSAO), botaoDaMusica('inicio-botao inicio-botao-claro inicio-musica'));
     anexarCena(tela, true);
-    palco().replaceChildren(tela);
+    mostrarTela(tela);
     logo.ligar();
     // Quem não tem nome começa no campo. Quem já tem não começa com foco em nada: o contorno
     // do foco no Singleplayer parecia um botão já escolhido. O Enter joga do mesmo jeito.

@@ -57,17 +57,45 @@ export const ESMAECER_MS = 350;
 // A classe das telas de fundo opaco, que cobrem o jogo inteiro (ver palco()).
 export const TELA_OPACA = 'inicio-tela-opaca';
 
-// Esmaece a tela e tira do lugar, escurecendo o jogo atrás junto (a próxima tela, ou a partida,
-// aparece do escuro); a promessa termina quando ela sumiu.
-export function sairComEsmaecer(tela: HTMLElement): Promise<void> {
+// As telas saindo: tiradas do palco quando terminam de esmaecer (voltando antes disso, ficam).
+const saindo = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
+
+function tirarDepoisDeEsmaecer(tela: HTMLElement, aoTirar?: () => void): void {
   tela.classList.add('inicio-saindo');
-  void fecharCortina(ESMAECER_MS);
-  return new Promise((resolver) =>
+  tela.inert = true; // sumindo: sem clique nem foco
+  clearTimeout(saindo.get(tela));
+  saindo.set(
+    tela,
     setTimeout(() => {
+      saindo.delete(tela);
       tela.remove();
-      resolver();
+      aoTirar?.();
     }, ESMAECER_MS),
   );
+}
+
+// Põe `nova` no palco no lugar da que está lá: as duas trocam ao mesmo tempo — a nova aparece
+// por cima enquanto a de antes esmaece por baixo —, então não sobra nenhum quadro só com o fundo
+// entre uma e outra (nem a tela nova surge de uma vez). Serve também para trazer de volta uma
+// tela que estava saindo.
+export function mostrarTela(nova: HTMLElement): void {
+  const el = palco();
+  for (const antiga of [...el.children]) {
+    if (antiga !== nova && antiga instanceof HTMLElement) tirarDepoisDeEsmaecer(antiga);
+  }
+  clearTimeout(saindo.get(nova));
+  saindo.delete(nova);
+  nova.classList.remove('inicio-saindo');
+  nova.inert = false;
+  // Já é a de cima (a tela só trocou a caixa por dentro): fica onde está, sem recomeçar a entrada.
+  if (el.lastElementChild !== nova) el.append(nova);
+}
+
+// Esmaece a tela e tira do lugar, escurecendo atrás junto (o jogo e a arte do menu: a próxima
+// tela, ou a partida, aparece do escuro); a promessa termina quando ela sumiu.
+export function sairComEsmaecer(tela: HTMLElement): Promise<void> {
+  void fecharCortina(ESMAECER_MS);
+  return new Promise((resolver) => tirarDepoisDeEsmaecer(tela, resolver));
 }
 
 // A barra de rolagem do jogo numa tela (a do navegador fica escondida: inicio.css). Aparece só
@@ -132,16 +160,15 @@ function barraDeRolagem(tela: HTMLElement): void {
   });
 }
 
-// A cortina: um preto por cima do jogo (não das telas). A transição entre as telas: a que sai
-// esmaece e o jogo atrás escurece junto; a próxima (ou a partida) aparece e a cortina abre.
+// A cortina: um preto por cima do jogo e da arte do menu (cena.ts), mas por baixo das telas. A
+// transição entre as telas: a que sai esmaece e tudo atrás escurece junto; a próxima (ou a
+// partida) aparece e a cortina abre.
 function cortina(): HTMLElement {
   let el = document.getElementById('cortina');
   if (!el) {
     el = document.createElement('div');
     el.id = 'cortina';
-    const tela = document.getElementById('tela');
-    if (!tela) throw new Error('faltou o <div id="tela"> na página');
-    tela.append(el);
+    document.body.append(el);
   }
   return el;
 }

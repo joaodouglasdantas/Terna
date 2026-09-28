@@ -11,7 +11,7 @@
 import urlTemporada from '../assets/temporada-chamado-da-floresta.webp';
 import { carregarImagem, contexto2d } from '../motor/imagens';
 import type { ConexaoPartida } from '../rede/partida';
-import { botao, elemento, palco, sairComEsmaecer, TELA_OPACA } from './dom';
+import { botao, elemento, mostrarTela, sairComEsmaecer, TELA_OPACA } from './dom';
 
 export const TEMPORADA = {
   numero: 1,
@@ -142,7 +142,7 @@ export function telaTemporada(opcoes: OpcoesTemporada): Promise<{ saiu: boolean 
     frase.setAttribute('aria-live', 'polite');
 
     tela.append(cabeca, outdoor, novidades, dica, barra, frase);
-    palco().replaceChildren(tela);
+    mostrarTela(tela);
     const pararBrilhos = particulas(brilhos);
 
     let acabou = false;

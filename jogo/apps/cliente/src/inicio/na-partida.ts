@@ -6,7 +6,7 @@
 
 import type { Heroi } from '@terna/compartilhado';
 import { montarAjuda } from './ajuda';
-import { botao, elemento, palco, sairComEsmaecer } from './dom';
+import { botao, elemento, mostrarTela, sairComEsmaecer } from './dom';
 import { botaoDaMusica } from './musica';
 import type { Revanche } from './revanche';
 
@@ -111,7 +111,9 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
     const titulo = elemento('h1', 'inicio-titulo', online ? 'Menu' : 'Pausado');
     const continuar = botao('Continuar', 'inicio-botao', fecharMenu);
     const sair = botao('Sair da partida', 'inicio-botao inicio-botao-claro', () => {
-      remover();
+      // O menu esmaece junto com o jogo escurecendo atrás (em vez de sumir e mostrar o jogo
+      // claro por um instante).
+      remover('esmaecendo');
       aoSair();
     });
     caixa.append(titulo);
@@ -123,7 +125,7 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
     tela.addEventListener('click', (evento) => {
       if (evento.target === tela) fecharMenu();
     });
-    palco().replaceChildren(tela);
+    mostrarTela(tela);
     menu = tela;
     aoMudarMenu(true);
     continuar.focus();
@@ -133,7 +135,7 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
   const abrirAjuda = (): void => {
     if (acabou || ajudaAberta) return;
     const tela = montarAjuda(heroi, fecharMenu);
-    palco().replaceChildren(tela);
+    mostrarTela(tela);
     const estava = Boolean(menu);
     menu = tela;
     ajudaAberta = true;
@@ -159,18 +161,21 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
   };
   window.addEventListener('keydown', aoTeclar);
 
-  const remover = (): void => {
+  // `menuSai`: como o menu aberto sai — de uma vez; esmaecendo, com o escuro atrás (saindo da
+  // partida); ou fica, para a tela seguinte entrar por cima enquanto ele esmaece (mostrarTela).
+  const remover = (menuSai: 'agora' | 'esmaecendo' | 'trocando' = 'agora'): void => {
     acabou = true;
     window.removeEventListener('keydown', aoTeclar);
     engrenagem.remove();
-    menu?.remove();
+    if (menu && menuSai === 'esmaecendo') void sairComEsmaecer(menu);
+    else if (menuSai === 'agora') menu?.remove();
     menu = null;
     ajudaAberta = false;
   };
 
   return {
     mostrarFim(titulo, texto, revanche) {
-      remover();
+      remover('trocando');
       return new Promise((resolver) => {
         const tela = elemento('section', 'inicio-tela inicio-pausa');
         const caixa = elemento('div', 'inicio-caixa');
@@ -187,7 +192,7 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
           const jogar = botao('Jogar novamente', 'inicio-botao', () => sair('revanche'));
           caixa.append(jogar, voltar);
           tela.append(caixa);
-          palco().replaceChildren(tela);
+          mostrarTela(tela);
           jogar.focus();
           return;
         }
@@ -216,13 +221,13 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
           void revanche.pronta.then(() => sair('revanche'));
           caixa.append(estado, jogar, voltar);
           tela.append(caixa);
-          palco().replaceChildren(tela);
+          mostrarTela(tela);
           jogar.focus();
           return;
         }
         caixa.append(voltar);
         tela.append(caixa);
-        palco().replaceChildren(tela);
+        mostrarTela(tela);
         voltar.focus();
       });
     },

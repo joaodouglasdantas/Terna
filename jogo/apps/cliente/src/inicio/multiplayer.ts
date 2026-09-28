@@ -10,7 +10,7 @@
 import { CodigoSala, TAMANHO_CODIGO, type Heroi, type Lado, type PartidaNaRede, type PedidoPartida } from '@terna/compartilhado';
 import { buscarPartidasNaRede, conectarPartida, type ConexaoPartida } from '../rede/partida';
 import { anexarCena } from './cena';
-import { botao, elemento, palco, sairComEsmaecer } from './dom';
+import { botao, elemento, mostrarTela, sairComEsmaecer } from './dom';
 import { telaSelecao } from './selecao';
 
 export interface EscolhaOnline {
@@ -64,7 +64,7 @@ export function telaMultiplayer(nome: string): Promise<EscolhaOnline | null> {
     const mostrar = (...partes: HTMLElement[]): void => {
       caixa.replaceChildren(...partes);
       anexarCena(tela);
-      if (!tela.isConnected) palco().replaceChildren(tela);
+      mostrarTela(tela);
     };
     const voltarAoModo = (erro = ''): void => (modo === 'rede' ? naRede(erro) : internet(erro));
 

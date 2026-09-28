@@ -7,7 +7,7 @@
 // notebook com tela de toque tem touchpad, então passa.
 
 import { logoSimples } from './inicio';
-import { elemento, palco } from './dom';
+import { elemento, mostrarTela } from './dom';
 
 const NOME_DE_MOVEL = /Android|iPhone|iPad|iPod|Mobile|Tablet|Silk|Kindle|KF[A-Z]{2,4}Wi|PlayBook|BlackBerry|BB10|IEMobile|Opera Mini|webOS/i;
 
@@ -32,5 +32,5 @@ export function telaSoNoComputador(): void {
     elemento('p', 'inicio-sub', 'Abra este mesmo endereço no computador para jogar.'),
   );
   tela.append(logoSimples(), caixa);
-  palco().replaceChildren(tela);
+  mostrarTela(tela);
 }

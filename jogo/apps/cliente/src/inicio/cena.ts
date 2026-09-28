@@ -281,10 +281,12 @@ export function anexarCena(_telaDoMenu?: HTMLElement, entrar = false): void {
     folhas = [];
     luzes = [];
     el.classList.remove('inicio-cena-entrando');
-    // Espera dois quadros: o primeiro depois do carregamento é pesado e comeria a entrada.
+    // Escondida já (como começa a chegada); a chegada espera dois quadros: o primeiro depois do
+    // carregamento é pesado e a comeria.
+    el.classList.add('inicio-cena-escondida');
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
-        el.classList.add('inicio-cena-entrando');
+        el.classList.replace('inicio-cena-escondida', 'inicio-cena-entrando');
         setTimeout(() => el.classList.remove('inicio-cena-entrando'), ENTRADA_MS);
       }),
     );
