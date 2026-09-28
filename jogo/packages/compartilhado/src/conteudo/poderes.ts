@@ -6,7 +6,7 @@
 import { IMPACTO, JULGAMENTO, PODERES_ANJO, RAJADA } from './anjo';
 import type { Heroi } from './herois';
 import { GOLEM, INVESTIDA, PEDRA, PODERES_GOLEM, PODERES_GROW, REVOADA, SALTO, VENTO } from './grow';
-import { CHICOTE, FURIA, PODERES_LESLIE, RAIZES } from './leslie';
+import { CHICOTE, FLOR, PODERES_LESLIE, RAIZES } from './leslie';
 
 export * from './anjo';
 export * from './leslie';
@@ -22,7 +22,7 @@ export const VIDA_MAXIMA = 2500;
 // com ~222 (na forma base ele só tem as armas e o soco). Numa luta, cada um usa a barra cheia umas
 // 2 vezes. Ela começa vazia. O Anjo a gasta para virar anjo (e de anjo ela não carrega, para uma
 // forma de anjo não emendar na outra). Os poderes 1 e 2 da Leslie e do Grow gastam quase nada (a
-// barra é da ult); a Fúria da Floresta e o golem pedem a barra cheia. De golem não gasta nada (a
+// barra é da ult); a Flor Carnívora e o golem pedem a barra cheia. De golem não gasta nada (a
 // barra desce com o tempo da forma) e ela não carrega.
 export const ENERGIA_PIXY = {
   maxima: 100,
@@ -30,7 +30,7 @@ export const ENERGIA_PIXY = {
   porDanoGrow: 0.3, // o Grow enche mais depressa
   porDanoAnjo: 0.45, // e o Anjo mais ainda (a forma base só tem arma e soco)
   custoAnjo: 100,
-  custoLeslie: { chicote: 2, raizes: 6, furia: 100 }, // o 1 e o 2: quase nada
+  custoLeslie: { chicote: 2, raizes: 6, flor: 100 }, // o 1 e o 2: quase nada
   custoGrow: { aves: 2, vento: 3, golem: 100 }, // a Revoada e o Vendaval: quase nada
 };
 
@@ -52,7 +52,7 @@ const DADOS = {
   julgamento: JULGAMENTO,
   chicote: CHICOTE,
   raizes: RAIZES,
-  furia: FURIA,
+  flor: FLOR,
   aves: REVOADA,
   vento: VENTO,
   golem: GOLEM,

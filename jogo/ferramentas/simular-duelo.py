@@ -2,6 +2,7 @@
 
 Uso (na pasta jogo/):  python3 ferramentas/simular-duelo.py        # os números de agora
                        python3 ferramentas/simular-duelo.py antes  # os de antes do balanceamento
+                       python3 ferramentas/simular-duelo.py furia  # com a Fúria, antes da Flor
 
 Os números do jogo ficam em packages/compartilhado/src/conteudo/*.ts; aqui eles estão copiados em
 NUMEROS (mudou lá, mude aqui também). 'p' (a chance de acertar), 'ocupa', 'engajado', 'longe',
@@ -33,10 +34,13 @@ NUMEROS = {'vida': 2500,
  'arco': {'dano': 22, 'recarga': 1.4, 'ocupa': 0.4, 'p': 0.35},
  'durabilidade': 30,
  'soco': {'dano': 4, 'recarga': 0.45, 'ocupa': 0.25, 'p': 0.45},
- 'chicote': {'dano': 10, 'recarga': 1.4, 'ocupa': 0.44, 'p': 0.4, 'custo': 2},
- 'veneno': {'dano': 4, 'intervalo': 0.5, 'duracao': 3},
+ 'chicote': {'dano': 8, 'recarga': 1.4, 'ocupa': 0.44, 'p': 0.4, 'custo': 2},
+ 'veneno': {'dano': 4, 'intervalo': 0.5, 'duracao': 2.5, 'cura': 0.5},
  'raizes': {'dano': 14, 'rodas': 3, 'recarga': 9, 'ocupa': 0.5, 'p': 0.35, 'custo': 6, 'prende': 2.4},
  'furia': {'dano': 250, 'recarga': 3, 'ocupa': 0.4, 'p': 0.35, 'pPreso': 0.9, 'custo': 100, 'cura': 100},
+ # A Flor Carnívora (a ult da Leslie no lugar da Fúria): brota, segue o outro e cospe de longe,
+ # esteja a luta perto ou não. 'antes': segundos até a primeira cusparada.
+ 'flor': {'dano': 50, 'duracao': 10, 'intervalo': 1.6, 'antes': 1.6, 'recarga': 3, 'ocupa': 0.4, 'p': 0.35, 'custo': 100},
  'aves': {'dano': 55, 'bicada': 6, 'recarga': 6.5, 'ocupa': 0.35, 'p': 0.35, 'custo': 2, 'tira': 2.0},
  'vento': {'tique': 0.3, 'dano': 5, 'duracao': 3.6, 'recarga': 8, 'p': 0.5, 'custo': 3, 'atrapalha': 0.5},
  'golem': {'duracao': 30, 'recarga': 10, 'defesa': 0.4, 'custo': 100},
@@ -69,6 +73,8 @@ class Lutador:
         self.veneno = 0.0
         self.venenoTique = 0.0
         self.venenoDono = None
+        self.flor = 0.0  # segundos que a flor carnívora ainda fica de pé
+        self.florTique = 0.0
         self.canal = 0.0  # soprando
         self.canalTique = 0.0
         self.danoFeito = 0.0
@@ -139,8 +145,9 @@ def acoes(l):
                 if l.energia - d['custo'] < 70 and l.energia >= 70:
                     continue
                 out.append((k, esp, d['ocupa']))
-        if l.energia >= c['furia']['custo'] and l.pronto('furia'):
-            out.append(('furia', 9999, c['furia']['ocupa']))
+        ult = 'flor' if c.get('flor') else 'furia'
+        if l.energia >= c[ult]['custo'] and l.pronto(ult) and l.flor <= 0:
+            out.append((ult, 9999, c[ult]['ocupa']))
     if l.h == 'grow':
         d = c['aves']
         if l.pronto('aves') and l.energia >= d['custo']:
@@ -222,6 +229,9 @@ def agir(l, o, nome, rng):
         if rng.random() < p:
             ferir(l, o, d['dano'], 'furia')
         l.vida = min(c['vida'], l.vida + d['cura'])
+    elif nome == 'flor':
+        l.flor = d['duracao'] + d['antes']
+        l.florTique = d['antes']
     elif nome == 'aves':
         if rng.random() < p:
             if o.forma == 'golem':
@@ -279,7 +289,21 @@ def passo(l, o, dt, engajado, rng):
         l.venenoTique -= dt
         if l.venenoTique <= 0:
             l.venenoTique += c['veneno']['intervalo']
+            antes = l.vida
             ferir(l.venenoDono, l, c['veneno']['dano'], 'veneno')
+            # O chicote cura a Leslie em metade do que o veneno tirou.
+            dono = l.venenoDono
+            dono.vida = min(c['vida'], dono.vida + (antes - l.vida) * c['veneno'].get('cura', 0))
+    # a flor carnívora cuspindo (segue o outro: vale perto ou longe)
+    if l.flor > 0:
+        l.flor -= dt
+        l.florTique -= dt
+        if l.florTique <= 0 and l.flor > 0:
+            d = c['flor']
+            l.florTique += d['intervalo']
+            p = 0.9 if o.preso > 0 else d['p']
+            if not voando(o, rng) and rng.random() < p:
+                ferir(l, o, d['dano'], 'flor')
     # soprando
     if l.canal > 0:
         l.canal -= dt
@@ -368,7 +392,7 @@ ANTES = copy.deepcopy(NUMEROS)
 for chave, valor in {
     'vida': 1000, 'porDano': 0.3, 'porDano_grow': 0.4, 'porDano_anjo': 0.3, 'soco': None,
     'espada': {'dano': 35, 'recarga': 0.6}, 'arco': {'dano': 30, 'recarga': 0.9},
-    'chicote': {'custo': 10}, 'veneno': {'dano': 6}, 'raizes': {'custo': 25},
+    'chicote': {'custo': 10, 'dano': 10}, 'veneno': {'dano': 6, 'cura': 0, 'duracao': 3}, 'raizes': {'custo': 25}, 'flor': None,
     'furia': {'dano': 180, 'cura': 60}, 'aves': {'dano': 20}, 'vento': {'dano': 2},
     'salto': {'dano': 100}, 'investida': {'dano': 80}, 'pedra': {'dano': 95, 'lascas': 50},
     'anjo': {'duracao': 25, 'recarga': 10}, 'impacto': {'dano': 50}, 'rajada': {'dano': 40},
@@ -378,6 +402,13 @@ for chave, valor in {
         ANTES[chave].update(valor)
     else:
         ANTES[chave] = valor
+
+
+# Os de logo antes da Flor Carnívora: a Fúria da Floresta (com a cura) e o chicote sem cura.
+FURIA = copy.deepcopy(NUMEROS)
+FURIA['flor'] = None
+FURIA['veneno'].update({'cura': 0, 'duracao': 3})
+FURIA['chicote']['dano'] = 10
 
 
 def imprimir(cfg, n=600):
@@ -393,4 +424,4 @@ def imprimir(cfg, n=600):
 
 if __name__ == '__main__':
     import sys
-    imprimir(ANTES if 'antes' in sys.argv[1:] else NUMEROS)
+    imprimir(ANTES if 'antes' in sys.argv[1:] else FURIA if 'furia' in sys.argv[1:] else NUMEROS)

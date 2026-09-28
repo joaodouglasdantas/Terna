@@ -62,6 +62,7 @@ import { desenharArmaNaMao, desenharSoco, type ArmaNaMao, type Ataque } from './
 import { BRACO_ANJO, BRACO_BASE, BRACO_GROW, BRACO_LESLIE, desenharBracoComMao, maisBraco, ombroDe, type CoresBraco } from './braco';
 import { CORPO, manobraAcabou, pontoDaManobra, type Manobra, type Medida } from './efeitos';
 import { carregarAguias } from './grow/aguia';
+import { carregarFlor } from './leslie/flor';
 import { desenharCajadoNasCostas } from './grow/cajado';
 import {
   alternarGolem,
@@ -144,6 +145,7 @@ export async function carregarHerois(): Promise<SpritesDosHerois> {
     carregarImagem(urlGrowGolem),
     carregarImagem(urlGrowSemCajado),
     carregarAguias(), // as águias da Revoada do Grow
+    carregarFlor(), // a Flor Carnívora da Leslie
   ]);
   return {
     leslie: { base: recortar(leslie, QUADROS_LESLIE, false) },

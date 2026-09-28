@@ -4,7 +4,7 @@
 // do personagem, a barra de vida, a barra de energia pixy e, embaixo, os quadrinhos:
 // - Leslie: o da arma da mão e os três dos poderes, lado a lado; o que o clique esquerdo usa
 //   agora (a tecla R troca) fica aceso e o outro lado, apagado. A energia pixy é verde e brilha
-//   quando a Fúria da Floresta está pronta.
+//   quando a Flor Carnívora está pronta.
 // - Grow: de gente, como a Leslie (a energia pixy em verde-musgo, que brilha quando dá para virar
 //   golem); de golem, a barra de pedra com o tempo que resta, descendo, e os três poderes do golem.
 // - Anjo: na forma base, a energia pixy (brilha quando dá para virar anjo) e o quadrinho da arma;
@@ -154,7 +154,7 @@ const PALETA_PODERES: Paleta = {
   W: '#ffffff',
 };
 // Os da Leslie, nos verdes e marrons da floresta: a vinha do chicote com espinhos, as raízes saindo da
-// terra e a trepadeira da Fúria.
+// terra e a Flor Carnívora (no roxo dela).
 const PALETA_LESLIE: Paleta = {
   t: '#3c2412',
   m: '#6b4424',
@@ -164,6 +164,11 @@ const PALETA_LESLIE: Paleta = {
   g: '#4f9a38',
   v: '#8fd45a',
   w: '#d4f7a8',
+  p: '#5a1a66', // o roxo da flor
+  P: '#a8308e',
+  q: '#e070c0',
+  k: '#1e0a1e', // a boca por dentro
+  y: '#b8f25a', // o veneno
 };
 // Os do Grow: os pássaros da Revoada, o vento com a folha do Vendaval e a cara do golem; os do
 // golem nos cinzas da pedra com musgo: o Salto caindo na terra, a Investida e o pedregulho.
@@ -311,19 +316,20 @@ const ICONES: Record<IdPoder, HTMLCanvasElement> = {
     ],
     PALETA_LESLIE,
   ),
-  furia: criarSprite(
+  // A Flor Carnívora: a boca roxa escancarada, com os dentes e o veneno pingando.
+  flor: criarSprite(
     [
-      '....wv.....',
-      '...vgs..vw.',
-      '....gs.vgs.',
-      '.wv.sg..s..',
-      'vgs..sg.s..',
-      '.s...gs.g..',
-      '.gs.egsgs..',
-      '..gsg.gse..',
-      '...gs.gs...',
-      '..tmsmgmt..',
-      '.ttmtmtmtt.',
+      '...pPPq....',
+      '.pPPPPPPq..',
+      'pPPPqPPPPPq',
+      'pPPkekekeke',
+      'pPkkkkkkkk.',
+      'pPkkkkkkky.',
+      'pPPekekeky.',
+      '.pPPPPPPPy.',
+      '..vsg...y..',
+      '.vgsgv.....',
+      '..tmtmt....',
     ],
     PALETA_LESLIE,
   ),
@@ -409,7 +415,7 @@ const COR_SEGUNDOS = '#ffffff';
 const COR_AVISO = '#fff4dc';
 
 // Um quadrinho de poder. Sem os poderes na mão (o Anjo fora da forma de anjo, a Leslie no modo
-// arma) ou sem a energia da Fúria, o ícone fica apagado. Em recarga, uma sombra cobre o ícone e
+// arma) ou sem a energia da Flor, o ícone fica apagado. Em recarga, uma sombra cobre o ícone e
 // desce, sumindo de cima para baixo conforme o tempo passa, com os segundos que faltam por cima.
 function desenharEspaco(
   p: Pincel,
@@ -504,7 +510,7 @@ export function desenharPainel(
       desenharPoderes(p, personagem, ESPACO + ENTRE_ESPACOS);
     }
   } else if (personagem.heroi === 'leslie') {
-    // A energia pixy, que enche para a Fúria; e a arma e os poderes lado a lado.
+    // A energia pixy, que enche para a Flor; e a arma e os poderes lado a lado.
     const cheia = personagem.energia >= ENERGIA_PIXY.maxima;
     p.imagem(FOLHA, ICONE_X, ANJO_Y + 1, cheia ? 0.7 + 0.3 * pulso : 0.6);
     desenharBarra(p, ANJO_Y, 3, personagem.energia / ENERGIA_PIXY.maxima, ENERGIA_LESLIE);

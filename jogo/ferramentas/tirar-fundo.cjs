@@ -7,9 +7,11 @@
 // (Antes, todo preto virava fundo e os sprites ficavam com buracos na cara.)
 //
 // Uso (na pasta jogo/): node ferramentas/tirar-fundo.cjs <folha original.png> <nome em fontes/>
-//   [--cor-do-canto] [--limite N]
+//   [--cor-do-canto] [--xadrez] [--limite N]
 // `--cor-do-canto`: o fundo não é preto, é a cor do canto de cima da folha (um azul-escuro, por
 // exemplo), até N de diferença em cada canal.
+// `--xadrez`: o fundo é o xadrez branco e cinza-claro de "transparente" pintado na folha (a da
+// flor carnívora): todo pixel claro e sem cor, ligado à borda (ou num vão largo por dentro).
 
 const path = require('path');
 const { lerPng, escreverPng } = require('./png.cjs');
@@ -17,12 +19,20 @@ const { lerPng, escreverPng } = require('./png.cjs');
 const LIMITE = 16; // o preto do fundo: nenhum canal acima disto (ou tão longe da cor do fundo)
 const VAO = { area: 60, largura: 3 }; // um buraco de preto por dentro é fundo com esta área e esta folga
 
-function tirarFundo(img, cor = [0, 0, 0], limite = LIMITE) {
+const XADREZ = { claro: 215, cor: 12 }; // o canal mais escuro pelo menos isto; a diferença entre canais até isto
+
+function tirarFundo(img, cor = [0, 0, 0], limite = LIMITE, xadrez = false) {
   const { largura, altura, px } = img;
   const n = largura * altura;
+  // `escuro`: o que pode ser fundo (o nome vem do fundo preto; no xadrez, é o claro sem cor).
   const escuro = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
-    const d = Math.max(Math.abs(px[i * 4] - cor[0]), Math.abs(px[i * 4 + 1] - cor[1]), Math.abs(px[i * 4 + 2] - cor[2]));
+    const [r, g, b] = [px[i * 4], px[i * 4 + 1], px[i * 4 + 2]];
+    if (xadrez) {
+      escuro[i] = Math.min(r, g, b) >= XADREZ.claro && Math.max(r, g, b) - Math.min(r, g, b) <= XADREZ.cor ? 1 : 0;
+      continue;
+    }
+    const d = Math.max(Math.abs(r - cor[0]), Math.abs(g - cor[1]), Math.abs(b - cor[2]));
     escuro[i] = d <= limite ? 1 : 0;
   }
 
@@ -78,11 +88,11 @@ function tirarFundo(img, cor = [0, 0, 0], limite = LIMITE) {
 
 const args = process.argv.slice(2);
 const [origem, nome] = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--limite');
-if (!origem || !nome) throw new Error('uso: node ferramentas/tirar-fundo.cjs <folha original.png> <nome em fontes/> [--cor-do-canto] [--limite N]');
+if (!origem || !nome) throw new Error('uso: node ferramentas/tirar-fundo.cjs <folha original.png> <nome em fontes/> [--cor-do-canto] [--xadrez] [--limite N]');
 const lida = lerPng(origem);
 const corDoFundo = args.includes('--cor-do-canto') ? [lida.px[0], lida.px[1], lida.px[2]] : [0, 0, 0];
 const limite = args.includes('--limite') ? Number(args[args.indexOf('--limite') + 1]) : LIMITE;
-const img = tirarFundo(lida, corDoFundo, limite);
+const img = tirarFundo(lida, corDoFundo, limite, args.includes('--xadrez'));
 const destino = path.join(__dirname, '..', 'fontes', nome);
 escreverPng(destino, img.largura, img.altura, img.px);
 console.log(`${path.basename(origem)} -> ${path.relative(path.join(__dirname, '..'), destino)}`);

@@ -5,28 +5,30 @@
 // Distâncias em pixels, tempos em segundos, velocidades em px/s.
 //
 // A energia pixy (poderes.ts) é o combustível: começa vazia e enche com o dano que ela dá. O 1 e o
-// 2 gastam quase nada; a Fúria pede a barra cheia.
+// 2 gastam quase nada; a Flor Carnívora pede a barra cheia.
 //
 // Cada um se desvia de um jeito:
 // - 1 · Chicote de Espinhos: uma vinha com espinhos sai da mão dela em linha reta na direção do
 //   cursor e volta para a mão como um chicote. Pega o primeiro que encontrar: pouco dano, mas
 //   deixa envenenado (perde um pouquinho de vida de tempos em tempos) — sai-se da linha ou pula.
+//   Cada pinguinho do veneno cura a Leslie em metade do que tirou.
 // - 2 · Raízes: uma fileira de três rodas de raízes, como o Impacto do Anjo: a primeira na direção
 //   do cursor e as outras duas logo em seguida, cada uma depois de onde a anterior acaba. Em cada
 //   uma a terra racha e as raízes saem do chão e prendem quem está em cima (sem andar nem pular);
 //   enquanto ficam de fora, quem encostar nelas também fica preso, até elas voltarem para a terra.
 //   A fileira vai crescendo: a primeira roda é baixa, a do meio mais alta e a última bem alta —
 //   quanto mais para o fim, mais alto pega (pular a última é difícil) e mais tempo prende; a
-//   última, o bastante para a Fúria cair nele. Pulando na hora, ou saindo da rachadura, escapa.
-// - 3 · Fúria da Floresta: só com a barra de energia pixy cheia, e gasta a barra. A terra treme
-//   numa área grande e brotam trepadeiras com espinhos — pular não adianta, só saindo de baixo.
-//   A Leslie recupera vida na hora em que usa.
+//   última, o bastante para a Flor acertar umas cusparadas. Pulando na hora, ou saindo da rachadura, escapa.
+// - 3 · Flor Carnívora: só com a barra de energia pixy cheia, e gasta a barra. A terra treme onde
+//   ela mirou e brota uma flor carnívora enorme, que fica um tempo de pé: vai atrás do outro (sem
+//   chegar colada) e cospe bolas de veneno nele, de muito longe. Não dá para matar a flor: é
+//   desviar das bolas (pular, andar) até ela murchar.
 
-export const PODERES_LESLIE = ['chicote', 'raizes', 'furia'] as const;
+export const PODERES_LESLIE = ['chicote', 'raizes', 'flor'] as const;
 
 export const CHICOTE = {
   nome: 'Chicote de Espinhos',
-  dano: 10, // no acerto; o veneno tira o resto aos poucos
+  dano: 8, // no acerto; o veneno tira o resto aos poucos
   recarga: 1.4,
   alcance: 130, // até onde a vinha estica, da mão
   estica: 0.2, // segundos para esticar tudo
@@ -34,12 +36,14 @@ export const CHICOTE = {
   raio: 3, // da ponta, para o acerto
 };
 
-// O veneno do chicote: tira `dano` a cada `intervalo`, por `duracao` segundos (6 × 6 = 36). Um novo
-// acerto recomeça a contagem (não soma).
+// O veneno do chicote: tira `dano` a cada `intervalo`, por `duracao` segundos (5 × 4 = 20). Um novo
+// acerto recomeça a contagem (não soma). A cada pinguinho, a Leslie recupera `cura` do que ele
+// tirou (a metade: 4 de veneno, 2 de cura; no golem, que segura parte, a metade do que passou).
 export const VENENO = {
-  duracao: 3,
+  duracao: 2.5,
   intervalo: 0.5,
-  dano: 4, // por tique: 24 no total
+  dano: 4, // por tique: 20 no total
+  cura: 0.5, // da vida que o veneno tirou, volta para a Leslie
 };
 
 export const RAIZES = {
@@ -60,18 +64,28 @@ export const RAIZES = {
     [20, 34],
     [34, 54],
   ],
-  // Segundos sem andar nem pular, por roda: a última prende o bastante para trocar para a Fúria e
-  // ela cair (o aviso dela é de 1 s). As raízes ficam de fora da terra esse tempo.
+  // Segundos sem andar nem pular, por roda. As raízes ficam de fora da terra esse tempo.
   prende: [1.1, 1.6, 2.4],
 };
 
-export const FURIA = {
-  nome: 'Fúria da Floresta',
-  dano: 250,
+// A Flor Carnívora. Brota a até `alcance` da Leslie, na direção do cursor: a terra treme por
+// `aviso` segundos e ela sobe da terra em `brota`. De pé por `duracao` segundos, vai atrás do
+// outro a `velocidade` e para a `distancia` dele; de `intervalo` em `intervalo` segundos agacha
+// (`prepara`) e cospe uma bola de veneno na direção dele, que voa reto a `tiro.velocidade` até
+// `tiro.alcance` (quase a tela inteira) ou até bater em alguém ou no chão. No fim, murcha e estoura
+// em veneno (só a imagem: não tira vida).
+export const FLOR = {
+  nome: 'Flor Carnívora',
   recarga: 3, // curta: quem segura o especial é a barra de energia
-  alcance: 260,
-  aviso: 1, // a terra tremendo antes das trepadeiras: andando, dá para sair ~90 px
-  raio: 50, // metade da largura da área
-  duracao: 0.9,
-  cura: 100, // vida que a Leslie recupera ao usar
+  alcance: 120,
+  aviso: 0.6,
+  brota: 0.5,
+  duracao: 10,
+  velocidade: 42, // a Leslie anda a 90: dá para fugir dela, não dos tiros
+  distancia: 60,
+  primeiro: 0.5, // segundos de pé até a primeira cusparada
+  intervalo: 1.6, // ~6 cusparadas
+  prepara: 0.3,
+  murcha: 1,
+  tiro: { dano: 50, velocidade: 230, alcance: 420, raio: 3 }, // até 6 × 50 = 300
 };

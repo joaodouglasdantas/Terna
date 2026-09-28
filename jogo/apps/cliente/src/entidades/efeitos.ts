@@ -9,7 +9,7 @@
 // Online, cada um confere só o que acerta o próprio personagem: os efeitos do outro também
 // passam pelo corpo dele aqui, mas só para a imagem — a vida dele chega pela rede.
 
-import { VENENO, type ZonaDoCorpo } from '@terna/compartilhado';
+import { VENENO, VIDA_MAXIMA, type ZonaDoCorpo } from '@terna/compartilhado';
 import { ALTURA_FONTE, textoEmPixels } from '../motor/fonte';
 
 // Quem pode ser acertado. `ferir`: tira vida de verdade (o seu personagem, ou os dois sozinho);
@@ -210,7 +210,7 @@ export const absorvidoPor = (c: { defesa: number }, dano: number): number => Mat
 export const absorvidoDoQuePassou = (c: { defesa: number }, passou: number): number =>
   c.defesa > 0 && c.defesa < 1 ? Math.round((passou * c.defesa) / (1 - c.defesa)) : 0;
 
-// A vida que voltou (a Fúria da Floresta cura a Leslie): o número sobe em verde, com um "+".
+// A vida que voltou (o outro online se curou): o número sobe em verde, com um "+".
 export function mostrarCura(e: Nucleo<EfeitoBase>, alvo: { x: number; y: number }, cura: number): void {
   numero(e, alvo, `+${Math.round(cura)}`, COR_DA_CURA, SOMBRA_DA_CURA, 1, 1.1);
 }
@@ -252,9 +252,11 @@ export const vivos = (alvos: readonly Alvo[], dono: Dono): Alvo[] =>
 export const limitarAoAlcance = (x: number, de: number, alcance: number, mundo: number): number =>
   Math.max(0, Math.min(mundo, Math.max(de - alcance, Math.min(de + alcance, x))));
 
-// O veneno: quem está envenenado perde VENENO.dano a cada VENENO.intervalo, até acabar. Só tira
-// vida de quem se fere de verdade aqui (online, o do outro chega pela rede); o tempo corre para
-// todos, para a imagem.
+// O veneno: quem está envenenado perde VENENO.dano a cada VENENO.intervalo, até acabar, e quem o
+// envenenou (a Leslie do outro lado: só ela envenena, e a partida é de dois) recupera VENENO.cura
+// do que cada pinguinho tirou. O tempo corre para todos; o dano só sai onde o envenenado se fere de
+// verdade, e a cura onde a Leslie se fere de verdade — online, cada um no seu lado (o que o outro
+// perdeu ou ganhou chega pela rede).
 export function atualizarVeneno(e: Nucleo<EfeitoBase>, alvos: readonly Alvo[], dt: number): void {
   for (const alvo of alvos) {
     const c = alvo.corpo;
@@ -263,13 +265,22 @@ export function atualizarVeneno(e: Nucleo<EfeitoBase>, alvos: readonly Alvo[], d
       continue;
     }
     c.veneno = Math.max(0, c.veneno - dt);
-    if (!alvo.ferir || c.vida <= 0) continue;
+    if (c.vida <= 0) continue;
     c.venenoTique += dt;
+    const quem = alvos.find((o) => o.corpo !== c);
     while (c.venenoTique >= VENENO.intervalo) {
       c.venenoTique -= VENENO.intervalo;
       const passou = VENENO.dano - absorvidoPor(c, VENENO.dano);
-      c.vida = Math.max(0, c.vida - passou);
-      numero(e, c, `-${passou}`, COR_DO_VENENO, SOMBRA_DA_CURA, 1, 0.7);
+      if (alvo.ferir) {
+        c.vida = Math.max(0, c.vida - passou);
+        numero(e, c, `-${passou}`, COR_DO_VENENO, SOMBRA_DA_CURA, 1, 0.7);
+      }
+      const leslie = quem?.corpo;
+      if (!quem?.ferir || !leslie || leslie.vida <= 0) continue;
+      const cura = Math.min(Math.round(passou * VENENO.cura), VIDA_MAXIMA - leslie.vida);
+      if (cura <= 0) continue;
+      leslie.vida += cura;
+      numero(e, leslie, `+${cura}`, COR_DA_CURA, SOMBRA_DA_CURA, 1, 0.7);
     }
   }
 }

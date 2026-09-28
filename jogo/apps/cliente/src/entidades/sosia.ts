@@ -6,7 +6,7 @@
 // vem voando. Vai buscar as armas que caem perto e luta com elas: com a espada chega junto; com
 // o arco fica longe e atira.
 // - Leslie: com uma arma boa na mão, fica no modo arma; sem ela, aperta R para o modo poderes e
-//   ataca com os três quando você está no alcance (a Fúria, só com a barra de energia cheia).
+//   ataca com os três quando você está no alcance (a Flor Carnívora, só com a barra de energia cheia).
 // - Grow: de gente, como a Leslie (os pássaros e o vento — soprando um tempo sorteado); com a
 //   barra cheia, vira golem pelo terceiro quadrinho e aí chega perto e bate com os do golem.
 // - Anjo: quando a energia e a recarga deixam, vira anjo (e aí voa, plana e às vezes solta o
@@ -16,7 +16,6 @@
 import {
   ARCO,
   ENERGIA_PIXY,
-  FURIA,
   IMPACTO,
   INVESTIDA,
   JULGAMENTO,
@@ -144,7 +143,6 @@ const AVISO: Partial<Record<IdPoder, number>> = {
   impacto: IMPACTO.aviso,
   julgamento: JULGAMENTO.aviso,
   raizes: RAIZES.aviso,
-  furia: FURIA.aviso,
   salto: SALTO.agachar + SALTO.voo,
   investida: INVESTIDA.preparo + 0.2,
 };

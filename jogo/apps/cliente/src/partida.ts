@@ -29,7 +29,6 @@ import {
   CARREGAMENTO_MS,
   CONTAGEM_MS,
   DURACAO_PARTIDA_MS,
-  FURIA,
   HEROIS_LIBERADOS,
   MUNDO,
   VIDA_MAXIMA,
@@ -252,7 +251,7 @@ export function criarPartida(
             mostrarDano(p.efeitos, p.outro, dano, undefined, absorvidoDoQuePassou(p.outro, dano));
             ganharEnergia(p.jogador, dano);
           } else if (m.estado.vida > p.outro.vida && p.outro.vida > 0) {
-            mostrarCura(p.efeitos, p.outro, m.estado.vida - p.outro.vida); // a Fúria da Floresta
+            mostrarCura(p.efeitos, p.outro, m.estado.vida - p.outro.vida); // o veneno do chicote dela
           }
           p.outro.vida = m.estado.vida;
           p.outro.energia = m.estado.energia;
@@ -342,14 +341,6 @@ function usarPoder(p: Partida, corpo: Personagem, alvo: { x: number; y: number }
   uso.y = mao.y;
   lancarPoder(p.efeitos, corpo, uso);
   if (uso.poder === 'vento') corpo.canalizando = true;
-  // A Fúria da Floresta cura a Leslie.
-  if (corpo.heroi === 'leslie' && !corpo.daRede) {
-    if (uso.poder === 'furia') {
-      const cura = Math.min(FURIA.cura, VIDA_MAXIMA - corpo.vida);
-      corpo.vida += cura;
-      if (cura > 0) mostrarCura(p.efeitos, corpo, cura);
-    }
-  }
   if (corpo === p.jogador) p.remoto?.conexao.enviarPoder(uso);
 }
 

@@ -8,13 +8,15 @@
 //   atravessando o barro), a terra racha e a grama treme; na hora, rompem a superfície com
 //   torrões de terra voando, prendem quem está em cima e, no fim, voltam para dentro do chão.
 //   Quem fica preso ganha raízes enroladas nos pés.
-// - Fúria da Floresta: o mesmo, maior — a terra treme numa área grande, com folhas subindo e uma
-//   luz verde saindo das rachaduras, e trepadeiras grossas com folhas e espinhos rompem o chão.
+// - Flor Carnívora: a terra treme, uma flor carnívora enorme sobe dela, vai atrás do outro e
+//   cospe bolas de veneno de longe (flor.ts).
 //
 // A grama do chão é redesenhada por cima da base do que sai da terra (efeitos.ts): a base fica
 // escondida atrás dela, e não parece uma imagem colada sobre o solo.
 
-import { CHICOTE, FURIA, MUNDO, RAIZES, type PoderUsado } from '@terna/compartilhado';
+import { CHICOTE, MUNDO, RAIZES, type PoderUsado } from '@terna/compartilhado';
+import { ombroDe } from '../braco';
+import { ameacasDaFlor, atualizarFlor, criarFlor, desenharFlorNaFrente, desenharFlorNoChao, ondeBrota, type Flor } from './flor';
 import {
   dentroDaFaixa,
   acertaCorpo,
@@ -24,7 +26,6 @@ import {
   envenenar,
   faisca,
   ferirAlvo,
-  limitarAoAlcance,
   redesenharGrama,
   vivos,
   type Alvo,
@@ -34,7 +35,7 @@ import {
   type Nucleo,
 } from '../efeitos';
 
-export type PoderLeslie = 'chicote' | 'raizes' | 'furia';
+export type PoderLeslie = 'chicote' | 'raizes' | 'flor';
 
 // A vinha do chicote: sai da mão na direção (dx, dy) e estica até o alcance (ou até acertar); aí
 // volta para a mão. A mão acompanha o corpo enquanto isso.
@@ -60,7 +61,7 @@ interface Rama {
 }
 
 interface Area {
-  tipo: 'raizes' | 'furia';
+  tipo: 'raizes';
   dono: Dono;
   x: number; // centro, no chão
   idade: number; // negativa enquanto espera a vez (as rodas das Raízes saem uma depois da outra)
@@ -72,7 +73,7 @@ interface Area {
   presos: Set<CorpoAlvo>; // as Raízes: quem esta roda já prendeu (cada um, uma vez)
 }
 
-export type EfeitoLeslie = Chicote | Area;
+export type EfeitoLeslie = Chicote | Area | Flor;
 type Efeitos = Nucleo<EfeitoLeslie>;
 
 export const VERDE = {
@@ -87,7 +88,6 @@ export const MADEIRA = { funda: '#2a180c', escura: '#3c2412', media: '#6b4424', 
 const ESPINHO = '#efe3b8';
 const TERRA = ['#3c2412', '#5a381c', '#6b4424', '#8a5a2b'];
 const GRAMA = ['#4f9a38', '#6fb842', '#3f8a32'];
-const FOLHAS = [VERDE.escuro, VERDE.medio, VERDE.claro];
 const aoAcaso = <T>(lista: readonly T[]): T => lista[(Math.random() * lista.length) | 0];
 const sortear = (min: number, max: number): number => min + Math.random() * (max - min);
 
@@ -95,11 +95,16 @@ const sortear = (min: number, max: number): number => min + Math.random() * (max
 export const ALCANCE_LESLIE: Record<PoderLeslie, number> = {
   chicote: CHICOTE.alcance - 6,
   raizes: RAIZES.alcance + RAIZES.raio * 2 * (RAIZES.rodas - 1) + RAIZES.raio,
-  furia: FURIA.alcance + FURIA.raio,
+  flor: 300, // ela anda atrás e cospe de longe
 };
 
-// De onde o chicote sai: a mão da frente, na altura do peito.
-const maoDe = (d: Dono): { x: number; y: number } => ({ x: d.x + d.direcao * 3, y: d.y - 17 });
+// De onde o chicote sai: a mão dela, na ponta do braço esticado para a mira (o gesto dos poderes,
+// em personagem.ts: 10 px e mais o que o ombro dela fica atrás do de sempre, braco.ts).
+const BRACO_ESTICADO = 12;
+function maoDe(c: Chicote): { x: number; y: number } {
+  const ombro = ombroDe({ ...c.dono, heroi: 'leslie' });
+  return { x: ombro.x + c.dx * BRACO_ESTICADO, y: ombro.y + c.dy * BRACO_ESTICADO };
+}
 
 function direcao(uso: { x: number; y: number; alvoX: number; alvoY: number }): { dx: number; dy: number } {
   const dx = uso.alvoX - uso.x;
@@ -118,9 +123,8 @@ function ramas(quantas: number, raio: number, alturas: [number, number]): Rama[]
   }));
 }
 
-// Os números de uma área: as rodas das Raízes ficam de fora da terra o tempo que prendem.
+// Os números de uma roda: ela fica de fora da terra o tempo que prende.
 function dados(a: Area): { aviso: number; raio: number; duracao: number; dano: number } {
-  if (a.tipo === 'furia') return FURIA;
   return { aviso: RAIZES.aviso, raio: RAIZES.raio, duracao: a.prende, dano: RAIZES.dano };
 }
 
@@ -166,23 +170,7 @@ export function lancarPoderLeslie(e: Efeitos, dono: Dono, uso: PoderUsado & { po
     });
     return;
   }
-  const x = limitarAoAlcance(uso.alvoX, uso.x, FURIA.alcance, MUNDO);
-  e.lista.push({
-    tipo: 'furia',
-    dono,
-    x,
-    idade: 0,
-    prende: 0,
-    indice: 0,
-    estourou: false,
-    ramas: ramas(11, FURIA.raio, [38, 72]),
-    rachaduras: rachaduras(FURIA.raio, 9),
-    presos: new Set(),
-  });
-  // A Fúria cura a Leslie na hora (partida.ts): um brilho verde sobe da mão dela.
-  if (uso.poder === 'furia') {
-    for (let i = 0; i < 18; i++) faisca(e, uso.x + sortear(-5, 5), uso.y + 8, 40, -60, aoAcaso([VERDE.brilho, VERDE.claro]));
-  }
+  e.lista.push(criarFlor(dono, uso));
 }
 
 // ---- Chicote ----
@@ -191,7 +179,7 @@ function atualizarChicote(e: Efeitos, c: Chicote, dt: number, alvos: readonly Al
   c.idade += dt;
   if (c.voltaDe === null) {
     const novo = Math.min(CHICOTE.alcance, (c.idade / CHICOTE.estica) * CHICOTE.alcance);
-    const mao = maoDe(c.dono);
+    const mao = maoDe(c);
     // Em passos de 2 px: a ponta não atravessa ninguém entre dois quadros.
     for (let s = c.comprimento; s <= novo; s += 2) {
       const px = mao.x + c.dx * s;
@@ -228,7 +216,7 @@ function atualizarChicote(e: Efeitos, c: Chicote, dt: number, alvos: readonly Al
 // A vinha: da mão até a ponta, com uma onda que corre por ela (mais forte no meio), 2 px de
 // grossura, espinhos alternando os lados, folhas de vez em quando e um botão de espinhos na ponta.
 function desenharChicote(ctx: CanvasRenderingContext2D, c: Chicote, tempo: number): void {
-  const mao = maoDe(c.dono);
+  const mao = maoDe(c);
   const len = Math.round(c.comprimento);
   if (len < 2) return;
   const [nx, ny] = [-c.dy, c.dx]; // a perpendicular, para a onda
@@ -271,7 +259,7 @@ function desenharChicote(ctx: CanvasRenderingContext2D, c: Chicote, tempo: numbe
   ctx.restore();
 }
 
-// ---- Raízes e Fúria ----
+// ---- Raízes ----
 
 // Um torrão de terra (ou fiapo de grama) que voa e pousa no chão.
 function particulaQuePousa(e: Efeitos, x: number, y: number, forca = 70, grama = false): void {
@@ -300,29 +288,13 @@ function prender(c: CorpoAlvo, segundos: number): void {
 function atualizarArea(e: Efeitos, a: Area, dt: number, alvos: readonly Alvo[]): boolean {
   const n = dados(a);
   const yChao = chao();
-  const furia = a.tipo === 'furia';
   a.idade += dt;
   if (a.idade < 0) return true; // ainda não é a vez dela na fileira
   if (!a.estourou && a.idade < n.aviso) {
     const p = a.idade / n.aviso;
     // A terra solta poeira e torrõezinhos pelas rachaduras, mais perto da hora.
-    if (Math.random() < dt * (furia ? 26 : 12) * (0.4 + p)) {
+    if (Math.random() < dt * 12 * (0.4 + p)) {
       particulaQuePousa(e, a.x + aoAcaso(a.rachaduras) + sortear(-2, 2), yChao - 1, 30 + 40 * p);
-    }
-    // Na Fúria, folhas sobem em redemoinho da área.
-    if (furia && Math.random() < dt * 22) {
-      const total = sortear(0.6, 1);
-      e.particulas.push({
-        x: a.x + sortear(-n.raio, n.raio),
-        y: yChao - 2,
-        vx: sortear(-15, 15),
-        vy: sortear(-70, -40),
-        gravidade: -10,
-        vida: total,
-        total,
-        cor: aoAcaso([...FOLHAS, VERDE.brilho]),
-        somar: false,
-      });
     }
     return true;
   }
@@ -330,25 +302,22 @@ function atualizarArea(e: Efeitos, a: Area, dt: number, alvos: readonly Alvo[]):
     a.estourou = true;
     for (const alvo of vivos(alvos, a.dono)) {
       const dentro = dentroDaFaixa(alvo.corpo, a.x, n.raio);
-      // As raízes pegam só quem está perto do chão; as trepadeiras sobem alto: pular não adianta.
-      const alcancaAltura = furia || yChao - alvo.corpo.y <= RAIZES.altura[Math.min(a.indice, RAIZES.altura.length - 1)];
+      // As raízes pegam só quem está perto do chão.
+      const alcancaAltura = yChao - alvo.corpo.y <= RAIZES.altura[Math.min(a.indice, RAIZES.altura.length - 1)];
       if (!dentro || !alcancaAltura) continue;
       ferirAlvo(e, alvo, n.dano);
       // Online, o "preso" do outro chega pela rede, com o estado dele.
-      if (!furia) {
-        a.presos.add(alvo.corpo);
-        if (alvo.ferir) prender(alvo.corpo, a.prende);
-      }
+      a.presos.add(alvo.corpo);
+      if (alvo.ferir) prender(alvo.corpo, a.prende);
     }
     // A terra rompe: torrões e grama voando de onde cada rama sai.
     for (const r of a.ramas) {
-      for (let k = 0; k < (furia ? 5 : 3); k++) particulaQuePousa(e, a.x + r.dx, yChao - 2, furia ? 120 : 80, k === 0);
+      for (let k = 0; k < 3; k++) particulaQuePousa(e, a.x + r.dx, yChao - 2, 80, k === 0);
     }
-    if (furia) for (let k = 0; k < 24; k++) faisca(e, a.x + sortear(-n.raio, n.raio) * 0.8, yChao - sortear(20, 60), 60, 0, VERDE.brilho);
   }
   // Enquanto as raízes estão de fora, quem encostar nelas também fica preso (uma vez por roda),
   // até elas voltarem para a terra.
-  if (!furia && subida(a) > 0.3) {
+  if (subida(a) > 0.3) {
     const resta = n.aviso + n.duracao - a.idade;
     const altura = RAIZES.altura[Math.min(a.indice, RAIZES.altura.length - 1)];
     for (const alvo of vivos(alvos, a.dono)) {
@@ -389,16 +358,16 @@ function desenharDentroDaTerra(ctx: CanvasRenderingContext2D, a: Area, tempo: nu
       const lado = Math.round(Math.sin(d * 0.4 + r.fase) * 1.5 + r.curva * (d / r.fundura) * 3);
       const x = Math.round(a.x + r.dx + lado);
       ctx.fillStyle = d % 5 === 0 ? MADEIRA.media : MADEIRA.escura;
-      ctx.fillRect(x, yChao + d, a.tipo === 'furia' ? 2 : 1, 1);
+      ctx.fillRect(x, yChao + d, 1, 1);
       // Raizinhas laterais, de tempos em tempos.
       if (d % 7 === 3) {
         ctx.fillStyle = MADEIRA.funda;
         ctx.fillRect(x + (d % 2 ? 1 : -1), yChao + d + 1, 1, 1);
       }
     }
-    // A ponta que ainda sobe brilha um pouco (na Fúria, verde).
+    // A ponta que ainda sobe brilha um pouco.
     if (!a.estourou) {
-      ctx.fillStyle = a.tipo === 'furia' ? VERDE.claro : MADEIRA.clara;
+      ctx.fillStyle = MADEIRA.clara;
       ctx.fillRect(Math.round(a.x + r.dx), yChao + ate, 1, 1);
     }
   }
@@ -416,19 +385,6 @@ function desenharDentroDaTerra(ctx: CanvasRenderingContext2D, a: Area, tempo: nu
       }
     }
   }
-  // Na Fúria, luz verde sai das rachaduras, mais forte perto da hora.
-  if (a.tipo === 'furia' && !a.estourou) {
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 1;
-    const pisca = 0.75 + 0.25 * Math.sin(tempo * (18 + p * 30));
-    for (const rx of a.rachaduras) {
-      const luz = ctx.createLinearGradient(0, yChao + 2, 0, yChao - 30);
-      luz.addColorStop(0, `rgba(160, 230, 110, ${0.45 * p * pisca})`);
-      luz.addColorStop(1, 'rgba(160, 230, 110, 0)');
-      ctx.fillStyle = luz;
-      ctx.fillRect(Math.round(a.x + rx) - 2, yChao - 30, 5, 32);
-    }
-  }
   ctx.restore();
 }
 
@@ -437,7 +393,7 @@ function tremerGrama(ctx: CanvasRenderingContext2D, a: Area, tempo: number): voi
   const n = dados(a);
   const p = a.idade / n.aviso;
   if (p < 0.35) return;
-  const treme = Math.sin(tempo * (a.tipo === 'furia' ? 50 : 38) + a.x) > 0 ? 1 : 0;
+  const treme = Math.sin(tempo * 38 + a.x) > 0 ? 1 : 0;
   if (treme) redesenharGrama(ctx, a.x - n.raio, a.x + n.raio, 1, 1);
 }
 
@@ -483,22 +439,10 @@ function desenharForaDaTerra(ctx: CanvasRenderingContext2D, a: Area, tempo: numb
   const n = dados(a);
   const yChao = chao();
   const quanto = subida(a);
-  const furia = a.tipo === 'furia';
-  const t = Math.min(1, (a.idade - n.aviso) / n.duracao);
   ctx.save();
-  if (furia && t < 0.2) {
-    // O clarão verde da Fúria rompendo a terra.
-    ctx.globalCompositeOperation = 'lighter';
-    const luz = ctx.createRadialGradient(a.x, yChao - 20, 0, a.x, yChao - 20, FURIA.raio * 2);
-    luz.addColorStop(0, `rgba(160, 230, 110, ${0.5 * (1 - t / 0.2)})`);
-    luz.addColorStop(1, 'rgba(160, 230, 110, 0)');
-    ctx.fillStyle = luz;
-    ctx.fillRect(a.x - FURIA.raio * 2, yChao - 20 - FURIA.raio * 2, FURIA.raio * 4, FURIA.raio * 4);
-    ctx.globalCompositeOperation = 'source-over';
-  }
-  // Mais grossas quanto mais altas: a Fúria e a última roda das Raízes.
-  const grossura = furia || a.indice >= 2 ? 3 : 2;
-  for (const r of a.ramas) desenharRama(ctx, a.x, yChao, r, Math.round(r.altura * quanto), grossura, furia, tempo);
+  // A última roda, a mais alta, tem as raízes mais grossas.
+  const grossura = a.indice >= 2 ? 3 : 2;
+  for (const r of a.ramas) desenharRama(ctx, a.x, yChao, r, Math.round(r.altura * quanto), grossura, false, tempo);
   redesenharGrama(ctx, a.x - n.raio - 3, a.x + n.raio + 3);
   // A terra empurrada: um montinho de cada lado da base, enquanto a rama está de fora.
   ctx.globalAlpha = Math.min(1, quanto * 2);
@@ -516,31 +460,36 @@ function desenharForaDaTerra(ctx: CanvasRenderingContext2D, a: Area, tempo: numb
 // Passa o tempo de um efeito da Leslie; devolve se ele continua no mapa.
 export function atualizarEfeitoLeslie(e: Efeitos, ef: EfeitoLeslie, dt: number, alvos: readonly Alvo[]): boolean {
   if (ef.tipo === 'chicote') return atualizarChicote(e, ef, dt, alvos);
+  if (ef.tipo === 'flor') return atualizarFlor(e, ef, dt, alvos);
   return atualizarArea(e, ef, dt, alvos);
 }
 
 export function ameacasDaLeslie(ef: EfeitoLeslie, ameacas: Ameacas): void {
   if (ef.tipo === 'chicote') {
     if (ef.voltaDe !== null) return;
-    const mao = maoDe(ef.dono);
+    const mao = maoDe(ef);
     const v = CHICOTE.alcance / CHICOTE.estica;
     ameacas.projeteis.push({ x: mao.x + ef.dx * ef.comprimento, y: mao.y + ef.dy * ef.comprimento, vx: ef.dx * v, vy: ef.dy * v });
+  } else if (ef.tipo === 'flor') {
+    ameacasDaFlor(ef, ameacas);
   } else if (!ef.estourou) {
     const n = dados(ef);
     ameacas.areas.push({ x: ef.x, raio: n.raio, resta: n.aviso - ef.idade, aviso: n.aviso, baixa: ef.tipo === 'raizes' && ef.indice < 2 }); // a última roda é alta demais para pular
   }
 }
 
-// Antes dos personagens: o que está dentro da terra, as rachaduras e a grama tremendo.
+// Antes dos personagens: o que está dentro da terra, as rachaduras, a grama tremendo e a flor.
 export function desenharLeslieNoChao(ctx: CanvasRenderingContext2D, ef: EfeitoLeslie, tempo: number): void {
+  if (ef.tipo === 'flor') return desenharFlorNoChao(ctx, ef, tempo);
   if (ef.tipo === 'chicote' || ef.idade < 0) return; // a roda ainda não chegou na vez dela
   desenharDentroDaTerra(ctx, ef, tempo);
   if (!ef.estourou) tremerGrama(ctx, ef, tempo);
 }
 
-// Depois dos personagens: o chicote e o que rompeu a terra.
+// Depois dos personagens: o chicote, o que rompeu a terra e as bolas de veneno da flor.
 export function desenharLeslieNaFrente(ctx: CanvasRenderingContext2D, ef: EfeitoLeslie, tempo: number): void {
   if (ef.tipo === 'chicote') desenharChicote(ctx, ef, tempo);
+  else if (ef.tipo === 'flor') desenharFlorNaFrente(ctx, ef);
   else if (ef.estourou) desenharForaDaTerra(ctx, ef, tempo);
 }
 
@@ -601,7 +550,7 @@ export function desenharVeneno(ctx: CanvasRenderingContext2D, c: CorpoAlvo, temp
 
 // ---- Prévia da mira ----
 // O Chicote: a linha pontilhada até onde a vinha chega. Raízes: o contorno das três rodas da
-// fileira. Fúria: o contorno da área.
+// fileira. Flor: o contorno de onde ela brota.
 export function desenharPreviaLeslie(
   ctx: CanvasRenderingContext2D,
   poder: PoderLeslie,
@@ -625,8 +574,8 @@ export function desenharPreviaLeslie(
     }
     return;
   }
-  const n = poder === 'raizes' ? RAIZES : FURIA;
-  const centros = poder === 'raizes' ? fileiraDasRaizes(origem.x, alvo.x) : [limitarAoAlcance(alvo.x, origem.x, FURIA.alcance, MUNDO)];
+  const n = poder === 'raizes' ? RAIZES : { raio: 18 };
+  const centros = poder === 'raizes' ? fileiraDasRaizes(origem.x, alvo.x) : [ondeBrota(origem.x, alvo.x)];
   const ry = Math.max(2, Math.round(n.raio / 7));
   for (const x of centros) {
     elipse(ctx, x, yChao + 1, n.raio, ry, cores.sombra, false);

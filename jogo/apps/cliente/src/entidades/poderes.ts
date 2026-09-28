@@ -168,7 +168,7 @@ export function prepararPoderes(yDoChao: number, chaoDoMapa?: HTMLCanvasElement,
 const PODERES_LESLIE: readonly IdPoder[] = PODERES_DO_HEROI.leslie;
 const daLeslie = (poder: IdPoder): poder is PoderLeslie => PODERES_LESLIE.includes(poder);
 const efeitoDaLeslie = (ef: Efeito): ef is EfeitoLeslie =>
-  ef.tipo === 'chicote' || ef.tipo === 'raizes' || ef.tipo === 'furia';
+  ef.tipo === 'chicote' || ef.tipo === 'raizes' || ef.tipo === 'flor';
 const doGrow = (poder: IdPoder): poder is PoderGrow => (PODERES_DO_GROW as readonly IdPoder[]).includes(poder);
 const efeitoDoGrow = (ef: Efeito): ef is EfeitoGrow =>
   ef.tipo === 'aves' || ef.tipo === 'vento' || ef.tipo === 'salto' || ef.tipo === 'investida' || ef.tipo === 'pedra';

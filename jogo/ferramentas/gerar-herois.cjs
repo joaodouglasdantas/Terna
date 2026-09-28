@@ -4,7 +4,7 @@
 // jeito (recorte-sprite.cjs); cada personagem aponta os quadros dele e a altura no jogo.
 //
 // Uso (na pasta jogo/): npm run arte:leslie · npm run arte:grow (o Grow, o golem e as águias)
-// ou: node ferramentas/gerar-herois.cjs <leslie|grow|golem|aguia>...
+// ou: node ferramentas/gerar-herois.cjs <leslie|grow|golem|aguia|flor>...
 // Saída, por folha: apps/cliente/src/assets/<png> (quadros lado a lado) e
 // apps/cliente/src/gerado/<nome>-quadros.ts (recortes + eixo do corpo). O Anjo tem o gerador dele
 // (gerar-anjo.cjs), que também desenha a forma de anjo.
@@ -149,6 +149,27 @@ const FOLHAS = {
       // Grow têm 32) — assim o golem não parece maior que os outros no quadro e, largo como é,
       // ainda sobra um pixel de cada lado da moldura. Fora da conta da paleta (a folha não muda).
       retrato: { alturaRef: 104 * (46 / 30), ancora: 'caixa', foraDaPaleta: true, pontos: [[1079, 258]] },
+    },
+  },
+  // A Flor Carnívora, a ult da Leslie (a folha "flor carnívora", de fundo xadrez tirado por
+  // tirar-fundo.cjs --xadrez): uns 44 px em pé, bem maior que a gente. Olha para a direita.
+  // A folha desenhou cada bloco num tamanho; `alturaRef` acerta todos pela cabeça.
+  flor: {
+    fonte: 'flor.png',
+    png: path.join('leslie', 'flor.png'),
+    constante: 'QUADROS_FLOR',
+    alturaEmPe: 44,
+    cores: 32,
+    mediana: 0,
+    animacoes: {
+      parado: { alturaRef: 187, ancora: 'caixa', pontos: [[385, 210]] },
+      andando: { alturaRef: 168, ancora: 'caixa', pontos: [[590, 220], [765, 220], [935, 220], [1120, 220]] },
+      // Agachada, pronta para cuspir; cuspindo (boca escancarada, a língua para fora).
+      cuspindo: { alturaRef: 185, ancora: 'caixa', pontos: [[270, 715], [320, 480]] },
+      // Brotando do chão: agachada, antes de ficar de pé.
+      brotando: { alturaRef: 185, ancora: 'caixa', pontos: [[110, 715]] },
+      // Murchando no fim: debilitada, deitada, e a explosão de veneno.
+      murchando: { alturaRef: 168, ancora: 'caixa', pontos: [[945, 735], [1330, 720]] },
     },
   },
   // As águias da Revoada do Grow (a folha "ÁGUIA - MOVIMENTO", de fundo azul-escuro): a fileira VOO,

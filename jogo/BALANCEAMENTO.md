@@ -32,7 +32,7 @@ O `simular-duelo.py` simula milhares de duelos com o mesmo modelo para todos os 
   |---|---|
   | Espada, soco | 45% |
   | Chicote | 40% |
-  | Arco, Revoada, Salto, Investida, Julgamento | 35% |
+  | Arco, Revoada, Salto, Investida, Julgamento, cada cusparada da Flor | 35% |
   | Pedra | 30% em cheio |
   | Cada explosão e cada coração do Anjo | 30% |
 
@@ -52,9 +52,9 @@ Mediana da duração da luta e quem vence (600 duelos de cada):
 
 | Duelo | Antes | Depois | Vence (depois) | Dano das armas (depois) |
 |---|---|---|---|---|
-| Leslie × Leslie | 59 s | **189 s** | 48% × 52% | 37% |
-| Leslie × Grow | 91 s | **218 s** | 51% × 49% | 37% |
-| Leslie × Anjo | 73 s | **203 s** | 51% × 49% | 36% |
+| Leslie × Leslie | 59 s | **212 s** | 48% × 52% | 38% |
+| Leslie × Grow | 91 s | **237 s** | 50% × 50% | 39% |
+| Leslie × Anjo | 73 s | **218 s** | 50% × 50% | 39% |
 | Grow × Grow | 119 s | **252 s** | 48% × 52% | 19% |
 | Grow × Anjo | 103 s | **234 s** | 60% × 40% | 19% |
 | Anjo × Anjo | 90 s | **216 s** | 48% × 52% | 26% |
@@ -94,13 +94,21 @@ Antes:
 
 | Poder | Dano (antes → depois) | % da vida | Recarga | Energia (antes → depois) |
 |---|---|---|---|---|
-| 1 · Chicote de Espinhos | 10 + veneno 6×6 = 46 → 10 + **4×6 = 34** | 1,4% | 1,4 s | 10 → **2** |
+| 1 · Chicote de Espinhos | 10 + veneno 6×6 = 46 → **8 + veneno 5×4 = 28**; o veneno cura a Leslie em **2 por pinguinho** (10) | 1,1% | 1,4 s | 10 → **2** |
 | 2 · Raízes | 14 por roda (até 42) | 1,7% | 9 s | 25 → **6** |
-| 3 · Fúria da Floresta | 180 → **250**; cura 60 → **100** | 10% | 3 s | 100 (barra cheia) |
+| 3 · Flor Carnívora (no lugar da Fúria) | **50 por cusparada, ~6 cusparadas (até 300)** | 2% cada | 3 s | 100 (barra cheia) |
 
-- **Vantagem:** o veneno. O dano dela continua depois do golpe, e isso é o que mais tira vida na
-  luta.
-- **Combo:** Raízes prendem, e a Fúria cai em quem está preso.
+- **A Flor Carnívora:** brota a até 120 px dela, fica **10 s** de pé, vai atrás do outro a 42 px/s
+  (ele anda a 90: dá para fugir dela) e para a 60 px; a cada **1,6 s** cospe uma bola de veneno
+  que voa reto a 230 px/s por até 420 px. Não dá para matar a flor: é desviar das bolas. Ela
+  continua cuspindo mesmo com a luta parada, e por isso foi medida valendo o tempo todo.
+- **A cura:** a Fúria curava 100 de uma vez; agora quem cura é o veneno do chicote — **metade do
+  que cada pinguinho tira** (4 de veneno, 2 de cura; no golem, que segura parte, a metade do que
+  passou). Para a Leslie não ficar forte demais com a cura, o chicote tira 8 no acerto (era 10) e
+  o veneno dura 2,5 s (era 3). Sem esses dois ajustes, com a Flor e a cura ela vencia de 64% a 66%.
+- **Vantagem:** o veneno. O dano dela continua depois do golpe, cura ela, e isso é o que mais tira
+  vida na luta.
+- **Combo:** Raízes prendem, e a Flor acerta as cusparadas em quem está preso.
 
 ### Grow, de gente
 
@@ -122,7 +130,7 @@ Antes:
 | 3 · Pedra | 95 → **125** em cheio; lascas 50 → **65** | 5,0% | 5 s |
 
 - **Vantagem:** 30 s batendo forte com a pele de pedra segurando 40% do dano.
-- **Continua valendo:** o veneno e as raízes da Leslie pegam nele; ele não pega arma, não dá pulo
+- **Continua valendo:** o veneno (e a cura dele) e as raízes da Leslie pegam nele; ele não pega arma, não dá pulo
   duplo e as águias só bicam (6).
 
 ### Anjo (escondido; pronto para voltar)
@@ -144,4 +152,7 @@ Antes:
 - **Grow × Anjo** deu 60% × 40%. O Anjo está escondido; quando ele voltar, vale medir de novo.
 - O modelo não sabe de mira, de leitura de jogo nem da CPU. Depois de umas partidas de verdade,
   ajuste pelo que sentir e rode `python3 ferramentas/simular-duelo.py` de novo. Mudou um número
-  no jogo, mude também em `NUMEROS`, no começo do simulador.
+  no jogo, mude também em `NUMEROS`, no começo do simulador. (`simular-duelo.py furia` roda com a
+  Fúria da Floresta de antes, para comparar.)
+- **A Flor Carnívora** é a coisa mais difícil de medir: o modelo não sabe desviar. Se na prática
+  as bolas acertarem demais (ou de menos), mexa no dano da cusparada (`FLOR.tiro.dano`).

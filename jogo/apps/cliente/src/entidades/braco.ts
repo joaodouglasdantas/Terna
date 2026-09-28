@@ -4,8 +4,10 @@
 // do casaco do Grow, a pulseira de folhas da Leslie, a manga do moletom do Anjo) e a mão fechada
 // na ponta, segurando o que tiver.
 
-// De lado, o ombro da frente fica 2 px à frente do eixo e 16 px acima dos pés.
+// De lado, o ombro da frente fica 2 px à frente do eixo e 16 px acima dos pés. O da Leslie, que é
+// miúda e tem o pescoço comprido no sprite, fica mais baixo e no eixo: senão o braço saía do queixo.
 export const OMBRO = { frente: 2, altura: 16 };
+const OMBRO_DA_LESLIE = { frente: 0, altura: 14 };
 
 // O Grow, de gente, ataca com a mão de trás: o braço desenhado — a arma e o soco — sai do ombro
 // de trás, passa por trás do corpo (é desenhado antes do sprite) e aparece na frente do peito;
@@ -16,8 +18,11 @@ export interface ComOmbro {
   y: number;
   direcao: 1 | -1;
   maoLivreAtras?: boolean;
+  heroi?: string;
 }
-export const maisBraco = (c: ComOmbro): number => (c.maoLivreAtras ? 2 * OMBRO.frente : 0);
+const ombroDo = (c: ComOmbro): { frente: number; altura: number } => (c.heroi === 'leslie' ? OMBRO_DA_LESLIE : OMBRO);
+// Quanto o braço cresce para a mão chegar no mesmo ponto: o que o ombro dele fica atrás do de sempre.
+export const maisBraco = (c: ComOmbro): number => (c.maoLivreAtras ? 2 * OMBRO.frente : OMBRO.frente - ombroDo(c).frente);
 
 interface Tons {
   luz: string;
@@ -32,6 +37,8 @@ export interface CoresBraco {
   // A faixa: logo depois da manga, ou (`noPulso`) encostada na mão.
   faixa?: { cima: string; sombra: string; noPulso?: boolean };
   mao: Tons & { brilho: string; vinco: string };
+  // Delicado (a Leslie): o braço de 3 px, sem o contorno de cima, e a mão menor.
+  fino?: boolean;
 }
 
 // O Grow: a manga do casaco escuro, o punho de pelo claro (o da gola) e a pele do sprite.
@@ -42,9 +49,10 @@ export const BRACO_GROW: CoresBraco = {
   braco: { luz: '#eac2a9', cima: '#c7a18a', sombra: '#8e705e' },
   mao: { brilho: '#fbe6cc', luz: '#eac2a9', cima: '#c7a18a', sombra: '#8e705e', vinco: '#7a5040' },
 };
-// A Leslie: o braço nu, com uma pulseira de folhas no pulso.
+// A Leslie: o braço nu, fino como o dela, com uma pulseira de folhas no pulso.
 export const BRACO_LESLIE: CoresBraco = {
-  contorno: '#2b1911',
+  fino: true,
+  contorno: '#4e3425',
   faixa: { cima: '#6c7d48', sombra: '#3d492a', noPulso: true },
   braco: { luz: '#f1c299', cima: '#e3a37c', sombra: '#ac7355' },
   mao: { brilho: '#fde2ba', luz: '#f1c299', cima: '#e3a37c', sombra: '#c88968', vinco: '#936147' },
@@ -70,8 +78,9 @@ export interface Ponto {
 
 // O ombro do braço desenhado, em pixels inteiros do mapa: o da frente (ou o de trás, no Grow).
 export function ombroDe(c: ComOmbro): Ponto {
-  const frente = c.maoLivreAtras ? -OMBRO.frente : OMBRO.frente;
-  return { x: Math.round(c.x) + c.direcao * frente, y: Math.round(c.y) - OMBRO.altura };
+  const ombro = ombroDo(c);
+  const frente = c.maoLivreAtras ? -ombro.frente : ombro.frente;
+  return { x: Math.round(c.x) + c.direcao * frente, y: Math.round(c.y) - ombro.altura };
 }
 
 // O ângulo no mapa de um ângulo "do corpo": 0 = para a frente, positivo = para baixo. Assim uma
@@ -121,10 +130,10 @@ export function desenharBracoGrosso(
       } else if (faixa && t >= faixaDe && t < faixaAte) {
         const meia = faixa.noPulso ? 1 : 1.5; // o punho do casaco é da grossura da manga
         if (d >= -meia && d < meia) cor = d < 0 ? faixa.cima : faixa.sombra;
-        else if (d >= -meia - 1 && d < meia + 1) cor = cores.contorno;
+        else if (d >= (cores.fino ? meia : -meia - 1) && d < meia + 1) cor = cores.contorno;
       } else if (d >= -1 && d < 1) {
         cor = d < 0 ? (t > pulso - 3 ? braco.luz : braco.cima) : braco.sombra;
-      } else if (d >= -2 && d < 2) {
+      } else if (d >= (cores.fino ? 1 : -2) && d < 2) {
         cor = cores.contorno;
       }
       if (!cor) continue;
@@ -145,17 +154,26 @@ const MAO = [
   'kSCSk',
   '.kkk.',
 ];
+// A da Leslie, delicada (4×4).
+const MAO_FINA = [
+  '.kk.',
+  'kBLk',
+  'kCSk',
+  '.kk.',
+];
 
 function pintarMao(ctx: CanvasRenderingContext2D, mao: Ponto, direcao: 1 | -1, cores: CoresBraco, contorno: boolean): void {
   const { mao: tons } = cores;
   const cor: Record<string, string> = { k: cores.contorno, B: tons.brilho, L: tons.luz, C: tons.cima, S: tons.sombra, v: tons.vinco };
   const mx = Math.round(mao.x);
   const my = Math.round(mao.y);
-  MAO.forEach((linha, y) =>
+  const desenho = cores.fino ? MAO_FINA : MAO;
+  const meio = desenho.length >> 1;
+  desenho.forEach((linha, y) =>
     [...linha].forEach((ch, x) => {
       if (ch === '.' || (ch === 'k') !== contorno) return;
       ctx.fillStyle = cor[ch];
-      ctx.fillRect(mx + direcao * (x - 2), my + y - 2, 1, 1);
+      ctx.fillRect(mx + direcao * (x - meio), my + y - meio, 1, 1);
     }),
   );
 }

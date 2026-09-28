@@ -22,7 +22,7 @@
     "db:migrar": "npm run db:migrar -w @terna/servidor",
     "arte:cenario": "node ferramentas/gerar-cenario.cjs",
     "arte:anjo": "node ferramentas/gerar-anjo.cjs",
-    "arte:leslie": "node ferramentas/gerar-herois.cjs leslie",
+    "arte:leslie": "node ferramentas/gerar-herois.cjs leslie flor",
     "arte:grow": "node ferramentas/gerar-herois.cjs grow golem aguia"
   },
   "devDependencies": {

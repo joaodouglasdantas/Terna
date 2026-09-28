@@ -33,18 +33,19 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 | `npm run db:gerar` | cria a migração do banco depois de mudar `schema.ts` |
 | `npm run db:migrar` | aplica as migrações (o servidor também aplica sozinho ao subir) |
 | `npm run arte:cenario` | regera o cenário a partir de `fontes/` (a paisagem com o rio, e onde fica a água que o jogo anima) |
-| `npm run arte:leslie` | regera a Leslie a partir de `fontes/leslie.png` |
+| `npm run arte:leslie` | regera a Leslie e a Flor Carnívora (a ult dela) a partir de `fontes/leslie.png` e `flor.png` |
 | `npm run arte:grow` | regera o Grow (com o musgo pintado no cajado, e a folha sem o cajado na mão), o golem e as águias a partir de `fontes/grow.png`, `golem.png` e `aguia.png` |
-| `python3 ferramentas/simular-duelo.py` | simula duelos entre os personagens (duração e quem vence) com os números do balanceamento; `antes` compara com os de antes (BALANCEAMENTO.md) |
-| `node ferramentas/tirar-fundo.cjs <folha.png> <nome>` | tira o fundo preto de uma folha nova de personagem e grava em `fontes/` (os pretos de dentro do desenho — olhos, contornos — ficam); com `--cor-do-canto`, o fundo é a cor do canto da folha (as águias vieram num azul-escuro) |
+| `python3 ferramentas/simular-duelo.py` | simula duelos entre os personagens (duração e quem vence) com os números do balanceamento; `antes` compara com os de antes, `furia` com a Fúria da Floresta no lugar da Flor (BALANCEAMENTO.md) |
+| `node ferramentas/tirar-fundo.cjs <folha.png> <nome>` | tira o fundo preto de uma folha nova de personagem e grava em `fontes/` (os pretos de dentro do desenho — olhos, contornos — ficam); com `--cor-do-canto`, o fundo é a cor do canto da folha (as águias vieram num azul-escuro); com `--xadrez`, o xadrez branco e cinza de "transparente" pintado na folha (a da flor) |
 | `npm run arte:anjo` | regera o Anjo (desligado por enquanto) a partir de `fontes/SpriteBase.png` |
 
 ## Personagens
 
 - **Leslie**, a dríade da floresta: pega as armas que caem do céu e, com **R**, troca o clique
-  esquerdo entre a arma e os poderes dela (Chicote de Espinhos, Raízes e Fúria da Floresta; o
-  botão direito troca o poder escolhido). O Chicote e as Raízes gastam quase nada de energia pixy;
-  dar dano enche a barra, e a Fúria só sai com ela cheia. Números em `packages/compartilhado/src/conteudo/leslie.ts`
+  esquerdo entre a arma e os poderes dela (Chicote de Espinhos, Raízes e Flor Carnívora; o
+  botão direito troca o poder escolhido). O veneno do Chicote cura a Leslie em metade do que tira.
+  O Chicote e as Raízes gastam quase nada de energia pixy; dar dano enche a barra, e a Flor
+  Carnívora (brota do chão, persegue o outro e cospe veneno de longe) só sai com ela cheia. Números em `packages/compartilhado/src/conteudo/leslie.ts`
   e, os custos de energia, em `conteudo/poderes.ts`.
 - **Grow**, o metamorfo: de gente é como a Leslie (arma ou poderes na **R**), mas os poderes dele
   tiram pouca vida — servem para afastar: a Revoada de Águias (três águias levam o outro bem alto

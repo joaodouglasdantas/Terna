@@ -28,9 +28,9 @@ import { botao, elemento, palco, sairComEsmaecer } from './dom';
 
 // Uma linha sobre cada poder, para o cartão.
 export const SOBRE_PODER: Record<IdPoder, string> = {
-  chicote: 'uma vinha de espinhos que estala e envenena',
+  chicote: 'uma vinha de espinhos que envenena; o veneno cura você',
   raizes: 'uma fileira de raízes rompe a terra e prende; a última, por mais tempo',
-  furia: 'com a energia cheia: trepadeiras rompem uma área grande, e ela se cura',
+  flor: 'com a energia cheia: uma flor carnívora brota, persegue e cospe veneno de longe',
   impacto: 'uma fileira de explosões correndo pelo chão',
   rajada: 'dois corações que enfeitiçam quem acertam',
   julgamento: 'um pilar de luz desce do céu',

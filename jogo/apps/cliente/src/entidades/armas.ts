@@ -737,24 +737,33 @@ const PUNHO = [
   '.kTTkSk',
   '..kkkk.',
 ];
-const LARGURA_DO_PUNHO = PUNHO[0].length;
+// O da Leslie, delicado (5×5): o mesmo desenho, menor.
+const PUNHO_FINO = [
+  '.kkk.',
+  'kBLBk',
+  '.CkLk',
+  '.TTSk',
+  '..kk.',
+];
 
 // O braço do soco (braco.ts), de `ombro` até `comprimento` na direção `ang`, e o punho na ponta.
 function desenharBracoDoSoco(ctx: CanvasRenderingContext2D, ombro: Ponto, ang: number, comprimento: number, cores: CoresBraco, direcao: 1 | -1): void {
   const ux = Math.cos(ang);
   const uy = Math.sin(ang);
-  desenharBracoGrosso(ctx, ombro, ang, comprimento - LARGURA_DO_PUNHO + 2, cores); // o antebraço acaba dentro do punho
+  const punho = cores.fino ? PUNHO_FINO : PUNHO;
+  const largura = punho[0].length;
+  desenharBracoGrosso(ctx, ombro, ang, comprimento - largura + 2, cores); // o antebraço acaba dentro do punho
   // O punho: a frente dele na ponta do braço, um pixel mais alto e um mais baixo que o antebraço.
   const px = Math.round(ombro.x + ux * comprimento);
-  const py = Math.round(ombro.y + uy * comprimento) - 3;
+  const py = Math.round(ombro.y + uy * comprimento) - (cores.fino ? 2 : 3);
   const { mao } = cores;
   const cor: Record<string, string> = { k: cores.contorno, B: mao.brilho, L: mao.luz, C: mao.cima, S: mao.sombra, v: mao.vinco, T: mao.brilho };
-  PUNHO.forEach((linha, y) =>
+  punho.forEach((linha, y) =>
     [...linha].forEach((ch, x) => {
       if (ch === '.') return;
       ctx.fillStyle = cor[ch];
       // Olhando para a esquerda, o punho é espelhado.
-      const dx = x - (LARGURA_DO_PUNHO - 1);
+      const dx = x - (largura - 1);
       ctx.fillRect(px + direcao * dx, py + y, 1, 1);
     }),
   );
@@ -782,8 +791,9 @@ export function desenharSoco(ctx: CanvasRenderingContext2D, c: CorpoArmado, core
   ctx.fillStyle = cores.mao.brilho;
   if (t < 0.45) {
     ctx.globalAlpha = 0.7 * (1 - t / 0.45);
-    for (let k = 0; k < 4; k++) ponto(-LARGURA_DO_PUNHO - 1 - k, -4);
-    for (let k = 0; k < 3; k++) ponto(-LARGURA_DO_PUNHO - 2 - k, 3);
+    const largura = (cores.fino ? PUNHO_FINO : PUNHO)[0].length;
+    for (let k = 0; k < 4; k++) ponto(-largura - 1 - k, -4);
+    for (let k = 0; k < 3; k++) ponto(-largura - 2 - k, 3);
   }
   if (t >= 0.3 && t < 0.6) {
     ctx.globalAlpha = 0.85 * (1 - (t - 0.3) / 0.3);

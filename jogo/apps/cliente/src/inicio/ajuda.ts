@@ -9,6 +9,7 @@ import {
   DEFESA_GOLEM,
   DURACAO_ANJO,
   DURACAO_GOLEM,
+  FLOR,
   NOME_PODER,
   PODERES_DO_HEROI,
   PODERES_GOLEM,
@@ -87,8 +88,9 @@ function dicasDo(heroi: Heroi): { dicas: string[]; outra?: { titulo: string; pod
     return {
       dicas: [
         'O Chicote envenena: o outro vai perdendo vida aos poucos.',
-        'A última roda das Raízes prende por mais tempo — dá para emendar a Fúria.',
-        'A Fúria da Floresta só sai com a barra cheia, e cura você.',
+        'O veneno do Chicote cura você: a metade do que ele tira.',
+        'A última roda das Raízes prende por mais tempo — dá para emendar a Flor.',
+        `A Flor Carnívora só sai com a barra cheia: fica ${FLOR.duracao} s de pé, persegue o outro e cospe veneno de longe.`,
       ],
     };
   }
