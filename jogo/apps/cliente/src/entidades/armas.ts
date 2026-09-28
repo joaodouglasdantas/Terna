@@ -30,9 +30,9 @@ import {
   BRACO_BASE,
   anguloNoMapa,
   type CoresBraco,
-  type CoresSoco,
-  desenharBracoEsticado,
-  desenharMao,
+  desenharBracoComMao,
+  desenharBracoGrosso,
+  desenharMaoSegurando,
   maisBraco,
   ombroDe,
   type Ponto,
@@ -90,7 +90,7 @@ function ombroDoSoco(c: CorpoArmado): Ponto {
 }
 const DURACAO_ATAQUE: Record<TipoAtaque, number> = { espada: ESPADA.golpe + 0.08, arco: 0.4, soco: SOCO.golpe + 0.04 };
 const LIMITE_DA_MIRA: Record<TipoAtaque, number> = { espada: POSE.miraEspada, arco: POSE.miraArco, soco: POSE.miraSoco };
-const LAMINA = { de: 3, ate: 14 }; // pixels da mão até o começo e a ponta da lâmina
+const LAMINA = { de: 4, ate: 15 }; // pixels da mão até o começo e a ponta da lâmina (o cabo fica na mão)
 const ACABANDO = 3; // segundos: com menos que isto de durabilidade, a arma pisca
 
 const cores = {
@@ -554,12 +554,12 @@ function pixel(ctx: CanvasRenderingContext2D, o: Ponto, ang: number, k: number, 
   ctx.fillRect(Math.round(o.x + cos * k - sin * lado), Math.round(o.y + sin * k + cos * lado), 1, 1);
 }
 
-// A espada com o cabo em `mao`, apontando para `ang` (no mapa): pomo, cabo, guarda dourada,
-// lâmina de 2 px (clara em cima, escura embaixo) e a ponta branca.
+// A espada com o cabo em `mao`, apontando para `ang` (no mapa): pomo, cabo (saindo dos dois lados
+// da mão fechada), guarda dourada, lâmina de 2 px (clara em cima, escura embaixo) e a ponta branca.
 function desenharEspada(ctx: CanvasRenderingContext2D, mao: Ponto, ang: number): void {
-  pixel(ctx, mao, ang, -2, 0, cores.guarda);
-  for (let k = -1; k <= 1; k += 0.5) pixel(ctx, mao, ang, k, 0, cores.cabo);
-  for (let l = -2; l <= 2; l += 0.5) pixel(ctx, mao, ang, 2, l, Math.abs(l) < 1 ? cores.guardaClara : cores.guarda);
+  pixel(ctx, mao, ang, -3, 0, cores.guarda);
+  for (let k = -2.5; k <= 2; k += 0.5) pixel(ctx, mao, ang, k, 0, cores.cabo);
+  for (let l = -2; l <= 2; l += 0.5) pixel(ctx, mao, ang, 3, l, Math.abs(l) < 1 ? cores.guardaClara : cores.guarda);
   for (let k = LAMINA.de; k < LAMINA.ate; k += 0.5) {
     pixel(ctx, mao, ang, k, 0.5, cores.laminaEscura);
     pixel(ctx, mao, ang, k, -0.5, cores.lamina);
@@ -676,10 +676,10 @@ export function desenharArmasNaFrente(ctx: CanvasRenderingContext2D, a: Arsenal)
 }
 
 // A arma na mão, por cima do sprite. De frente e sem atacar (`maoDeFrente`: a mão do próprio
-// sprite), só a arma nessa mão: a espada de pé e o arco ao lado do corpo. De lado, o braço saindo
-// do ombro da frente com a arma na mão; atacando, a espada varrendo (com o risco de luz da ponta)
-// ou o arco esticado na direção da mira, com a corda voltando depois de soltar a flecha. Acabando,
-// pisca. `braco`: as cores do braço de quem segura (a manga do Anjo, a pele da Leslie).
+// sprite), só a mão fechada com a arma: a espada de pé e o arco ao lado do corpo. De lado, o
+// braço saindo do ombro com a arma na mão fechada; atacando, a espada varrendo (com o risco de luz
+// da ponta) ou o arco esticado na direção da mira, com a corda voltando depois de soltar a flecha.
+// Acabando, pisca. `braco`: as cores do braço de quem segura (braco.ts).
 export function desenharArmaNaMao(
   ctx: CanvasRenderingContext2D,
   c: CorpoArmado,
@@ -691,38 +691,36 @@ export function desenharArmaNaMao(
   if (!arma) return;
   const ombro = ombroDe(c);
   const ataque = c.ataque?.tipo === arma.tipo ? c.ataque : null;
+  const esticar = (ang: number, comprimento: number, segurar: (mao: Ponto) => void): void => {
+    desenharBracoComMao(ctx, ombro, ang, comprimento, c.direcao, braco, segurar);
+  };
   ctx.save();
   if (arma.durabilidade < ACABANDO && Math.floor(tempo * 8) % 2 === 0) ctx.globalAlpha = 0.45;
   if (maoDeFrente && !ataque) {
-    if (arma.tipo === 'espada') desenharEspada(ctx, maoDeFrente, anguloNoMapa(POSE.espadaEmPe, c.direcao));
-    else desenharArco(ctx, maoDeFrente, anguloNoMapa(0, c.direcao), 0);
-    desenharMao(ctx, maoDeFrente, braco);
+    desenharMaoSegurando(ctx, maoDeFrente, c.direcao, braco, (mao) => {
+      if (arma.tipo === 'espada') desenharEspada(ctx, mao, anguloNoMapa(POSE.espadaEmPe, c.direcao));
+      else desenharArco(ctx, mao, anguloNoMapa(0, c.direcao), 0);
+    });
   } else if (arma.tipo === 'espada') {
     if (ataque) {
       const t = ataque.idade / ESPADA.golpe;
       desenharRisco(ctx, c, ombro, ataque.mira, Math.min(1, t));
       const ang = anguloNoMapa(anguloDoGolpe(ataque.mira, t), c.direcao);
-      const mao = desenharBracoEsticado(ctx, ombro, ang, POSE.bracoGolpe + maisBraco(c), braco);
-      desenharEspada(ctx, mao, ang);
-      desenharMao(ctx, mao, braco);
+      esticar(ang, POSE.bracoGolpe + maisBraco(c), (mao) => desenharEspada(ctx, mao, ang));
     } else {
-      const mao = desenharBracoEsticado(ctx, ombro, anguloNoMapa(POSE.descanso.espada, c.direcao), POSE.braco + maisBraco(c), braco);
-      desenharEspada(ctx, mao, anguloNoMapa(POSE.espadaEmPe, c.direcao));
-      desenharMao(ctx, mao, braco);
+      const emPe = anguloNoMapa(POSE.espadaEmPe, c.direcao);
+      esticar(anguloNoMapa(POSE.descanso.espada, c.direcao), POSE.braco + maisBraco(c), (mao) => desenharEspada(ctx, mao, emPe));
     }
   } else if (ataque) {
     // Mirando: estica rápido, fica, e a corda treme de volta depois da flecha sair.
     const t = ataque.idade / DURACAO_ATAQUE.arco;
     const estica = t < 0.15 ? 0.6 + (t / 0.15) * 0.4 : t > 0.8 ? 1 - ((t - 0.8) / 0.2) * 0.4 : 1;
     const ang = anguloNoMapa(ataque.mira, c.direcao);
-    const mao = desenharBracoEsticado(ctx, ombro, ang, Math.round((POSE.bracoArco + maisBraco(c)) * estica), braco);
     const treme = t < 0.35 ? Math.abs(Math.sin(t * 60)) * (1 - t / 0.35) * 0.6 : 0;
-    desenharArco(ctx, mao, ang, treme);
-    desenharMao(ctx, mao, braco);
+    esticar(ang, Math.round((POSE.bracoArco + maisBraco(c)) * estica), (mao) => desenharArco(ctx, mao, ang, treme));
   } else {
-    const mao = desenharBracoEsticado(ctx, ombro, anguloNoMapa(POSE.descanso.arco, c.direcao), POSE.braco + maisBraco(c), braco);
-    desenharArco(ctx, mao, anguloNoMapa(0, c.direcao), 0);
-    desenharMao(ctx, mao, braco);
+    const deLado = anguloNoMapa(0, c.direcao);
+    esticar(anguloNoMapa(POSE.descanso.arco, c.direcao), POSE.braco + maisBraco(c), (mao) => desenharArco(ctx, mao, deLado, 0));
   }
   ctx.restore();
 }
@@ -741,53 +739,11 @@ const PUNHO = [
 ];
 const LARGURA_DO_PUNHO = PUNHO[0].length;
 
-// O braço do soco, de `ombro` até `comprimento` na direção `ang`, e o punho na ponta. Cada pixel
-// perto da linha do braço é pintado pela distância a ela: assim a grossura é a mesma em qualquer
-// mira, sem buraco na diagonal. De cima para baixo: o contorno, a luz, a cor, a sombra e o
-// contorno de novo; a manga (quem tem) é 1 px mais grossa que o antebraço. Começa 2 px para dentro
-// do ombro, para não parecer solto do corpo.
-function desenharBracoDoSoco(ctx: CanvasRenderingContext2D, ombro: Ponto, ang: number, comprimento: number, cores: CoresSoco, direcao: 1 | -1): void {
+// O braço do soco (braco.ts), de `ombro` até `comprimento` na direção `ang`, e o punho na ponta.
+function desenharBracoDoSoco(ctx: CanvasRenderingContext2D, ombro: Ponto, ang: number, comprimento: number, cores: CoresBraco, direcao: 1 | -1): void {
   const ux = Math.cos(ang);
   const uy = Math.sin(ang);
-  // A normal aponta sempre para baixo: o lado da sombra, olhando para qualquer lado.
-  const [nx, ny] = ux >= 0 ? [-uy, ux] : [uy, -ux];
-  const ox = ombro.x + 0.5;
-  const oy = ombro.y + 0.5;
-  const fim = comprimento - LARGURA_DO_PUNHO + 2; // o antebraço acaba dentro do punho
-  const { manga, faixa, braco } = cores;
-  // Onde fica a faixa, ao longo do braço: logo depois da manga ou encostada no punho.
-  const faixaDe = faixa ? (faixa.noPulso ? fim - 2 : (manga?.ate ?? 0)) : Infinity;
-  const faixaAte = faixa ? (faixa.noPulso ? fim : faixaDe + 1) : -Infinity;
-  const x0 = Math.floor(Math.min(ox, ox + ux * comprimento)) - 3;
-  const x1 = Math.ceil(Math.max(ox, ox + ux * comprimento)) + 3;
-  const y0 = Math.floor(Math.min(oy, oy + uy * comprimento)) - 3;
-  const y1 = Math.ceil(Math.max(oy, oy + uy * comprimento)) + 3;
-  for (let y = y0; y <= y1; y++) {
-    for (let x = x0; x <= x1; x++) {
-      const cx = x + 0.5 - ox;
-      const cy = y + 0.5 - oy;
-      const t = cx * ux + cy * uy; // ao longo do braço
-      const d = cx * nx + cy * ny; // para o lado (positivo = para baixo)
-      if (t < -2 || t > fim) continue;
-      let cor: string | null = null;
-      if (manga && t < manga.ate) {
-        if (d >= -1.5 && d < 1.5) cor = d < -0.5 ? manga.luz : d < 0.5 ? manga.cima : manga.sombra;
-        else if (d >= -2.5 && d < 2.5) cor = cores.contorno;
-      } else if (faixa && t >= faixaDe && t < faixaAte) {
-        const grossa = !faixa.noPulso; // o punho do casaco é da grossura da manga
-        const meia = grossa ? 1.5 : 1;
-        if (d >= -meia && d < meia) cor = d < 0 ? faixa.cima : faixa.sombra;
-        else if (d >= -meia - 1 && d < meia + 1) cor = cores.contorno;
-      } else if (d >= -1 && d < 1) {
-        cor = d < 0 ? (t > fim - 3 ? braco.luz : braco.cima) : braco.sombra;
-      } else if (d >= -2 && d < 2) {
-        cor = cores.contorno;
-      }
-      if (!cor) continue;
-      ctx.fillStyle = cor;
-      ctx.fillRect(x, y, 1, 1);
-    }
-  }
+  desenharBracoGrosso(ctx, ombro, ang, comprimento - LARGURA_DO_PUNHO + 2, cores); // o antebraço acaba dentro do punho
   // O punho: a frente dele na ponta do braço, um pixel mais alto e um mais baixo que o antebraço.
   const px = Math.round(ombro.x + ux * comprimento);
   const py = Math.round(ombro.y + uy * comprimento) - 3;
@@ -806,7 +762,7 @@ function desenharBracoDoSoco(ctx: CanvasRenderingContext2D, ombro: Ponto, ang: n
 
 // O soco: o braço esticando na direção da mira com o punho fechado na ponta. Esticando, dois
 // riscos de vento correm atrás do punho; no fim do esticão, o ar estala na frente dele.
-export function desenharSoco(ctx: CanvasRenderingContext2D, c: CorpoArmado, cores: CoresSoco): void {
+export function desenharSoco(ctx: CanvasRenderingContext2D, c: CorpoArmado, cores: CoresBraco): void {
   const ataque = c.ataque;
   if (!ataque || ataque.tipo !== 'soco') return;
   const t = Math.min(1, ataque.idade / SOCO.golpe);

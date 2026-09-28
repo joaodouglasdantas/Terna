@@ -59,21 +59,7 @@ import {
 } from './anjo/anjo';
 import { PAIRAR_NO_AR, criarVoo, decolar, voarNoAr, type Voo } from './anjo/voo';
 import { desenharArmaNaMao, desenharSoco, type ArmaNaMao, type Ataque } from './armas';
-import {
-  BRACO_ANJO,
-  BRACO_BASE,
-  BRACO_GROW,
-  BRACO_LESLIE,
-  SOCO_BASE,
-  SOCO_GROW,
-  SOCO_LESLIE,
-  desenharBracoEsticado,
-  desenharMao,
-  maisBraco,
-  ombroDe,
-  type CoresBraco,
-  type CoresSoco,
-} from './braco';
+import { BRACO_ANJO, BRACO_BASE, BRACO_GROW, BRACO_LESLIE, desenharBracoComMao, maisBraco, ombroDe, type CoresBraco } from './braco';
 import { CORPO, manobraAcabou, pontoDaManobra, type Manobra, type Medida } from './efeitos';
 import { carregarAguias } from './grow/aguia';
 import { desenharCajadoNasCostas } from './grow/cajado';
@@ -226,8 +212,6 @@ const MAO_DE_FRENTE: Record<Heroi, { lado: number; linha: number }> = {
 };
 // O braço que segura a arma: a manga do moletom do Anjo, a pele da Leslie e do Grow.
 const BRACO_DA_ARMA: Record<Heroi, CoresBraco> = { anjo: BRACO_BASE, leslie: BRACO_LESLIE, grow: BRACO_GROW };
-// E o do soco, mais grosso e com a roupa de cada um.
-const BRACO_DO_SOCO: Record<Heroi, CoresSoco> = { anjo: SOCO_BASE, leslie: SOCO_LESLIE, grow: SOCO_GROW };
 const BRACO_DO_PODER: Record<Heroi, { cores: CoresBraco; brilho: string }> = {
   anjo: { cores: BRACO_ANJO, brilho: '255, 95, 162' }, // rosa
   leslie: { cores: BRACO_LESLIE, brilho: '143, 212, 90' }, // verde
@@ -944,7 +928,7 @@ export function desenharPersonagem(ctx: CanvasRenderingContext2D, p: Personagem,
     if (p.gesto && !golem && !pelaPedra(p)) desenharBraco(ctx, p, p.gesto);
     if (p.vida > 0 && !(p.heroi !== 'anjo' && p.modo === 'poderes') && !golem) {
       desenharArmaNaMao(ctx, p, tempo, maoDeFrente, BRACO_DA_ARMA[p.heroi]);
-      desenharSoco(ctx, p, BRACO_DO_SOCO[p.heroi]); // sem arma na mão
+      desenharSoco(ctx, p, BRACO_DA_ARMA[p.heroi]); // sem arma na mão
     }
   };
   // O Grow, no modo arma: o cajado nas costas, atrás de tudo. O braço da arma e do soco é o de
@@ -966,25 +950,24 @@ export function desenharPersonagem(ctx: CanvasRenderingContext2D, p: Personagem,
 }
 
 // O braço do gesto (entidades/braco.ts): sai do ombro da frente na direção da mira, com a mão
-// mais clara e um brilho na cor dos poderes (rosa no Anjo, verde na Leslie). Estica rápido, fica
-// e recolhe no fim.
+// fechada na ponta e um brilho na cor dos poderes em volta dela (rosa no Anjo, verde na Leslie).
+// Estica rápido, fica e recolhe no fim.
 function desenharBraco(ctx: CanvasRenderingContext2D, p: Personagem, gesto: { resta: number; angulo: number }): void {
   const t = 1 - gesto.resta / GESTO.duracao; // 0 → 1
   const estica = t < 0.25 ? t / 0.25 : t > 0.75 ? (1 - t) / 0.25 : 1;
   const comprimento = Math.round((GESTO.braco + maisBraco(p)) * estica);
   if (comprimento < 2) return;
   const braco = BRACO_DO_PODER[p.heroi];
-  const mao = desenharBracoEsticado(ctx, ombroDe(p), gesto.angulo, comprimento, braco.cores);
-  const [mx, my] = [mao.x, mao.y];
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  const brilho = ctx.createRadialGradient(mx, my, 0, mx, my, 6);
-  brilho.addColorStop(0, `rgba(${braco.brilho}, ${0.7 * estica})`);
-  brilho.addColorStop(1, `rgba(${braco.brilho}, 0)`);
-  ctx.fillStyle = brilho;
-  ctx.fillRect(mx - 6, my - 6, 12, 12);
-  ctx.restore();
-  desenharMao(ctx, mao, braco.cores);
+  desenharBracoComMao(ctx, ombroDe(p), gesto.angulo, comprimento, p.direcao, braco.cores, ({ x, y }) => {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const brilho = ctx.createRadialGradient(x, y, 0, x, y, 7);
+    brilho.addColorStop(0, `rgba(${braco.brilho}, ${0.75 * estica})`);
+    brilho.addColorStop(1, `rgba(${braco.brilho}, 0)`);
+    ctx.fillStyle = brilho;
+    ctx.fillRect(x - 7, y - 7, 14, 14);
+    ctx.restore();
+  });
 }
 
 // O Grow soltando um poder: a pedra do cajado acende na cor do vento, com um brilho em volta e
