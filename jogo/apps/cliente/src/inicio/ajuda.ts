@@ -95,6 +95,7 @@ function dicasDo(heroi: Heroi): { dicas: string[]; outra?: { titulo: string; pod
   if (heroi === 'grow') {
     return {
       dicas: [
+        'O cajado: no modo poderes fica na mão, e os poderes saem da pedra dele; no modo arma (arma ou soco) vai nas costas.',
         'Vendaval: segure o clique esquerdo para soprar; soltando, o vento para.',
         `Golem: com a barra cheia, o 3 vira golem por ${DURACAO_GOLEM} s (o R desfaz antes).`,
         `De golem: os poderes não gastam energia, a pele de pedra segura ${Math.round(DEFESA_GOLEM * 100)}% do dano (DEF), e ele não pega arma, não dá soco nem pulo duplo.`,

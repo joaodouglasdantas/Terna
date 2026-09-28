@@ -30,6 +30,7 @@ import {
   BRACO_BASE,
   anguloNoMapa,
   type CoresBraco,
+  type CoresSoco,
   desenharBracoEsticado,
   desenharMao,
   maisBraco,
@@ -57,7 +58,7 @@ export interface Ataque {
 // O que as armas precisam de um personagem (o corpo é de entidades/personagem.ts).
 export interface CorpoArmado extends CorpoAlvo {
   direcao: 1 | -1;
-  maoLivreAtras?: boolean; // a mão da frente segura outra coisa (o cajado do Grow): o braço é o de trás
+  maoLivreAtras?: boolean; // o Grow: o braço da arma e do soco é o de trás
   dash: number; // no dash o lado já está decidido: o ataque não vira o corpo
   arma: ArmaNaMao | null;
   ataque: Ataque | null;
@@ -726,38 +727,86 @@ export function desenharArmaNaMao(
   ctx.restore();
 }
 
-// O punho fechado (4×3), na ponta do braço, olhando para a frente: os dedos dobrados em cima, o
-// nó dos dedos claro, a sombra embaixo e o contorno escuro na frente.
-const PUNHO = ['.mmk', 'mmnk', '.ssk'];
-const CONTORNO_DO_PUNHO = '#3a2418';
-const MANGA_DO_SOCO = 4; // pixels do ombro em que o braço ainda é a manga (quem tem)
+// O punho fechado (7×6), olhando para a frente (a coluna da direita é a dos nós dos dedos): as
+// costas da mão clara em cima, os nós dos dedos com brilho na frente, o vinco entre os dedos, o
+// dedão atravessado embaixo e o contorno escuro em volta. A coluna da esquerda fica aberta no
+// meio: é o pulso, por onde o antebraço entra (sem uma linha separando a mão do braço).
+const PUNHO = [
+  '.kkkk..',
+  'kBLLLk.',
+  '.CCCkBk',
+  '.CCkLCk',
+  '.kTTkSk',
+  '..kkkk.',
+];
+const LARGURA_DO_PUNHO = PUNHO[0].length;
 
-// O braço do soco: sai de dentro do ombro (2 px atrás dele, por cima do corpo, para não parecer
-// solto), com 3 px de grossura — o contorno escuro em cima, a cor e a sombra embaixo — e a manga
-// perto do ombro. Devolve a ponta.
-function desenharBracoDoSoco(ctx: CanvasRenderingContext2D, ombro: Ponto, ang: number, comprimento: number, braco: CoresBraco): Ponto {
-  const cos = Math.cos(ang);
-  const sin = Math.sin(ang);
-  const pontos: { x: number; y: number; manga: boolean }[] = [];
-  for (let i = -2; i < comprimento; i++) {
-    pontos.push({ x: Math.round(ombro.x + cos * i), y: Math.round(ombro.y + sin * i), manga: i < MANGA_DO_SOCO });
+// O braço do soco, de `ombro` até `comprimento` na direção `ang`, e o punho na ponta. Cada pixel
+// perto da linha do braço é pintado pela distância a ela: assim a grossura é a mesma em qualquer
+// mira, sem buraco na diagonal. De cima para baixo: o contorno, a luz, a cor, a sombra e o
+// contorno de novo; a manga (quem tem) é 1 px mais grossa que o antebraço. Começa 2 px para dentro
+// do ombro, para não parecer solto do corpo.
+function desenharBracoDoSoco(ctx: CanvasRenderingContext2D, ombro: Ponto, ang: number, comprimento: number, cores: CoresSoco, direcao: 1 | -1): void {
+  const ux = Math.cos(ang);
+  const uy = Math.sin(ang);
+  // A normal aponta sempre para baixo: o lado da sombra, olhando para qualquer lado.
+  const [nx, ny] = ux >= 0 ? [-uy, ux] : [uy, -ux];
+  const ox = ombro.x + 0.5;
+  const oy = ombro.y + 0.5;
+  const fim = comprimento - LARGURA_DO_PUNHO + 2; // o antebraço acaba dentro do punho
+  const { manga, faixa, braco } = cores;
+  // Onde fica a faixa, ao longo do braço: logo depois da manga ou encostada no punho.
+  const faixaDe = faixa ? (faixa.noPulso ? fim - 2 : (manga?.ate ?? 0)) : Infinity;
+  const faixaAte = faixa ? (faixa.noPulso ? fim : faixaDe + 1) : -Infinity;
+  const x0 = Math.floor(Math.min(ox, ox + ux * comprimento)) - 3;
+  const x1 = Math.ceil(Math.max(ox, ox + ux * comprimento)) + 3;
+  const y0 = Math.floor(Math.min(oy, oy + uy * comprimento)) - 3;
+  const y1 = Math.ceil(Math.max(oy, oy + uy * comprimento)) + 3;
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const cx = x + 0.5 - ox;
+      const cy = y + 0.5 - oy;
+      const t = cx * ux + cy * uy; // ao longo do braço
+      const d = cx * nx + cy * ny; // para o lado (positivo = para baixo)
+      if (t < -2 || t > fim) continue;
+      let cor: string | null = null;
+      if (manga && t < manga.ate) {
+        if (d >= -1.5 && d < 1.5) cor = d < -0.5 ? manga.luz : d < 0.5 ? manga.cima : manga.sombra;
+        else if (d >= -2.5 && d < 2.5) cor = cores.contorno;
+      } else if (faixa && t >= faixaDe && t < faixaAte) {
+        const grossa = !faixa.noPulso; // o punho do casaco é da grossura da manga
+        const meia = grossa ? 1.5 : 1;
+        if (d >= -meia && d < meia) cor = d < 0 ? faixa.cima : faixa.sombra;
+        else if (d >= -meia - 1 && d < meia + 1) cor = cores.contorno;
+      } else if (d >= -1 && d < 1) {
+        cor = d < 0 ? (t > fim - 3 ? braco.luz : braco.cima) : braco.sombra;
+      } else if (d >= -2 && d < 2) {
+        cor = cores.contorno;
+      }
+      if (!cor) continue;
+      ctx.fillStyle = cor;
+      ctx.fillRect(x, y, 1, 1);
+    }
   }
-  // Em três passadas, para a diagonal não apagar a linha de cima com a de baixo.
-  ctx.fillStyle = CONTORNO_DO_PUNHO;
-  for (const p of pontos) ctx.fillRect(p.x, p.y - 1, 1, 1);
-  for (const p of pontos) {
-    ctx.fillStyle = (p.manga && braco.manga ? braco.manga : braco).sombra;
-    ctx.fillRect(p.x, p.y + 1, 1, 1);
-  }
-  for (const p of pontos) {
-    ctx.fillStyle = (p.manga && braco.manga ? braco.manga : braco).cima;
-    ctx.fillRect(p.x, p.y, 1, 1);
-  }
-  return { x: ombro.x + cos * comprimento, y: ombro.y + sin * comprimento };
+  // O punho: a frente dele na ponta do braço, um pixel mais alto e um mais baixo que o antebraço.
+  const px = Math.round(ombro.x + ux * comprimento);
+  const py = Math.round(ombro.y + uy * comprimento) - 3;
+  const { mao } = cores;
+  const cor: Record<string, string> = { k: cores.contorno, B: mao.brilho, L: mao.luz, C: mao.cima, S: mao.sombra, v: mao.vinco, T: mao.brilho };
+  PUNHO.forEach((linha, y) =>
+    [...linha].forEach((ch, x) => {
+      if (ch === '.') return;
+      ctx.fillStyle = cor[ch];
+      // Olhando para a esquerda, o punho é espelhado.
+      const dx = x - (LARGURA_DO_PUNHO - 1);
+      ctx.fillRect(px + direcao * dx, py + y, 1, 1);
+    }),
+  );
 }
 
-// O soco, por cima do sprite: o braço esticando na direção da mira com o punho na ponta.
-export function desenharSoco(ctx: CanvasRenderingContext2D, c: CorpoArmado, braco: CoresBraco = BRACO_BASE): void {
+// O soco: o braço esticando na direção da mira com o punho fechado na ponta. Esticando, dois
+// riscos de vento correm atrás do punho; no fim do esticão, o ar estala na frente dele.
+export function desenharSoco(ctx: CanvasRenderingContext2D, c: CorpoArmado, cores: CoresSoco): void {
   const ataque = c.ataque;
   if (!ataque || ataque.tipo !== 'soco') return;
   const t = Math.min(1, ataque.idade / SOCO.golpe);
@@ -765,26 +814,31 @@ export function desenharSoco(ctx: CanvasRenderingContext2D, c: CorpoArmado, brac
   const ombro = ombroDoSoco(c);
   const ang = anguloNoMapa(ataque.mira, c.direcao);
   const comprimento = Math.round(POSE.punhoRecolhido + maisBraco(c) + (SOCO.alcance - POSE.punhoRecolhido) * esticado);
-  const ponta = desenharBracoDoSoco(ctx, ombro, ang, comprimento, braco);
-  const px = Math.round(ponta.x);
-  const py = Math.round(ponta.y) - 1;
-  const cor: Record<string, string> = { m: braco.mao, n: cores.ponta, s: braco.sombra, k: CONTORNO_DO_PUNHO };
-  PUNHO.forEach((linha, y) =>
-    [...linha].forEach((ch, x) => {
-      if (ch === '.') return;
-      ctx.fillStyle = cor[ch];
-      // Olhando para a esquerda, o punho é espelhado.
-      ctx.fillRect(c.direcao === 1 ? px + x - 1 : px - x + 1, py + y, 1, 1);
-    }),
-  );
-  // Esticando, dois risquinhos de vento atrás do punho.
-  if (t < 0.4) {
-    ctx.save();
-    ctx.globalAlpha = 0.5 * (1 - t / 0.4);
-    ctx.fillStyle = cores.ponta;
-    for (const d of [3, 5]) ctx.fillRect(Math.round(ponta.x - Math.cos(ang) * d), Math.round(ponta.y - Math.sin(ang) * d) - 2, 1, 1);
-    ctx.restore();
+  desenharBracoDoSoco(ctx, ombro, ang, comprimento, cores, c.direcao);
+
+  const ux = Math.cos(ang);
+  const uy = Math.sin(ang);
+  const [nx, ny] = ux >= 0 ? [-uy, ux] : [uy, -ux];
+  const ponta = { x: ombro.x + 0.5 + ux * comprimento, y: ombro.y + 0.5 + uy * comprimento };
+  const ponto = (ao: number, lado: number): void =>
+    ctx.fillRect(Math.floor(ponta.x + ux * ao + nx * lado), Math.floor(ponta.y + uy * ao + ny * lado), 1, 1);
+  ctx.save();
+  ctx.fillStyle = cores.mao.brilho;
+  if (t < 0.45) {
+    ctx.globalAlpha = 0.7 * (1 - t / 0.45);
+    for (let k = 0; k < 4; k++) ponto(-LARGURA_DO_PUNHO - 1 - k, -4);
+    for (let k = 0; k < 3; k++) ponto(-LARGURA_DO_PUNHO - 2 - k, 3);
   }
+  if (t >= 0.3 && t < 0.6) {
+    ctx.globalAlpha = 0.85 * (1 - (t - 0.3) / 0.3);
+    ponto(2, -1);
+    ponto(3, -1);
+    ponto(1, -4);
+    ponto(2, -5);
+    ponto(1, 2);
+    ponto(2, 3);
+  }
+  ctx.restore();
 }
 
 // O risco de luz que a ponta da espada deixa no golpe: um arco que se apaga para trás.

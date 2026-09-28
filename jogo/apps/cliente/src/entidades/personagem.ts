@@ -11,8 +11,10 @@
 //   lugares), gerados de fontes/SpriteBase.png por ferramentas/gerar-anjo.cjs.
 // - Grow, o metamorfo: de gente é como a Leslie (arma ou poderes, na tecla R); o terceiro poder,
 //   com a barra cheia, o transforma em golem por um tempo (grow/golem.ts) — aí os três poderes são
-//   os do golem, ele fica pesado e a pele de pedra absorve parte do dano. Quadros em
-//   assets/grow/base.png e grow/golem.png, gerados de fontes/grow.png e fontes/golem.png por
+//   os do golem, ele fica pesado e a pele de pedra absorve parte do dano. O cajado fica na mão
+//   só no modo poderes (os poderes saem da pedra dele); no modo arma vai nas costas
+//   (grow/cajado.ts). Quadros em assets/grow/base.png, grow/sem-cajado.png (o mesmo corpo sem o
+//   cajado na mão) e grow/golem.png, gerados de fontes/grow.png e fontes/golem.png por
 //   ferramentas/gerar-herois.cjs (que também gera os da Leslie).
 // Os sprites são desenhados virados para a direita.
 
@@ -31,6 +33,7 @@ import urlAnjoBase from '../assets/anjo/base.png';
 import urlAnjoAnjo from '../assets/anjo/anjo.png';
 import urlGrowBase from '../assets/grow/base.png';
 import urlGrowGolem from '../assets/grow/golem.png';
+import urlGrowSemCajado from '../assets/grow/sem-cajado.png';
 import urlLeslie from '../assets/leslie.png';
 import { QUADROS_ANJO } from '../gerado/anjo-quadros';
 import { QUADROS_GOLEM } from '../gerado/golem-quadros';
@@ -56,9 +59,24 @@ import {
 } from './anjo/anjo';
 import { PAIRAR_NO_AR, criarVoo, decolar, voarNoAr, type Voo } from './anjo/voo';
 import { desenharArmaNaMao, desenharSoco, type ArmaNaMao, type Ataque } from './armas';
-import { BRACO_ANJO, BRACO_BASE, BRACO_GROW, BRACO_LESLIE, desenharBracoEsticado, desenharMao, maisBraco, ombroDe, type CoresBraco } from './braco';
+import {
+  BRACO_ANJO,
+  BRACO_BASE,
+  BRACO_GROW,
+  BRACO_LESLIE,
+  SOCO_BASE,
+  SOCO_GROW,
+  SOCO_LESLIE,
+  desenharBracoEsticado,
+  desenharMao,
+  maisBraco,
+  ombroDe,
+  type CoresBraco,
+  type CoresSoco,
+} from './braco';
 import { CORPO, manobraAcabou, pontoDaManobra, type Manobra, type Medida } from './efeitos';
 import { carregarAguias } from './grow/aguia';
+import { desenharCajadoNasCostas } from './grow/cajado';
 import {
   alternarGolem,
   atualizarGolem,
@@ -106,7 +124,7 @@ export function quadroPersonagem(heroi: Heroi, animacao: NomeAnimacao, quadro: n
   return { w, h, ...SEM_ANCORAS };
 }
 
-type Recorte = { x: number; y: number; w: number; h: number; ax: number; axAnjo?: number };
+type Recorte = { x: number; y: number; w: number; h: number; ax: number; axAnjo?: number; pedra?: readonly number[] };
 type TabelaDeQuadros = Record<NomeAnimacao, readonly Recorte[]> & { morto?: readonly Recorte[]; retrato?: readonly Recorte[] };
 
 // `anjo`: usa o eixo do sprite do anjo — de lado a cabeça dele recua, e o eixo recua junto para
@@ -117,29 +135,38 @@ function recortar(folha: HTMLImageElement, tabela: TabelaDeQuadros, anjo: boolea
     animacoes[nome] = (tabela[nome] ?? []).map((q) => {
       const canvas = novoCanvas(q.w, q.h);
       contexto2d(canvas).drawImage(folha, q.x, q.y, q.w, q.h, 0, 0, q.w, q.h);
-      return { imagem: canvas, eixo: anjo ? (q.axAnjo ?? q.ax) : q.ax };
+      return { imagem: canvas, eixo: anjo ? (q.axAnjo ?? q.ax) : q.ax, pedra: q.pedra };
     });
   });
   return animacoes;
 }
 
-// Os sprites de cada personagem, por forma: todos têm a base; o Anjo, a de anjo; o Grow, a de golem.
-export type SpritesDosHerois = Record<Heroi, { base: AnimacoesPersonagem } & Partial<Record<Forma, AnimacoesPersonagem>>>;
+// Os sprites de cada personagem, por forma: todos têm a base; o Anjo, a de anjo; o Grow, a de golem
+// e, de gente, a sem o cajado na mão (no modo arma o cajado vai nas costas: grow/cajado.ts).
+export type SpritesDosHerois = Record<
+  Heroi,
+  { base: AnimacoesPersonagem; semCajado?: AnimacoesPersonagem } & Partial<Record<Forma, AnimacoesPersonagem>>
+>;
 
 // O Anjo também carrega (a arte é pequena), mesmo guardado: é só ligar para ele voltar.
 export async function carregarHerois(): Promise<SpritesDosHerois> {
-  const [leslie, anjoBase, anjoAnjo, growBase, growGolem] = await Promise.all([
+  const [leslie, anjoBase, anjoAnjo, growBase, growGolem, growSemCajado] = await Promise.all([
     carregarImagem(urlLeslie),
     carregarImagem(urlAnjoBase),
     carregarImagem(urlAnjoAnjo),
     carregarImagem(urlGrowBase),
     carregarImagem(urlGrowGolem),
+    carregarImagem(urlGrowSemCajado),
     carregarAguias(), // as águias da Revoada do Grow
   ]);
   return {
     leslie: { base: recortar(leslie, QUADROS_LESLIE, false) },
     anjo: { base: recortar(anjoBase, QUADROS_ANJO, false), anjo: recortar(anjoAnjo, QUADROS_ANJO, true) },
-    grow: { base: recortar(growBase, QUADROS_GROW, false), golem: recortar(growGolem, QUADROS_GOLEM, false) },
+    grow: {
+      base: recortar(growBase, QUADROS_GROW, false),
+      golem: recortar(growGolem, QUADROS_GOLEM, false),
+      semCajado: recortar(growSemCajado, QUADROS_GROW, false),
+    },
   };
 }
 
@@ -199,6 +226,8 @@ const MAO_DE_FRENTE: Record<Heroi, { lado: number; linha: number }> = {
 };
 // O braço que segura a arma: a manga do moletom do Anjo, a pele da Leslie e do Grow.
 const BRACO_DA_ARMA: Record<Heroi, CoresBraco> = { anjo: BRACO_BASE, leslie: BRACO_LESLIE, grow: BRACO_GROW };
+// E o do soco, mais grosso e com a roupa de cada um.
+const BRACO_DO_SOCO: Record<Heroi, CoresSoco> = { anjo: SOCO_BASE, leslie: SOCO_LESLIE, grow: SOCO_GROW };
 const BRACO_DO_PODER: Record<Heroi, { cores: CoresBraco; brilho: string }> = {
   anjo: { cores: BRACO_ANJO, brilho: '255, 95, 162' }, // rosa
   leslie: { cores: BRACO_LESLIE, brilho: '143, 212, 90' }, // verde
@@ -249,8 +278,8 @@ export interface Personagem {
   arma: ArmaNaMao | null; // a espada ou o arco na mão (só a forma base)
   ataque: Ataque | null; // o golpe, a flechada ou o soco em curso
   recargaSoco: number; // segundos até o próximo soco (sem arma)
-  // O Grow, de gente, segura o cajado com a mão da frente: a arma, o soco e o gesto dos poderes
-  // são da mão de trás (braco.ts).
+  // O Grow, de gente: a arma e o soco são da mão de trás (braco.ts); o cajado vai nas costas no
+  // modo arma e na mão no modo poderes.
   maoLivreAtras: boolean;
   energia: number; // energia pixy, de 0 a ENERGIA_PIXY.maxima: vem do dano dado, enche a barra do anjo
   daRede: boolean; // o outro jogador online: a forma, o modo e a energia dele vêm da rede
@@ -278,6 +307,23 @@ export function prepararPersonagens(animacoes: SpritesDosHerois, yDoChao: number
 // Os quadros de um personagem, na forma dele.
 export function spritesDo(heroi: Heroi, forma: Forma = 'base'): AnimacoesPersonagem {
   return ANIMACOES[heroi][forma] ?? ANIMACOES[heroi].base;
+}
+
+// O cajado do Grow, de gente: na mão só para os poderes. No modo arma (a arma do chão ou o soco)
+// ele vai nas costas (grow/cajado.ts) e o corpo é o da folha sem o cajado na mão.
+export function cajadoNasCostas(p: Personagem): boolean {
+  return p.heroi === 'grow' && formaDo(p) === 'base' && p.modo === 'arma' && p.vida > 0;
+}
+
+// Os poderes do Grow, de gente, saem da pedra do cajado: sem braço esticado, ela brilha.
+function pelaPedra(p: Personagem): boolean {
+  return p.heroi === 'grow' && formaDo(p) === 'base';
+}
+
+// Os quadros que aparecem agora: os da forma, ou os do Grow sem o cajado na mão.
+function quadrosDo(p: Personagem): AnimacoesPersonagem {
+  const semCajado = cajadoNasCostas(p) ? ANIMACOES.grow.semCajado : undefined;
+  return semCajado ?? spritesDo(p.heroi, formaDo(p));
 }
 
 export function criarPersonagem(heroi: Heroi, x: number, direcao: 1 | -1 = 1): Personagem {
@@ -431,9 +477,11 @@ export function gesticular(p: Personagem, alvo: { x: number; y: number }, paraCi
   p.gesto = { resta: GESTO.duracao, angulo };
 }
 
-// A ponta do braço esticado no gesto: de onde os poderes saem (sem gesto, o peito).
+// A ponta do braço esticado no gesto: de onde os poderes saem (sem gesto, o peito). O Grow, de
+// gente, os solta pela pedra do cajado.
 export function maoDo(p: Personagem): { x: number; y: number } {
   if (!p.gesto || formaDo(p) === 'golem') return peitoDo(p);
+  if (pelaPedra(p)) return pedraDoCajado(p) ?? peitoDo(p);
   const ombro = ombroDe(p);
   const braco = GESTO.braco + maisBraco(p);
   return { x: ombro.x + Math.cos(p.gesto.angulo) * braco, y: ombro.y + Math.sin(p.gesto.angulo) * braco };
@@ -566,8 +614,16 @@ function spriteAtual(p: Personagem): Sprite {
   const morto = spriteMorto(p);
   if (morto) return morto;
   const { animacao, quadro } = quadroMostrado(p);
-  const quadros = spritesDo(p.heroi, formaDo(p))[animacao];
+  const quadros = quadrosDo(p)[animacao];
   return quadros[Math.min(quadro, quadros.length - 1)];
+}
+
+// A pedra na ponta do cajado do Grow, no mapa (null sem o cajado na mão).
+function pedraDoCajado(p: Personagem): { x: number; y: number } | null {
+  const { pedra } = spriteAtual(p);
+  if (!pedra) return null;
+  const { x, topo, eixo, direcao } = poseDe(p);
+  return { x: x + direcao * (pedra[0] + 0.5 - eixo), y: topo + pedra[1] + 0.5 };
 }
 
 // A tinta das cópias do dash: a da Leslie, a do Grow (ou do golem), ou a da forma do Anjo.
@@ -883,22 +939,25 @@ export function desenharPersonagem(ctx: CanvasRenderingContext2D, p: Personagem,
   const mao = MAO_DE_FRENTE[p.heroi];
   const maoDeFrente = pose.deFrente ? { x: x + p.direcao * mao.lado, y: topo + mao.linha } : undefined;
   // O braço do gesto, a arma na mão e o soco. No modo poderes, a arma da Leslie e do Grow fica
-  // guardada (a mão é dos poderes).
+  // guardada (a mão é dos poderes); o Grow não estica braço: quem brilha é a pedra do cajado.
   const bracos = (): void => {
-    if (p.gesto && !golem) desenharBraco(ctx, p, p.gesto);
+    if (p.gesto && !golem && !pelaPedra(p)) desenharBraco(ctx, p, p.gesto);
     if (p.vida > 0 && !(p.heroi !== 'anjo' && p.modo === 'poderes') && !golem) {
       desenharArmaNaMao(ctx, p, tempo, maoDeFrente, BRACO_DA_ARMA[p.heroi]);
-      desenharSoco(ctx, p, BRACO_DA_ARMA[p.heroi]); // sem arma na mão
+      desenharSoco(ctx, p, BRACO_DO_SOCO[p.heroi]); // sem arma na mão
     }
   };
-  // Com a mão da frente no cajado (o Grow), o braço é o de trás: vem antes do corpo, que o cobre
-  // até ele sair na frente do peito. De frente, a arma fica na mão do próprio sprite, na frente.
+  // O Grow, no modo arma: o cajado nas costas, atrás de tudo. O braço da arma e do soco é o de
+  // trás: vem antes do corpo, que o cobre até ele sair na frente do peito. De frente, a arma fica
+  // na mão do próprio sprite, na frente.
+  if (cajadoNasCostas(p)) desenharCajadoNasCostas(ctx, pose);
   const bracoAtras = p.maoLivreAtras && !pose.deFrente;
   if (bracoAtras) bracos();
   desenhar(imagem, alfa);
   // Acabou de apanhar: o corpo pisca em branco-rosado, duas vezes.
   if (p.ferido > 0 && Math.floor(p.ferido * 14) % 2 === 0) desenhar(tingido(imagem), 0.8 * alfa);
   if (!bracoAtras) bracos();
+  if (p.gesto && pelaPedra(p)) desenharBrilhoDaPedra(ctx, p, p.gesto, tempo);
   if (p.heroi === 'anjo') desenharAnjoNaFrente(ctx, p.anjo, tempo, pose);
   if (p.heroi === 'grow') desenharGolemNaFrente(ctx, p.golem, tempo, pose);
   desenharEncanto(ctx, p, tempo);
@@ -926,6 +985,32 @@ function desenharBraco(ctx: CanvasRenderingContext2D, p: Personagem, gesto: { re
   ctx.fillRect(mx - 6, my - 6, 12, 12);
   ctx.restore();
   desenharMao(ctx, mao, braco.cores);
+}
+
+// O Grow soltando um poder: a pedra do cajado acende na cor do vento, com um brilho em volta e
+// duas faíscas girando. Acende rápido, fica e apaga no fim, como o braço dos outros.
+function desenharBrilhoDaPedra(ctx: CanvasRenderingContext2D, p: Personagem, gesto: { resta: number }, tempo: number): void {
+  const pedra = pedraDoCajado(p);
+  if (!pedra) return;
+  const t = 1 - gesto.resta / GESTO.duracao; // 0 → 1
+  const forca = t < 0.2 ? t / 0.2 : t > 0.75 ? (1 - t) / 0.25 : 1;
+  const cor = BRACO_DO_PODER.grow.brilho;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const brilho = ctx.createRadialGradient(pedra.x, pedra.y, 0, pedra.x, pedra.y, 8);
+  brilho.addColorStop(0, `rgba(${cor}, ${0.85 * forca})`);
+  brilho.addColorStop(0.45, `rgba(${cor}, ${0.3 * forca})`);
+  brilho.addColorStop(1, `rgba(${cor}, 0)`);
+  ctx.fillStyle = brilho;
+  ctx.fillRect(pedra.x - 8, pedra.y - 8, 16, 16);
+  ctx.fillStyle = `rgba(255, 255, 240, ${forca})`;
+  ctx.fillRect(Math.floor(pedra.x), Math.floor(pedra.y), 1, 1);
+  for (const lado of [0, Math.PI]) {
+    const a = tempo * 9 + lado;
+    ctx.fillStyle = `rgba(${cor}, ${0.9 * forca})`;
+    ctx.fillRect(Math.round(pedra.x + Math.cos(a) * 4), Math.round(pedra.y + Math.sin(a) * 3), 1, 1);
+  }
+  ctx.restore();
 }
 
 const tingidos = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();

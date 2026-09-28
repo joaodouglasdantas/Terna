@@ -10,9 +10,11 @@ export interface Recorte {
 }
 
 // Imagem já recortada e a coluna do centro do corpo, que fica sobre o `x` de quem a usa.
+// `pedra`: a ponta do cajado do Grow no quadro (x, y), nos quadros que têm.
 export interface Sprite {
   imagem: HTMLCanvasElement;
   eixo: number;
+  pedra?: readonly number[];
 }
 
 // Símbolo da matriz de pixels → cor.

@@ -34,7 +34,7 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 | `npm run db:migrar` | aplica as migrações (o servidor também aplica sozinho ao subir) |
 | `npm run arte:cenario` | regera o cenário a partir de `fontes/` (a paisagem com o rio, e onde fica a água que o jogo anima) |
 | `npm run arte:leslie` | regera a Leslie a partir de `fontes/leslie.png` |
-| `npm run arte:grow` | regera o Grow (com o musgo pintado no cajado), o golem e as águias a partir de `fontes/grow.png`, `golem.png` e `aguia.png` |
+| `npm run arte:grow` | regera o Grow (com o musgo pintado no cajado, e a folha sem o cajado na mão), o golem e as águias a partir de `fontes/grow.png`, `golem.png` e `aguia.png` |
 | `python3 ferramentas/simular-duelo.py` | simula duelos entre os personagens (duração e quem vence) com os números do balanceamento; `antes` compara com os de antes (BALANCEAMENTO.md) |
 | `node ferramentas/tirar-fundo.cjs <folha.png> <nome>` | tira o fundo preto de uma folha nova de personagem e grava em `fontes/` (os pretos de dentro do desenho — olhos, contornos — ficam); com `--cor-do-canto`, o fundo é a cor do canto da folha (as águias vieram num azul-escuro) |
 | `npm run arte:anjo` | regera o Anjo (desligado por enquanto) a partir de `fontes/SpriteBase.png` |
