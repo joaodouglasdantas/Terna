@@ -386,22 +386,23 @@ const ICONES_ARMAS: Record<TipoArma, HTMLCanvasElement> = {
   espada: criarSprite(DESENHO_ICONE.espada, PALETA_ICONE),
   arco: criarSprite(DESENHO_ICONE.arco, PALETA_ICONE),
 };
-// Sem arma na mão, o quadrinho mostra o punho fechado: o clique esquerdo dá um soco.
+// Sem arma na mão, o quadrinho mostra o punho fechado, de frente: os três dedos dobrados com a
+// luz nos nós, o lado da mão na sombra e o dedão atravessado embaixo, com contorno escuro.
 const PUNHO = criarSprite(
   [
     '...........',
-    '...........',
-    '...kkkkk...',
-    '..kPpPpPk..',
-    '.kpppppppk.',
-    '.kpppppppk.',
-    '.kttpppppk.',
-    '..kttppppk.',
-    '...kkkkkk..',
-    '...........',
+    '..kkkkkkkk.',
+    '.kWPkWPkWPk',
+    'kopPkpPkpPk',
+    'kosPkppkppk',
+    'kospkppkpsk',
+    'kosskspkssk',
+    'kokkkkkkkk.',
+    'kosPWPPPpk.',
+    '.kkkkkkkk..',
     '...........',
   ],
-  { k: '#5a3a28', p: '#e0b08a', P: '#f6d3bd', t: '#c08a66' },
+  { k: '#1a0f0a', o: '#8a4a26', s: '#b8693a', p: '#e0955e', P: '#f4b27e', W: '#ffd8b0' },
 );
 
 // A moldura do escolhido é da interface (verde); a dos outros, clara e apagada. A da arma, com
@@ -448,7 +449,7 @@ function desenharEspacoDaArma(p: Pincel, arma: ArmaNaMao | null, tempo: number, 
   p.retangulo(ARMA_X + 1, ESPACOS_Y + 1, ESPACO - 2, ESPACO - 2, 'rgba(26, 10, 22, 0.85)');
   if (!arma) {
     // Sem arma: o soco (apagadinho — é o ataque mais fraco).
-    p.imagem(PUNHO, ARMA_X + 1, ESPACOS_Y + 1, ativo ? 0.7 : 0.25);
+    p.imagem(PUNHO, ARMA_X + 1, ESPACOS_Y + 1, ativo ? 0.85 : 0.3);
     return;
   }
   p.imagem(ICONES_ARMAS[arma.tipo], ARMA_X + 1, ESPACOS_Y + 1, !ativo ? 0.3 : apaga ? 0.45 : 1);

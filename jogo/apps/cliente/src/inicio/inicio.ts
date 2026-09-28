@@ -13,6 +13,7 @@ import { VERSAO } from '../versao';
 import { anexarCena } from './cena';
 import { botao, digitandoEm, elemento, palco } from './dom';
 import { logoViva } from './logo-viva';
+import { botaoDaMusica } from './musica';
 import { telaMultiplayer, type EscolhaOnline } from './multiplayer';
 import { telaSelecao } from './selecao';
 import { carregarArteDaTemporada } from './temporada';
@@ -278,7 +279,7 @@ export function escolherModo(online: boolean): Promise<Escolha> {
     const modos = elemento('div', 'inicio-modos');
     modos.append(campo, erroNome, solo, multiplayer);
     const logo = logoViva();
-    tela.append(logo.palco, modos, elemento('p', 'inicio-versao', VERSAO));
+    tela.append(logo.palco, modos, elemento('p', 'inicio-versao', VERSAO), botaoDaMusica('inicio-botao inicio-botao-claro inicio-musica'));
     anexarCena(tela, true);
     palco().replaceChildren(tela);
     logo.ligar();

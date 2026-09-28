@@ -108,6 +108,17 @@
   background: #93e57d;
 }
 
+/* Ligar e desligar a música, pequeno, no canto de baixo à esquerda da tela inicial. */
+.inicio-musica {
+  position: absolute;
+  left: 14px;
+  bottom: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.95rem;
+}
+
 /* A versão do jogo, no canto de baixo da tela inicial: pequena, mas legível. */
 .inicio-versao {
   position: absolute;
@@ -297,9 +308,8 @@
 
 /* ---- inicial ---- */
 
-/* O cenário roda atrás: o escurecido só garante que a logo e o botão se leiam. */
+/* A floresta ao pôr do sol (cena.ts) atrás; a logo e os botões no meio dela. */
 .inicio-titulo-tela {
-  background: radial-gradient(ellipse at 50% 50%, rgba(20, 14, 8, 0.3) 0%, rgba(20, 14, 8, 0.75) 100%);
   gap: 1rem;
 }
 
@@ -385,45 +395,140 @@
   pointer-events: none;
 }
 
-/* ---- cena da frente (cena.ts) ---- */
+/* ---- o fundo dos menus (cena.ts) ---- */
 
-/* Árvores do jogo, grandes, nas beiradas do quadro: por cima do cenário escurecido e por baixo
-   do resto. Posição e tamanho de cada planta vêm do cena.ts, pelo tamanho do quadro. */
+/* A floresta ao pôr do sol cobre o quadro, por baixo do conteúdo da tela. A arte fica um pouco
+   maior que o quadro (sobra para a paralaxe andar sem mostrar a beirada), respira devagar e anda
+   de leve atrás do mouse (--px, --py, do cena.ts). */
 .inicio-cena {
   position: fixed;
   inset: 0;
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
+  background: #1b1430;
 }
 
-.inicio-planta,
-.inicio-cena-folhas {
+.inicio-cena-arte {
   position: absolute;
+  inset: 0;
+  transform: translate(var(--px, 0px), var(--py, 0px)) scale(1.035);
+  animation: inicio-cena-respira 26s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.inicio-cena-fundo {
+  position: absolute;
+  inset: 0;
+  background: var(--arte) center / 100% 100% no-repeat;
   image-rendering: pixelated;
 }
 
+/* As luzes da arte, somando luz: o fogo tremula rápido e sem ritmo, as lanternas respiram, o sol
+   pulsa devagar e a névoa das cachoeiras vai e vem. */
+.inicio-cena-luz {
+  position: absolute;
+  left: calc(var(--x) - var(--r));
+  top: calc(var(--y) - var(--r) * 16 / 9);
+  width: calc(var(--r) * 2);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+}
+
+.inicio-cena-luz-fogo {
+  background: radial-gradient(closest-side, rgba(255, 190, 90, 0.75), rgba(255, 120, 40, 0.28) 45%, rgba(255, 90, 30, 0));
+  animation: inicio-fogo 1.3s steps(6) var(--atraso) infinite;
+}
+
+.inicio-cena-luz-lanterna {
+  background: radial-gradient(closest-side, rgba(255, 215, 130, 0.7), rgba(255, 170, 70, 0.22) 50%, rgba(255, 170, 70, 0));
+  animation: inicio-lanterna 3.4s ease-in-out var(--atraso) infinite;
+}
+
+.inicio-cena-luz-sol {
+  background: radial-gradient(closest-side, rgba(255, 220, 140, 0.55), rgba(255, 150, 90, 0.2) 50%, rgba(255, 150, 90, 0));
+  animation: inicio-lanterna 6s ease-in-out infinite;
+}
+
+.inicio-cena-luz-nevoa {
+  background: radial-gradient(closest-side, rgba(220, 240, 255, 0.35), rgba(220, 240, 255, 0));
+  animation: inicio-lanterna 2.2s ease-in-out var(--atraso) infinite;
+}
+
+.inicio-cena-arte::after {
+  /* Um pouco mais escuro nas beiradas, para o meio (a logo e os botões) se destacar. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 55%, rgba(12, 8, 24, 0) 45%, rgba(12, 8, 24, 0.35) 100%);
+  pointer-events: none;
+}
+
 .inicio-cena-folhas {
+  position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  image-rendering: pixelated;
 }
 
-/* Na frente, quase na luz do cenário; atrás, mais escuras, para dar profundidade. */
-.inicio-planta {
-  filter: brightness(0.85) drop-shadow(0 0 18px rgba(10, 6, 2, 0.55));
+/* Abrindo a tela inicial, a arte chega: clareia e se aproxima. */
+.inicio-cena-entrando .inicio-cena-arte {
+  animation: inicio-cena-chega 1.4s cubic-bezier(0.2, 0.8, 0.3, 1) both, inicio-cena-respira 26s ease-in-out 1.4s infinite alternate;
 }
 
-.inicio-planta-atras {
-  filter: brightness(0.55) saturate(0.85);
+@keyframes inicio-cena-respira {
+  from {
+    transform: translate(var(--px, 0px), var(--py, 0px)) scale(1.035);
+  }
+  to {
+    transform: translate(var(--px, 0px), var(--py, 0px)) scale(1.07);
+  }
 }
 
-.inicio-cena-escondida .inicio-planta {
-  transform: translateY(105%);
+@keyframes inicio-cena-chega {
+  from {
+    opacity: 0;
+    filter: brightness(0.4);
+    transform: translate(var(--px, 0px), var(--py, 0px)) scale(1.12);
+  }
 }
 
-.inicio-cena-entrando .inicio-planta {
-  animation: inicio-sobe 1.1s cubic-bezier(0.2, 0.9, 0.3, 1.08) var(--atraso) both;
+@keyframes inicio-fogo {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  40% {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
+  60% {
+    opacity: 0.95;
+    transform: scale(1.03);
+  }
+  80% {
+    opacity: 0.75;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes inicio-lanterna {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
 }
 
 /* ---- botões ---- */
@@ -491,32 +596,87 @@
   width: min(18rem, 100%);
 }
 
-/* Os dois modos são o mesmo botão, grande e pulsando com o brilho da própria cor: o
-   Singleplayer verde, o Multiplayer marrom. */
+/* Os dois modos são o mesmo botão, grande e pulsando com o brilho da própria cor, numa moldura
+   dourada com um ramo de folhas em pixel em cada ponta: o Singleplayer verde-folha, o
+   Multiplayer de madeira (com os veios). O texto é claro, contornado de escuro. */
 .inicio-jogar,
 .inicio-multiplayer {
+  --b-borda: #efdca2;
+  --b-tinta: #fffaf0;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
   min-height: 3.5rem;
   font-size: 1.6rem;
+  text-shadow: 2px 0 0 #102410, -2px 0 0 #102410, 0 2px 0 #102410, 0 -2px 0 #102410, 0 3px 0 #0a1a0a;
   animation: inicio-pulsa 1.6s ease-in-out infinite;
 }
 
+.inicio-jogar {
+  --b-fundo: linear-gradient(to bottom, #6fcf55 0 30%, #3f9a3a 30% 88%, #2f7a2e 88%);
+  --b-hover: linear-gradient(to bottom, #82de66 0 30%, #4aab44 30% 88%, #368836 88%);
+  --b-degrau: #1f5424;
+}
+
+.inicio-jogar,
+.inicio-jogar:hover {
+  background: var(--b-fundo);
+}
+
+.inicio-jogar:hover {
+  background: var(--b-hover);
+}
+
+/* Os ramos de folhas nas pontas, saindo por cima da moldura. */
+.inicio-jogar::before,
+.inicio-jogar::after,
+.inicio-multiplayer::before,
+.inicio-multiplayer::after {
+  content: '';
+  position: absolute;
+  top: -0.75em;
+  width: 1.6em;
+  height: 1.92em;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 12' shape-rendering='crispEdges'%3E%3Crect x='3' y='0' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='4' y='0' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='2' y='1' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='3' y='1' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='4' y='1' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='5' y='1' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='2' y='2' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='3' y='2' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='5' y='2' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='4' y='3' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='4' y='4' width='1' height='1' fill='%236b4424'/%3E%3Crect x='6' y='4' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='7' y='4' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%236b4424'/%3E%3Crect x='6' y='5' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='7' y='5' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='8' y='5' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%236b4424'/%3E%3Crect x='4' y='6' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='6' y='6' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='7' y='6' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='8' y='6' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='9' y='6' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='1' y='7' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='2' y='7' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='4' y='7' width='1' height='1' fill='%236b4424'/%3E%3Crect x='7' y='7' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='8' y='7' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='0' y='8' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='1' y='8' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='2' y='8' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='3' y='8' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='4' y='8' width='1' height='1' fill='%236b4424'/%3E%3Crect x='0' y='9' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='1' y='9' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='2' y='9' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='3' y='9' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='5' y='9' width='1' height='1' fill='%236b4424'/%3E%3Crect x='1' y='10' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='2' y='10' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='5' y='10' width='1' height='1' fill='%236b4424'/%3E%3Crect x='6' y='11' width='1' height='1' fill='%236b4424'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.inicio-jogar::before,
+.inicio-multiplayer::before {
+  left: -0.95em;
+}
+
+.inicio-jogar::after,
+.inicio-multiplayer::after {
+  right: -0.95em;
+  top: auto;
+  bottom: -0.75em;
+  transform: scale(-1, -1);
+}
+
 .inicio-multiplayer {
-  /* Madeira: com o texto branco dá 5,9:1; o hover clareia só até onde o branco ainda fica
-     acima de 4,5:1. */
+  /* Madeira, com os veios: com o texto claro contornado, lê bem. */
   --b-fundo: #8a5a2b;
   --b-hover: #9a6632;
-  --b-borda: var(--marrom-claro);
   --b-degrau: var(--marrom-escuro);
   --b-brilho: rgba(222, 160, 86, 0.75);
-  --b-tinta: #ffffff;
   --b-tinta-sombra: #3a2410;
+  background-image:
+    linear-gradient(to bottom, rgba(255, 220, 160, 0.22) 0 26%, transparent 26% 86%, rgba(40, 20, 6, 0.3) 86%),
+    repeating-linear-gradient(to bottom, rgba(60, 32, 12, 0.28) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(to right, transparent 0 37%, rgba(60, 32, 12, 0.3) 37% calc(37% + 3px), transparent calc(37% + 3px) 71%, rgba(60, 32, 12, 0.25) 71% calc(71% + 3px), transparent calc(71% + 3px) 100%);
+  text-shadow: 2px 0 0 #2a1608, -2px 0 0 #2a1608, 0 2px 0 #2a1608, 0 -2px 0 #2a1608, 0 3px 0 #1a0c04;
 }
 
 /* Apagado: sem conexão com o servidor não dá para jogar com outras pessoas. */
+.inicio-multiplayer:disabled::before,
+.inicio-multiplayer:disabled::after {
+  filter: grayscale(1) brightness(0.6);
+}
+
 .inicio-multiplayer:disabled,
 .inicio-multiplayer:disabled:hover {
   --b-fundo: #2e261d;
@@ -554,9 +714,9 @@
   font: inherit;
   font-size: 1.3rem;
   color: var(--tinta);
-  background: rgba(20, 14, 8, 0.88);
-  border: 3px solid var(--suave);
-  box-shadow: 0 0 0 3px var(--contorno);
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.35) 0 4px, transparent 4px), rgba(22, 14, 8, 0.92);
+  border: 3px solid #c9a55a;
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px #5a3a18, 0 6px 14px rgba(0, 0, 0, 0.45);
   outline: none;
 }
 
@@ -607,9 +767,9 @@
   padding: 1.5rem;
   box-sizing: border-box;
   text-align: center;
-  background: rgba(26, 18, 10, 0.94);
+  background: linear-gradient(to bottom, rgba(90, 58, 26, 0.35), rgba(0, 0, 0, 0) 4rem), rgba(26, 16, 10, 0.92);
   border: 3px solid var(--marrom);
-  box-shadow: 0 0 0 3px var(--contorno), 0 0 28px rgba(222, 160, 86, 0.28), 0 12px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px rgba(239, 220, 162, 0.28), 0 0 28px rgba(222, 160, 86, 0.28), 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
 .inicio-titulo {
@@ -730,9 +890,9 @@
   font: inherit;
   text-align: left;
   color: var(--tinta);
-  background: rgba(26, 18, 10, 0.92);
+  background: linear-gradient(to bottom, rgba(90, 58, 26, 0.35), rgba(0, 0, 0, 0) 3.5rem), rgba(26, 16, 10, 0.9);
   border: 3px solid var(--marrom);
-  box-shadow: 0 0 0 3px var(--contorno), 0 10px 30px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px rgba(239, 220, 162, 0.28), 0 10px 30px rgba(0, 0, 0, 0.45);
   cursor: pointer;
   transition: border-color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease, opacity 0.2s ease;
 }
@@ -863,13 +1023,12 @@
 }
 
 .hud-engrenagem svg {
-  width: 64%;
-  height: 64%;
-  fill: #fff4dc;
+  width: 70%;
+  height: 70%;
 }
 
 .hud-engrenagem:hover svg {
-  fill: #ffffff;
+  filter: brightness(1.2);
 }
 
 .hud-engrenagem:focus-visible {
@@ -928,12 +1087,6 @@
   }
 }
 
-@keyframes inicio-sobe {
-  from {
-    transform: translateY(105%);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .inicio-logo-palco,
   .inicio-logo-aura,
@@ -941,9 +1094,12 @@
   .inicio-logo-reluz::before,
   .inicio-jogar,
   .inicio-multiplayer,
-  .inicio-aguarde {
+  .inicio-aguarde,
+  .inicio-cena-arte,
+  .inicio-cena-luz {
     animation: none;
   }
+
 }
 
 @container (max-height: 480px) {

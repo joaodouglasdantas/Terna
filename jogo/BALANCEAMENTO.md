@@ -52,9 +52,9 @@ Mediana da duração da luta e quem vence (600 duelos de cada):
 
 | Duelo | Antes | Depois | Vence (depois) | Dano das armas (depois) |
 |---|---|---|---|---|
-| Leslie × Leslie | 59 s | **212 s** | 48% × 52% | 38% |
-| Leslie × Grow | 91 s | **237 s** | 50% × 50% | 39% |
-| Leslie × Anjo | 73 s | **218 s** | 50% × 50% | 39% |
+| Leslie × Leslie | 59 s | **209 s** | 50% × 50% | 38% |
+| Leslie × Grow | 91 s | **236 s** | 53% × 47% | 39% |
+| Leslie × Anjo | 73 s | **215 s** | 50% × 50% | 39% |
 | Grow × Grow | 119 s | **252 s** | 48% × 52% | 19% |
 | Grow × Anjo | 103 s | **234 s** | 60% × 40% | 19% |
 | Anjo × Anjo | 90 s | **216 s** | 48% × 52% | 26% |
@@ -96,11 +96,12 @@ Antes:
 |---|---|---|---|---|
 | 1 · Chicote de Espinhos | 10 + veneno 6×6 = 46 → **8 + veneno 5×4 = 28**; o veneno cura a Leslie em **2 por pinguinho** (10) | 1,1% | 1,4 s | 10 → **2** |
 | 2 · Raízes | 14 por roda (até 42) | 1,7% | 9 s | 25 → **6** |
-| 3 · Flor Carnívora (no lugar da Fúria) | **50 por cusparada, ~6 cusparadas (até 300)** | 2% cada | 3 s | 100 (barra cheia) |
+| 3 · Flor Carnívora (no lugar da Fúria) | **45 por cusparada, ~6 cusparadas (até 270)**, e cada uma envenena | 1,8% cada | 3 s | 100 (barra cheia) |
 
 - **A Flor Carnívora:** brota a até 120 px dela, fica **10 s** de pé, vai atrás do outro a 42 px/s
   (ele anda a 90: dá para fugir dela) e para a 60 px; a cada **1,6 s** cospe uma bola de veneno
-  que voa reto a 230 px/s por até 420 px. Não dá para matar a flor: é desviar das bolas. Ela
+  que voa reto a 230 px/s por até 420 px e deixa envenenado quem acerta (o mesmo veneno do
+  chicote, que também cura a Leslie). Não dá para matar a flor: é desviar das bolas. Ela
   continua cuspindo mesmo com a luta parada, e por isso foi medida valendo o tempo todo.
 - **A cura:** a Fúria curava 100 de uma vez; agora quem cura é o veneno do chicote — **metade do
   que cada pinguinho tira** (4 de veneno, 2 de cura; no golem, que segura parte, a metade do que
@@ -109,6 +110,9 @@ Antes:
 - **Vantagem:** o veneno. O dano dela continua depois do golpe, cura ela, e isso é o que mais tira
   vida na luta.
 - **Combo:** Raízes prendem, e a Flor acerta as cusparadas em quem está preso.
+- **O veneno da Flor** vale menos do que parece: ele não soma, recomeça (como o do chicote), e na
+  luta o outro quase sempre já está envenenado. Por isso a cusparada só baixou de 50 para 45 quando
+  passou a envenenar (no simulador, de 40 a 50 dá tudo entre 46% e 53%).
 
 ### Grow, de gente
 

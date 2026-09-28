@@ -30,7 +30,7 @@ import { botao, elemento, palco, sairComEsmaecer } from './dom';
 export const SOBRE_PODER: Record<IdPoder, string> = {
   chicote: 'uma vinha de espinhos que envenena; o veneno cura você',
   raizes: 'uma fileira de raízes rompe a terra e prende; a última, por mais tempo',
-  flor: 'com a energia cheia: uma flor carnívora brota, persegue e cospe veneno de longe',
+  flor: 'com a energia cheia: uma flor carnívora brota, persegue e cospe de longe bolas que envenenam',
   impacto: 'uma fileira de explosões correndo pelo chão',
   rajada: 'dois corações que enfeitiçam quem acertam',
   julgamento: 'um pilar de luz desce do céu',

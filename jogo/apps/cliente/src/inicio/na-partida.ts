@@ -7,6 +7,7 @@
 import type { Heroi } from '@terna/compartilhado';
 import { montarAjuda } from './ajuda';
 import { botao, elemento, palco, sairComEsmaecer } from './dom';
+import { botaoDaMusica } from './musica';
 import type { Revanche } from './revanche';
 
 export interface OpcoesMenus {
@@ -28,7 +29,9 @@ export interface MenusDaPartida {
 }
 
 // Engrenagem em pixels (13×13), no mesmo estilo da arte do jogo: o corpo redondo com o furo no
-// meio e oito dentes quadrados, quatro nas pontas e quatro nas diagonais.
+// meio e oito dentes quadrados, quatro nas pontas e quatro nas diagonais. De metal, com a luz
+// vindo de cima e da esquerda: as beiradas viradas para lá claras, as do outro lado escuras (no
+// furo, ao contrário: a parede de baixo e da direita é a que pega luz).
 const ENGRENAGEM = [
   '.....###.....',
   '.##..###..##.',
@@ -44,20 +47,33 @@ const ENGRENAGEM = [
   '.##..###..##.',
   '.....###.....',
 ];
+const METAL = { brilho: '#e4e8f0', luz: '#b4bac8', meio: '#7e8492', sombra: '#4a4e5a' };
 
 function iconeEngrenagem(): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', `0 0 ${ENGRENAGEM.length} ${ENGRENAGEM.length}`);
   svg.setAttribute('shape-rendering', 'crispEdges');
   svg.setAttribute('aria-hidden', 'true');
+  const cheio = (x: number, y: number): boolean => ENGRENAGEM[y]?.[x] === '#';
   ENGRENAGEM.forEach((linha, y) =>
     [...linha].forEach((c, x) => {
       if (c !== '#') return;
+      const acima = cheio(x, y - 1);
+      const esquerda = cheio(x - 1, y);
+      const cor =
+        !acima && !esquerda
+          ? METAL.brilho
+          : !acima || !esquerda
+            ? METAL.luz
+            : !cheio(x, y + 1) || !cheio(x + 1, y)
+              ? METAL.sombra
+              : METAL.meio;
       const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       r.setAttribute('x', String(x));
       r.setAttribute('y', String(y));
       r.setAttribute('width', '1');
       r.setAttribute('height', '1');
+      r.setAttribute('fill', cor);
       svg.append(r);
     }),
   );
@@ -101,7 +117,7 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
     caixa.append(titulo);
     if (online) caixa.append(elemento('p', 'inicio-sub', 'A partida continua enquanto o menu está aberto.'));
     const controles = botao('Controles (Tab)', 'inicio-botao inicio-botao-claro', abrirAjuda);
-    caixa.append(continuar, controles, sair);
+    caixa.append(continuar, controles, botaoDaMusica(), sair);
     tela.append(caixa);
     // Clicar fora da caixa fecha, como o Esc.
     tela.addEventListener('click', (evento) => {

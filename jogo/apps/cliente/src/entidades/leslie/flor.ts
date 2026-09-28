@@ -5,7 +5,7 @@
 //
 // A terra treme onde a Leslie mirou, a flor sobe de dentro dela e fica de pé um tempo: vai atrás
 // do outro (sem chegar colada) e, de tempos em tempos, agacha e cospe uma bola de veneno nele, que
-// voa reto e longe. No fim, murcha e estoura num respingo de veneno (só a imagem).
+// voa reto e longe e deixa envenenado quem acerta. No fim, murcha e estoura num respingo de veneno (só a imagem).
 //
 // Online, a flor dos dois lados sai do mesmo uso e anda atrás do mesmo corpo; quem confere se a
 // bola acertou é o lado de quem apanha (efeitos.ts), como nos outros poderes.
@@ -18,6 +18,7 @@ import type { Sprite } from '../../motor/tipos';
 import {
   acertaCorpo,
   chao,
+  envenenar,
   faisca,
   ferirAlvo,
   limitarAoAlcance,
@@ -206,6 +207,9 @@ function atualizarTiros(e: Efeitos, f: Flor, dt: number, alvos: readonly Alvo[])
       const alvo = vivos(alvos, f.dono).find((a) => acertaCorpo(a.corpo, t.x, t.y, FLOR.tiro.raio));
       if (alvo) {
         ferirAlvo(e, alvo, FLOR.tiro.dano);
+        // Deixa envenenado, como o chicote (e o veneno cura a Leslie). Online, o veneno do outro
+        // chega pela rede, com o estado dele.
+        if (alvo.ferir) envenenar(alvo.corpo);
         respingar(e, t.x, t.y);
         return false;
       }

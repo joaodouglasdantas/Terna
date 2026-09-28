@@ -1,14 +1,23 @@
-// A cena da frente dos menus: árvores e moitas do próprio jogo, grandes, saindo de baixo nas
-// duas beiradas do quadro do jogo, balançando com o mesmo vento do cenário. Entre as árvores
-// de trás e as da frente caem folhas em pixel, balançando como pêndulo e rodopiando, flutua
-// pólen na luz do verão e piscam vagalumes perto do chão. Fica por cima do cenário escurecido
-// e por baixo da logo e dos botões, sempre dentro do quadro do jogo (as margens pretas ficam
-// livres). É uma peça só, que passa de uma tela para a outra (inicial ↔ multiplayer) sem
-// recomeçar; o laço dela para sozinho quando ela sai da página (a partida começou).
+// O fundo dos menus: a floresta ao pôr do sol (assets/tela-inicial.webp) — as árvores grandes
+// emoldurando as beiradas, a bandeira, as lanternas, as tochas e a fogueira, o rio e as cachoeiras
+// — e tudo o que dá vida a ela:
+// - a arte respira devagar (um zoom que vai e volta) e segue de leve o mouse (paralaxe);
+// - o vento balança as copas e a bandeira, e a água das cachoeiras e do rio ondula: esses pedaços
+//   da arte são redesenhados por cima dela em faixas finas, cada faixa um pouco deslocada por uma
+//   onda que corre (com a borda esfumada, para não mostrar o recorte);
+// - as luzes da fogueira, das tochas e das lanternas tremulam, e o sol pulsa;
+// - da fogueira e das tochas sobem fagulhas; bandos de pássaros cruzam o céu batendo as asas;
+//   o rio brilha e as cachoeiras soltam espuma;
+// - das copas caem folhas em pixel, balançando como pêndulo e rodopiando; flutua pólen na luz e
+//   piscam vagalumes perto do chão.
+// Fica por baixo da logo e dos botões, sempre dentro do quadro do jogo (as margens pretas ficam
+// livres). É uma peça só, que passa de uma tela para a outra (inicial ↔ seleção ↔ multiplayer)
+// sem recomeçar; o laço dela para sozinho quando ela sai da página (a partida começou).
+//
+// Os lugares da arte são frações do quadro (a arte e o quadro são 16:9): x da largura, y da altura.
 
-import { QUADROS_CENARIO } from '../gerado/cenario-quadros';
-import { contexto2d, novoCanvas } from '../motor/imagens';
-import { quadroDoVento } from '../mundo/cenario';
+import urlArte from '../assets/tela-inicial.webp';
+import { carregarImagem, contexto2d, novoCanvas } from '../motor/imagens';
 import { elemento, palco } from './dom';
 import {
   cair,
@@ -22,113 +31,129 @@ import {
   type TamanhoDeFolha,
 } from './efeitos';
 
-interface PlantaDaFrente {
-  grupo: 'arvores' | 'arbustos';
-  indice: number; // em QUADROS_CENARIO[grupo] (ver PlantaNoMapa em mundo/cenario.ts)
-  lado: 'esquerda' | 'direita';
-  centro: number; // do tronco até a beirada do quadro, em pixels do sprite das da frente
-  escala: number; // 1 = as da frente; as de trás são menores e mais escuras
-  afundar: number; // pixels do sprite abaixo da borda de baixo: o pé fica fora do quadro
-  atraso: number; // ms até começar a subir
-  folhas: number; // folhas soltas por segundo
-}
+type Area = { x0: number; x1: number; y0: number; y1: number };
 
-// As de trás primeiro (a ordem é a da pintura). Carvalho alto na frente de cada lado, um
-// pinheiro e um carvalho menores atrás, e uma moita cobrindo o pé.
-const PLANTAS: PlantaDaFrente[] = [
-  { grupo: 'arvores', indice: 9, lado: 'esquerda', centro: 58, escala: 0.8, afundar: 8, atraso: 140, folhas: 0.6 },
-  { grupo: 'arvores', indice: 11, lado: 'direita', centro: 56, escala: 0.8, afundar: 8, atraso: 220, folhas: 0.6 },
-  { grupo: 'arvores', indice: 0, lado: 'esquerda', centro: 12, escala: 1, afundar: 10, atraso: 0, folhas: 1.6 },
-  { grupo: 'arvores', indice: 2, lado: 'direita', centro: 14, escala: 1, afundar: 10, atraso: 80, folhas: 1.6 },
-  { grupo: 'arbustos', indice: 1, lado: 'esquerda', centro: 42, escala: 1, afundar: 3, atraso: 260, folhas: 0 },
-  { grupo: 'arbustos', indice: 0, lado: 'direita', centro: 44, escala: 1, afundar: 3, atraso: 320, folhas: 0 },
+// As luzes que tremulam por cima da arte: o centro e o raio da luz (em % da largura).
+const LUZES_DA_ARTE = [
+  { tipo: 'fogo', x: 16.9, y: 81, r: 9 }, // a fogueira
+  { tipo: 'fogo', x: 9.4, y: 71.5, r: 4 }, // a tocha da cerca
+  { tipo: 'fogo', x: 35, y: 80.8, r: 4 }, // a tocha do meio
+  { tipo: 'lanterna', x: 13.6, y: 44.8, r: 5 },
+  { tipo: 'lanterna', x: 93.7, y: 69.7, r: 5 },
+  { tipo: 'sol', x: 76.9, y: 32, r: 11 },
+  { tipo: 'nevoa', x: 81, y: 50, r: 6 }, // a espuma no pé da cachoeira grande
+  { tipo: 'nevoa', x: 79.8, y: 67.5, r: 4 }, // e na de baixo
+] as const;
+
+// Os pedaços da arte que se mexem: onde (fração do quadro; a borda é uma elipse esfumada) e
+// como. `onda`: a força (em pixels da arte), o ritmo (rad/s), o tamanho da onda (rad por pixel
+// da arte, de cima para baixo) e quanto a força cresce descendo (a bandeira presa em cima).
+interface Pedaco {
+  area: Area;
+  onda: { forca: number; ritmo: number; passo: number; desce: number };
+}
+const PEDACOS: Pedaco[] = [
+  // As copas: balançam devagar, mais em cima (a ponta dos galhos).
+  { area: { x0: 0, x1: 0.3, y0: 0, y1: 0.36 }, onda: { forca: 2.2, ritmo: 1.1, passo: 0.018, desce: -0.6 } },
+  { area: { x0: 0.72, x1: 1, y0: 0, y1: 0.32 }, onda: { forca: 2.2, ritmo: 1.25, passo: 0.02, desce: -0.6 } },
+  { area: { x0: 0.9, x1: 1, y0: 0.22, y1: 0.62 }, onda: { forca: 1.4, ritmo: 1.4, passo: 0.03, desce: 0 } },
+  { area: { x0: 0, x1: 0.07, y0: 0.3, y1: 0.7 }, onda: { forca: 1.4, ritmo: 1.2, passo: 0.03, desce: 0 } },
+  // A bandeira tremula, presa na barra.
+  { area: { x0: 0.066, x1: 0.13, y0: 0.4, y1: 0.63 }, onda: { forca: 2.4, ritmo: 3.2, passo: 0.09, desce: 1 } },
+  // As cachoeiras: a água treme depressa, em ondas curtas.
+  { area: { x0: 0.787, x1: 0.833, y0: 0.4, y1: 0.52 }, onda: { forca: 1.2, ritmo: 9, passo: 0.5, desce: 0 } },
+  { area: { x0: 0.782, x1: 0.815, y0: 0.6, y1: 0.69 }, onda: { forca: 1, ritmo: 9, passo: 0.5, desce: 0 } },
+  // O rio ondula.
+  { area: { x0: 0.44, x1: 0.83, y0: 0.7, y1: 0.81 }, onda: { forca: 1.3, ritmo: 2.2, passo: 0.35, desce: 0 } },
 ];
+const FAIXA = 2; // altura de cada faixa redesenhada, em pixels da arte
 
-// Tamanho de um pixel do sprite na tela: o carvalho da frente ocupa até 85% da altura do
-// quadro e, em quadro estreito, até 26% da largura (senão cobriria os botões).
-const ALTURA_REFERENCIA = 147;
-const LARGURA_REFERENCIA = 71;
+// De onde saem as folhas (as copas), as fagulhas (o fogo), a espuma (o pé das cachoeiras) e os
+// brilhos do rio; e por onde passam os pássaros.
+const COPAS: Area[] = [
+  { x0: 0.02, x1: 0.24, y0: 0.03, y1: 0.3 },
+  { x0: 0.76, x1: 0.99, y0: 0.02, y1: 0.24 },
+];
+const FOGOS = [
+  { x: 0.169, y: 0.8, forca: 1 },
+  { x: 0.094, y: 0.705, forca: 0.35 },
+  { x: 0.35, y: 0.8, forca: 0.35 },
+];
+const PES_DAS_CACHOEIRAS = [
+  { x: 0.81, y: 0.505, largura: 0.03 },
+  { x: 0.798, y: 0.675, largura: 0.02 },
+];
+const RIO: Area = { x0: 0.46, x1: 0.8, y0: 0.72, y1: 0.8 };
+const CEU: Area = { x0: 0, x1: 1, y0: 0.06, y1: 0.3 };
 
-const SUBIDA_MS = 1100; // a subida da mais atrasada termina em SUBIDA_MS + o atraso dela
+// Verdes das copas da arte, para as folhas que caem.
+const VERDES = ['#2f6b2a', '#3f8a32', '#57a83a', '#7cc44a', '#9ad04a'];
 
-// Quantos pólens e vagalumes ficam no ar ao mesmo tempo, no máximo.
+// Quantos de cada ficam no ar ao mesmo tempo, no máximo.
 const POLENS = 34;
-const VAGALUMES = 9;
-
-interface Planta {
-  config: PlantaDaFrente;
-  canvas: HTMLCanvasElement;
-  quadro: number; // o quadro do vento desenhado agora (-1: nenhum)
-  cores: string[]; // alguns verdes da copa, para as folhas que caem
-  caixa: { x: number; y: number; w: number; h: number }; // no quadro, em px
-  acumulado: number; // folhas "devidas" desde a última que caiu
-}
+const VAGALUMES = 10;
+const FOLHAS_POR_SEGUNDO = 1.4; // por copa
+const ENTRADA_MS = 1400;
+// A paralaxe: até quanto (fração do quadro) a arte anda seguindo o mouse, e quão depressa chega.
+const PARALAXE = 0.012;
+const SEGUE = 2.5; // por segundo
 
 interface FolhaCaindo extends Queda {
   desenho: DesenhoDeFolha;
   profundidade: number; // 1 = perto (maior, mais rápida); menos que isso, mais longe
 }
 
-// Pólen e vagalume: pontos de luz que vagueiam.
+// Pólen, vagalume, fagulha, espuma e brilho do rio: pontos de luz.
 interface Luz {
-  tipo: 'polen' | 'vagalume';
+  tipo: 'polen' | 'vagalume' | 'fagulha' | 'espuma' | 'brilho';
   x: number;
   y: number;
-  rumo: number; // direção em que vai, rad
-  velocidade: number; // px/s
+  vx: number;
+  vy: number;
+  rumo: number; // direção em que vai, rad (pólen e vagalume vagueiam)
+  velocidade: number;
   fase: number;
   vida: number;
   duracao: number;
 }
 
+// Um bando de pássaros cruzando o céu.
+interface Passaro {
+  dx: number; // lugar no bando, em px
+  dy: number;
+  fase: number;
+}
+interface Bando {
+  x: number;
+  y: number;
+  vx: number;
+  passaros: Passaro[];
+  tempo: number;
+}
+
 let camada: HTMLElement | null = null;
-let folhaCenario: HTMLImageElement;
-let plantas: Planta[] = [];
-let telaFolhas: HTMLCanvasElement;
+let arte: HTMLElement;
+let tela: HTMLCanvasElement;
 let folhas: FolhaCaindo[] = [];
 let luzes: Luz[] = [];
+let bandos: Bando[] = [];
+let proximoBando = 3;
 let rodando = false;
-let pixel = 1;
-// O tamanho do quadro do jogo, onde a cena mora (ver #inicio em inicio.css).
+let pixel = 1; // um "pixel" da arte na tela
 let largura = 0;
 let altura = 0;
+// A paralaxe: para onde o mouse puxa (de -1 a 1) e onde a arte está.
+const mouse = { x: 0, y: 0 };
+const paralaxe = { x: 0, y: 0 };
 
 const semMovimento = (): boolean => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const sortear = (min: number, max: number): number => min + Math.random() * (max - min);
 const escolher = <T>(lista: readonly T[]): T => lista[Math.floor(Math.random() * lista.length)];
-
-// Alguns verdes da metade de cima do sprite (a copa), para as folhas saírem da cor da árvore.
-// Poucos e bem diferentes entre si: cada cor vira um desenho de folha guardado.
-function coresDaCopa(canvas: HTMLCanvasElement): string[] {
-  const { width: w, height: h } = canvas;
-  const px = contexto2d(canvas).getImageData(0, 0, w, Math.ceil(h * 0.5)).data;
-  const todas: [number, number, number][] = [];
-  for (let i = 0; i < px.length; i += 4 * 5) {
-    const [r, g, b, a] = [px[i], px[i + 1], px[i + 2], px[i + 3]];
-    // Só o verde das folhas (o marrom dos galhos fica de fora).
-    if (a > 200 && g > r + 12 && g > b + 12) todas.push([r, g, b]);
-  }
-  if (!todas.length) return ['#4f8a3a'];
-  todas.sort((a, b) => a[0] + a[1] + a[2] - (b[0] + b[1] + b[2]));
-  // Cinco tons, do escuro ao claro, sem os extremos.
-  return [0.2, 0.38, 0.55, 0.7, 0.85].map((f) => {
-    const [r, g, b] = todas[Math.floor(f * (todas.length - 1))];
-    return `rgb(${r}, ${g}, ${b})`;
-  });
-}
-
-function desenharPlanta(p: Planta, quadro: number): void {
-  if (p.quadro === quadro) return;
-  p.quadro = quadro;
-  const q = QUADROS_CENARIO[p.config.grupo][p.config.indice][quadro];
-  const c = contexto2d(p.canvas);
-  c.clearRect(0, 0, p.canvas.width, p.canvas.height);
-  c.drawImage(folhaCenario, q.x, q.y, q.w, q.h, 0, 0, q.w, q.h);
-}
+const naArea = (a: Area): { x: number; y: number } => ({ x: sortear(a.x0, a.x1) * largura, y: sortear(a.y0, a.y1) * altura });
 
 // O tamanho do quadro do jogo (o #inicio). Quando a cena entra, a tela nova ainda pode não estar
-// na página e o #inicio, vazio, fica escondido (tamanho 0: as árvores sumiam na volta de uma
-// partida). Aí vale a mesma conta do CSS do #inicio, e o observador acerta quando ele aparece.
+// na página e o #inicio, vazio, fica escondido (tamanho 0). Aí vale a mesma conta do CSS do
+// #inicio, e o observador acerta quando ele aparece.
 function tamanhoDoQuadro(): { w: number; h: number } {
   const quadro = palco();
   if (quadro.clientWidth > 0 && quadro.clientHeight > 0) return { w: quadro.clientWidth, h: quadro.clientHeight };
@@ -138,79 +163,108 @@ function tamanhoDoQuadro(): { w: number; h: number } {
   };
 }
 
-// Tamanho e lugar de cada planta para o tamanho atual do quadro.
-function posicionar(): void {
-  const { w: larguraQuadro, h: alturaQuadro } = tamanhoDoQuadro();
-  if (larguraQuadro === largura && alturaQuadro === altura && telaFolhas.width === largura) return;
-  largura = larguraQuadro;
-  altura = alturaQuadro;
-  pixel = Math.min((0.85 * altura) / ALTURA_REFERENCIA, (0.26 * largura) / LARGURA_REFERENCIA);
-  for (const p of plantas) {
-    const { w, h, m = 0 } = QUADROS_CENARIO[p.config.grupo][p.config.indice][0];
-    const escala = pixel * p.config.escala;
-    // O centro do tronco fica em `centro` da beirada; o recorte tem `m` px a mais à esquerda
-    // para a copa vergar (ver esquerdaDaPlanta em mundo/cenario.ts).
-    const centro = p.config.centro * pixel;
-    const meioDoTronco = (m + (w - m) / 2) * escala;
-    const x = p.config.lado === 'esquerda' ? centro - meioDoTronco : largura - centro - meioDoTronco;
-    const y = altura - (h - p.config.afundar) * escala;
-    Object.assign(p.canvas.style, {
-      left: `${x}px`,
-      top: `${y}px`,
-      width: `${w * escala}px`,
-      height: `${h * escala}px`,
-    });
-    p.caixa = { x, y, w: w * escala, h: h * escala };
-  }
-  telaFolhas.width = largura;
-  telaFolhas.height = altura;
+function medir(): void {
+  const { w, h } = tamanhoDoQuadro();
+  if (w === largura && h === altura && tela.width === largura) return;
+  largura = w;
+  altura = h;
+  pixel = (0.85 * altura) / 147;
+  tela.width = largura;
+  tela.height = altura;
 }
 
-// Monta a cena uma vez, com a folha do cenário já carregada.
-export function prepararCena(folha: HTMLImageElement): void {
-  folhaCenario = folha;
+// Cada pedaço que se mexe, recortado da arte uma vez, com a borda esfumada (a elipse).
+let recortes: { pedaco: Pedaco; canvas: HTMLCanvasElement }[] = [];
+
+function recortar(img: HTMLImageElement): void {
+  recortes = PEDACOS.map((pedaco) => {
+    const { x0, x1, y0, y1 } = pedaco.area;
+    const sx = Math.round(x0 * img.naturalWidth);
+    const sy = Math.round(y0 * img.naturalHeight);
+    const w = Math.round((x1 - x0) * img.naturalWidth);
+    const h = Math.round((y1 - y0) * img.naturalHeight);
+    const canvas = novoCanvas(w, h);
+    const c = contexto2d(canvas);
+    c.drawImage(img, sx, sy, w, h, 0, 0, w, h);
+    c.globalCompositeOperation = 'destination-in';
+    c.translate(w / 2, h / 2);
+    c.scale(w / 2, h / 2);
+    const g = c.createRadialGradient(0, 0, 0, 0, 0, 1);
+    g.addColorStop(0, '#000');
+    g.addColorStop(0.6, '#000');
+    g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    c.fillStyle = g;
+    c.fillRect(-1, -1, 2, 2);
+    return { pedaco, canvas };
+  });
+}
+
+// Os pedaços por cima da arte, em faixas: cada faixa deslocada para o lado pela onda.
+function mexer(c: CanvasRenderingContext2D, tempo: number): void {
+  for (const { pedaco, canvas } of recortes) {
+    const { x0, x1, y0, y1 } = pedaco.area;
+    const { forca, ritmo, passo, desce } = pedaco.onda;
+    const dx = x0 * largura;
+    const dy = y0 * altura;
+    const escalaX = ((x1 - x0) * largura) / canvas.width;
+    const escalaY = ((y1 - y0) * altura) / canvas.height;
+    for (let y = 0; y < canvas.height; y += FAIXA) {
+      const h = Math.min(FAIXA, canvas.height - y);
+      const fracao = y / canvas.height;
+      const forcaAqui = forca * Math.max(0, desce >= 0 ? 1 - desce + desce * fracao : 1 + desce * fracao);
+      const desvio = Math.sin(tempo * ritmo - y * passo) * forcaAqui * escalaX;
+      c.drawImage(canvas, 0, y, canvas.width, h, Math.round(dx + desvio), Math.round(dy + y * escalaY), canvas.width * escalaX, Math.ceil(h * escalaY));
+    }
+  }
+}
+
+// Monta a cena uma vez.
+export function prepararCena(): void {
   camada = elemento('div', 'inicio-cena');
   camada.setAttribute('aria-hidden', 'true');
-  telaFolhas = elemento('canvas', 'inicio-cena-folhas');
-  plantas = PLANTAS.map((config) => {
-    const q = QUADROS_CENARIO[config.grupo][config.indice][0];
-    const canvas = novoCanvas(q.w, q.h);
-    canvas.className = `inicio-planta${config.escala < 1 ? ' inicio-planta-atras' : ''}`;
-    canvas.style.setProperty('--atraso', `${config.atraso}ms`);
-    const planta: Planta = { config, canvas, quadro: -1, cores: [], caixa: { x: 0, y: 0, w: 0, h: 0 }, acumulado: 0 };
-    desenharPlanta(planta, 0);
-    planta.cores = coresDaCopa(canvas);
-    return planta;
+  camada.style.setProperty('--arte', `url("${urlArte}")`);
+  arte = elemento('div', 'inicio-cena-arte');
+  const fundo = elemento('div', 'inicio-cena-fundo');
+  void carregarImagem(urlArte).then(recortar);
+  const luzesDaArte = LUZES_DA_ARTE.map(({ x, y, r, tipo }, i) => {
+    const luz = elemento('div', `inicio-cena-luz inicio-cena-luz-${tipo}`);
+    luz.style.setProperty('--x', `${x}%`);
+    luz.style.setProperty('--y', `${y}%`);
+    luz.style.setProperty('--r', `${r}%`);
+    luz.style.setProperty('--atraso', `${-i * 0.37}s`);
+    return luz;
   });
-  // As folhas caem entre as plantas de trás e as da frente.
-  const atras = plantas.filter((p) => p.config.escala < 1).map((p) => p.canvas);
-  const frente = plantas.filter((p) => p.config.escala >= 1).map((p) => p.canvas);
-  camada.append(...atras, telaFolhas, ...frente);
-  // A camada cobre o quadro: mudou de tamanho (a janela, ou o quadro que apareceu), reposiciona.
+  tela = elemento('canvas', 'inicio-cena-folhas');
+  arte.append(fundo, tela, ...luzesDaArte);
+  camada.append(arte);
+  // A arte segue o mouse de leve.
+  window.addEventListener('pointermove', (evento) => {
+    mouse.x = Math.max(-1, Math.min(1, (evento.clientX / innerWidth) * 2 - 1));
+    mouse.y = Math.max(-1, Math.min(1, (evento.clientY / innerHeight) * 2 - 1));
+  });
+  // A camada cobre o quadro: mudou de tamanho (a janela, ou o quadro que apareceu), mede de novo.
   new ResizeObserver(() => {
-    if (camada?.isConnected) posicionar();
+    if (camada?.isConnected) medir();
   }).observe(camada);
 }
 
-// Põe a cena no fundo da tela (por baixo do conteúdo dela). `entrar`: as plantas sobem de
-// baixo — ao abrir a tela inicial; passando entre os menus, ela só muda de lugar.
-export function anexarCena(tela: HTMLElement, entrar = false): void {
+// Põe a cena no fundo da tela (por baixo do conteúdo dela). `entrar`: a arte aparece chegando
+// (ao abrir a tela inicial); passando entre os menus, ela só muda de lugar.
+export function anexarCena(telaDoMenu: HTMLElement, entrar = false): void {
   if (!camada) return;
-  tela.prepend(camada);
+  telaDoMenu.prepend(camada);
   largura = altura = 0; // mede de novo
-  posicionar();
+  medir();
   if (entrar && !semMovimento()) {
     const el = camada;
     folhas = [];
     luzes = [];
     el.classList.remove('inicio-cena-entrando');
-    el.classList.add('inicio-cena-escondida');
-    // Espera dois quadros escondida: o primeiro depois do carregamento é pesado e comeria a subida.
+    // Espera dois quadros: o primeiro depois do carregamento é pesado e comeria a entrada.
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
-        el.classList.replace('inicio-cena-escondida', 'inicio-cena-entrando');
-        const fim = SUBIDA_MS + Math.max(...PLANTAS.map((p) => p.atraso));
-        setTimeout(() => el.classList.remove('inicio-cena-entrando'), fim);
+        el.classList.add('inicio-cena-entrando');
+        setTimeout(() => el.classList.remove('inicio-cena-entrando'), ENTRADA_MS);
       }),
     );
   }
@@ -229,23 +283,17 @@ function quadro(agora: number): void {
   }
   const dt = ultimo ? Math.min((agora - ultimo) / 1000, 1 / 20) : 0;
   ultimo = agora;
-  const parado = semMovimento();
   const tempo = agora / 1000;
-  const subindo = camada.classList.contains('inicio-cena-entrando') || camada.classList.contains('inicio-cena-escondida');
-
-  for (const p of plantas) {
-    const total = QUADROS_CENARIO[p.config.grupo][p.config.indice].length;
-    // O mesmo vento do cenário: a fase vem do lugar da planta, como no mapa.
-    desenharPlanta(p, parado ? 0 : quadroDoVento(tempo, p.caixa.x / pixel, total));
-    if (parado || subindo || !p.config.folhas) continue;
-    p.acumulado += p.config.folhas * rajada(tempo) * dt;
-    while (p.acumulado >= 1) {
-      p.acumulado--;
-      soltarFolha(p);
-    }
+  if (!semMovimento()) {
+    soltar(dt, tempo);
+    atualizar(dt, tempo);
+    // A paralaxe: a arte vai devagar para o lado contrário do mouse.
+    const k = 1 - Math.exp(-SEGUE * dt);
+    paralaxe.x += (-mouse.x * PARALAXE - paralaxe.x) * k;
+    paralaxe.y += (-mouse.y * PARALAXE - paralaxe.y) * k;
+    arte.style.setProperty('--px', `${(paralaxe.x * largura).toFixed(2)}px`);
+    arte.style.setProperty('--py', `${(paralaxe.y * altura).toFixed(2)}px`);
   }
-  if (!parado && !subindo) soltarLuzes(dt);
-  atualizar(dt, tempo);
   desenhar(tempo);
   requestAnimationFrame(quadro);
 }
@@ -256,19 +304,67 @@ function rajada(tempo: number): number {
   return 1 + 1.4 * onda ** 4;
 }
 
-// Uma folha sai de um ponto da copa e cai para a esquerda, com o vento, balançando. As das
-// árvores de trás são menores e mais lentas; algumas das da frente são grandes, como se
-// passassem perto.
-function soltarFolha(p: Planta): void {
-  const { x, y, w, h } = p.caixa;
-  const perto = p.config.escala >= 1;
+const acumulado = { folhas: [0, 0], fagulhas: [0, 0, 0], espuma: [0, 0], brilhos: 0 };
+
+// Tudo o que nasce neste quadro: folhas, pólen, vagalumes, fagulhas, espuma, brilhos do rio e,
+// de vez em quando, um bando de pássaros.
+function soltar(dt: number, tempo: number): void {
+  const vento = rajada(tempo);
+  const u = pixel / 4;
+  COPAS.forEach((copa, i) => {
+    acumulado.folhas[i] += FOLHAS_POR_SEGUNDO * vento * dt;
+    for (; acumulado.folhas[i] >= 1; acumulado.folhas[i]--) soltarFolha(copa);
+  });
+  FOGOS.forEach((fogo, i) => {
+    acumulado.fagulhas[i] += 9 * fogo.forca * dt;
+    for (; acumulado.fagulhas[i] >= 1; acumulado.fagulhas[i]--) {
+      nova('fagulha', fogo.x * largura + sortear(-6, 6) * u * fogo.forca, fogo.y * altura, sortear(-8, 8) * u, -sortear(40, 80) * u, sortear(0.7, 1.5));
+    }
+  });
+  PES_DAS_CACHOEIRAS.forEach((pe, i) => {
+    acumulado.espuma[i] += 14 * dt;
+    for (; acumulado.espuma[i] >= 1; acumulado.espuma[i]--) {
+      nova('espuma', (pe.x + sortear(-pe.largura, pe.largura) / 2) * largura, pe.y * altura, sortear(-14, 14) * u, -sortear(10, 30) * u, sortear(0.5, 1));
+    }
+  });
+  acumulado.brilhos += 5 * dt;
+  for (; acumulado.brilhos >= 1; acumulado.brilhos--) {
+    const { x, y } = naArea(RIO);
+    nova('brilho', x, y, sortear(4, 10) * u, 0, sortear(0.6, 1.2));
+  }
+  const polens = luzes.filter((l) => l.tipo === 'polen').length;
+  if (polens < POLENS && Math.random() < dt * 9) {
+    nova('polen', sortear(0, largura), sortear(altura * 0.08, altura * 0.92), 0, 0, sortear(4, 8)).velocidade = sortear(6, 16) * u;
+  }
+  const vagalumes = luzes.filter((l) => l.tipo === 'vagalume').length;
+  if (vagalumes < VAGALUMES && Math.random() < dt * 2) {
+    const x = Math.random() < 0.5 ? sortear(0, largura * 0.35) : sortear(largura * 0.62, largura);
+    nova('vagalume', x, sortear(altura * 0.5, altura * 0.9), 0, 0, sortear(5, 9)).velocidade = sortear(14, 26) * u;
+  }
+  proximoBando -= dt;
+  if (proximoBando <= 0) {
+    proximoBando = sortear(7, 15);
+    soltarBando();
+  }
+}
+
+function nova(tipo: Luz['tipo'], x: number, y: number, vx: number, vy: number, duracao: number): Luz {
+  const l: Luz = { tipo, x, y, vx, vy, rumo: sortear(0, Math.PI * 2), velocidade: 0, fase: sortear(0, Math.PI * 2), vida: 0, duracao };
+  luzes.push(l);
+  return l;
+}
+
+// Uma folha sai de um ponto da copa e cai com o vento, balançando.
+function soltarFolha(copa: Area): void {
+  const { x, y } = naArea(copa);
+  const perto = Math.random() < 0.6;
   const tamanho: TamanhoDeFolha = perto ? escolher(['pequena', 'media', 'media', 'grande']) : escolher(['pequena', 'pequena', 'media']);
   const profundidade = perto ? sortear(0.85, 1.15) : sortear(0.55, 0.75);
-  const passo = (pixel / 4) * profundidade; // as velocidades foram acertadas com o pixel do sprite em 4 px
+  const passo = (pixel / 4) * profundidade;
   const rodopia = Math.random() < 0.55;
   folhas.push({
-    x: x + w * sortear(0.15, 0.85),
-    y: y + h * sortear(0.08, 0.42),
+    x,
+    y,
     vento: -sortear(10, 30) * passo,
     descida: sortear(34, 58) * passo,
     balanco: sortear(10, 22) * passo,
@@ -277,79 +373,104 @@ function soltarFolha(p: Planta): void {
     giro: sortear(0, Math.PI * 2),
     rodopio: rodopia ? sortear(2.5, 6) * (Math.random() < 0.5 ? -1 : 1) : sortear(-0.6, 0.6),
     vida: 0,
-    desenho: folhaPronta(escolher(p.cores), tamanho),
+    desenho: folhaPronta(escolher(VERDES), tamanho),
     profundidade,
   });
 }
 
-// O pólen flutua em qualquer lugar do quadro; os vagalumes, perto do chão e das árvores.
-function soltarLuzes(dt: number): void {
-  const polens = luzes.filter((l) => l.tipo === 'polen').length;
-  if (polens < POLENS && Math.random() < dt * 9) {
-    luzes.push({
-      tipo: 'polen',
-      x: sortear(0, largura),
-      y: sortear(altura * 0.08, altura * 0.92),
-      rumo: sortear(0, Math.PI * 2),
-      velocidade: sortear(6, 16) * (pixel / 4),
-      fase: sortear(0, Math.PI * 2),
-      vida: 0,
-      duracao: sortear(4, 8),
-    });
+// Um bando de 3 a 6 pássaros em V, entrando por um lado do céu e saindo pelo outro.
+function soltarBando(): void {
+  const daDireita = Math.random() < 0.6;
+  const n = 3 + Math.floor(Math.random() * 4);
+  const u = pixel * 0.55;
+  const passaros: Passaro[] = [];
+  for (let i = 0; i < n; i++) {
+    const fileira = Math.ceil(i / 2);
+    const lado = i % 2 ? -1 : 1;
+    passaros.push({ dx: fileira * 9 * u * (daDireita ? 1 : -1), dy: lado * fileira * 5 * u + sortear(-1, 1) * u, fase: sortear(0, Math.PI * 2) });
   }
-  const vagalumes = luzes.length - polens;
-  if (vagalumes < VAGALUMES && Math.random() < dt * 2) {
-    const lado = Math.random() < 0.5;
-    luzes.push({
-      tipo: 'vagalume',
-      x: lado ? sortear(0, largura * 0.3) : sortear(largura * 0.7, largura),
-      y: sortear(altura * 0.55, altura * 0.95),
-      rumo: sortear(0, Math.PI * 2),
-      velocidade: sortear(14, 26) * (pixel / 4),
-      fase: sortear(0, Math.PI * 2),
-      vida: 0,
-      duracao: sortear(5, 9),
-    });
-  }
+  const { y } = naArea(CEU);
+  bandos.push({ x: daDireita ? largura + 40 * u : -40 * u, y, vx: (daDireita ? -1 : 1) * sortear(0.05, 0.08) * largura, passaros, tempo: 0 });
 }
 
 function atualizar(dt: number, tempo: number): void {
   const vento = rajada(tempo);
+  const u = pixel / 4;
   for (const f of folhas) cair(f, dt, vento);
   const margem = pixel * 12;
   folhas = folhas.filter((f) => f.y < altura + margem && f.x > -margem);
 
   for (const l of luzes) {
     l.vida += dt;
-    // Vagueiam: o rumo vira devagar para um lado e para o outro.
-    l.rumo += Math.sin(l.vida * (l.tipo === 'vagalume' ? 1.3 : 0.7) + l.fase) * dt * 1.6;
-    const subir = l.tipo === 'polen' ? -3 * (pixel / 4) : 0; // o pólen sobe no ar quente
-    l.x += (Math.cos(l.rumo) * l.velocidade - (vento - 1) * 12) * dt;
-    l.y += (Math.sin(l.rumo) * l.velocidade * 0.6 + subir) * dt;
+    if (l.tipo === 'polen' || l.tipo === 'vagalume') {
+      // Vagueiam: o rumo vira devagar para um lado e para o outro.
+      l.rumo += Math.sin(l.vida * (l.tipo === 'vagalume' ? 1.3 : 0.7) + l.fase) * dt * 1.6;
+      const subir = l.tipo === 'polen' ? -3 * u : 0; // o pólen sobe no ar quente
+      l.x += (Math.cos(l.rumo) * l.velocidade - (vento - 1) * 12) * dt;
+      l.y += (Math.sin(l.rumo) * l.velocidade * 0.6 + subir) * dt;
+      continue;
+    }
+    // A fagulha sobe ziguezagueando; a espuma sobe um pouco e cai; o brilho do rio só desliza.
+    if (l.tipo === 'fagulha') l.vx += Math.sin(l.vida * 7 + l.fase) * 40 * u * dt;
+    if (l.tipo === 'espuma') l.vy += 40 * u * dt;
+    l.x += l.vx * dt;
+    l.y += l.vy * dt;
   }
   luzes = luzes.filter((l) => l.vida < l.duracao);
+
+  for (const b of bandos) {
+    b.tempo += dt;
+    b.x += b.vx * dt;
+    b.y += Math.sin(b.tempo * 0.8) * 4 * u * dt;
+  }
+  bandos = bandos.filter((b) => (b.vx < 0 ? b.x > -60 * pixel : b.x < largura + 60 * pixel));
+}
+
+// Um pássaro em pixel, de asas para cima ou para baixo (a batida), na cor das silhuetas da arte.
+const ASAS = [
+  ['x.....x', '.x...x.', '..x.x..', '...x...'],
+  ['.......', '...x...', '.xx.xx.', 'x.....x'],
+];
+
+function desenharPassaro(c: CanvasRenderingContext2D, x: number, y: number, u: number, batida: number): void {
+  c.fillStyle = '#2a1830';
+  ASAS[batida].forEach((linha, j) =>
+    [...linha].forEach((ch, i) => {
+      if (ch === 'x') c.fillRect(Math.round(x + (i - 3) * u), Math.round(y + (j - 2) * u), Math.ceil(u), Math.ceil(u));
+    }),
+  );
 }
 
 function desenhar(tempo: number): void {
-  const c = contexto2d(telaFolhas);
+  const c = tela.getContext('2d');
+  if (!c) return;
   c.imageSmoothingEnabled = false;
-  c.clearRect(0, 0, telaFolhas.width, telaFolhas.height);
+  c.clearRect(0, 0, tela.width, tela.height);
   const u = Math.max(2, Math.round(pixel * 0.5)); // um pixel das luzes
+  c.imageSmoothingEnabled = true;
+  if (!semMovimento()) mexer(c, tempo);
+  c.imageSmoothingEnabled = false;
 
-  // Primeiro as luzes (por trás das folhas), somando luz.
+  // Os pássaros, lá longe no céu.
+  const up = Math.max(1, pixel * 0.55);
+  c.globalAlpha = 0.9;
+  for (const b of bandos) {
+    for (const p of b.passaros) desenharPassaro(c, b.x + p.dx, b.y + p.dy, up, Math.sin(b.tempo * 9 + p.fase) > 0 ? 0 : 1);
+  }
+
+  // As luzes, somando luz.
   c.globalCompositeOperation = 'lighter';
   for (const l of luzes) {
     const t = l.vida / l.duracao;
     const entra = Math.min(1, t * 5) * Math.min(1, (1 - t) * 4);
     if (l.tipo === 'polen') {
-      const pisca = 0.6 + 0.4 * Math.sin(tempo * 3 + l.fase);
-      const a = entra * pisca;
+      const a = entra * (0.6 + 0.4 * Math.sin(tempo * 3 + l.fase));
       desenharHalo(c, '#ffe7a3', l.x, l.y, u * 3.2, a * 0.35);
       c.globalAlpha = a * 0.9;
       c.fillStyle = '#fff6d6';
       c.fillRect(Math.round(l.x - u / 2), Math.round(l.y - u / 2), u, u);
-    } else {
-      // O vagalume acende e apaga devagar, e às vezes dá uma piscada forte com brilho em cruz.
+    } else if (l.tipo === 'vagalume') {
+      // Acende e apaga devagar, e às vezes dá uma piscada forte com brilho em cruz.
       const acende = Math.max(0, Math.sin(tempo * 1.7 + l.fase)) ** 2;
       const a = entra * (0.15 + 0.85 * acende);
       desenharHalo(c, '#c8f25a', l.x, l.y, u * 5.5, a * 0.45);
@@ -358,6 +479,25 @@ function desenhar(tempo: number): void {
       c.globalAlpha = a;
       c.fillStyle = '#fbffe0';
       c.fillRect(Math.round(l.x - u / 2), Math.round(l.y - u / 2), u, u);
+    } else if (l.tipo === 'fagulha') {
+      // Amarela saindo do fogo, laranja e depois vermelha, apagando.
+      const cor = t < 0.3 ? '#ffe28a' : t < 0.65 ? '#ff9a3c' : '#e8502a';
+      const a = entra * (0.7 + 0.3 * Math.sin(tempo * 20 + l.fase));
+      desenharHalo(c, '#ff9a3c', l.x, l.y, u * 2.5, a * 0.35);
+      c.globalAlpha = a;
+      c.fillStyle = cor;
+      c.fillRect(Math.round(l.x - u / 2), Math.round(l.y - u / 2), u, u);
+    } else if (l.tipo === 'espuma') {
+      c.globalAlpha = entra * 0.7;
+      c.fillStyle = '#e8f6ff';
+      c.fillRect(Math.round(l.x - u / 2), Math.round(l.y - u / 2), u, u);
+    } else {
+      // O brilho do sol no rio: um risquinho que acende e apaga.
+      const a = entra * Math.max(0, Math.sin(t * Math.PI));
+      desenharHalo(c, '#ffd6a0', l.x, l.y, u * 3, a * 0.3);
+      c.globalAlpha = a * 0.9;
+      c.fillStyle = '#fff1d8';
+      c.fillRect(Math.round(l.x - u), Math.round(l.y - u / 2), u * 2, Math.max(1, Math.round(u / 2)));
     }
   }
 

@@ -21,7 +21,8 @@
 //   última, o bastante para a Flor acertar umas cusparadas. Pulando na hora, ou saindo da rachadura, escapa.
 // - 3 · Flor Carnívora: só com a barra de energia pixy cheia, e gasta a barra. A terra treme onde
 //   ela mirou e brota uma flor carnívora enorme, que fica um tempo de pé: vai atrás do outro (sem
-//   chegar colada) e cospe bolas de veneno nele, de muito longe. Não dá para matar a flor: é
+//   chegar colada) e cospe bolas de veneno nele, de muito longe (cada uma envenena, como o
+//   chicote). Não dá para matar a flor: é
 //   desviar das bolas (pular, andar) até ela murchar.
 
 export const PODERES_LESLIE = ['chicote', 'raizes', 'flor'] as const;
@@ -72,7 +73,8 @@ export const RAIZES = {
 // `aviso` segundos e ela sobe da terra em `brota`. De pé por `duracao` segundos, vai atrás do
 // outro a `velocidade` e para a `distancia` dele; de `intervalo` em `intervalo` segundos agacha
 // (`prepara`) e cospe uma bola de veneno na direção dele, que voa reto a `tiro.velocidade` até
-// `tiro.alcance` (quase a tela inteira) ou até bater em alguém ou no chão. No fim, murcha e estoura
+// `tiro.alcance` (quase a tela inteira) ou até bater em alguém ou no chão; quem ela acerta fica
+// envenenado (VENENO, o mesmo do chicote). No fim, murcha e estoura
 // em veneno (só a imagem: não tira vida).
 export const FLOR = {
   nome: 'Flor Carnívora',
@@ -87,5 +89,5 @@ export const FLOR = {
   intervalo: 1.6, // ~6 cusparadas
   prepara: 0.3,
   murcha: 1,
-  tiro: { dano: 50, velocidade: 230, alcance: 420, raio: 3 }, // até 6 × 50 = 300
+  tiro: { dano: 45, velocidade: 230, alcance: 420, raio: 3 }, // até 6 × 45 = 270, e envenena
 };

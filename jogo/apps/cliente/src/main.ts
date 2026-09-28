@@ -64,6 +64,7 @@ import {
   type FimDaPartida,
   type Partida,
 } from './partida';
+import { tocarMusica } from './som/musica';
 
 const canvas = document.getElementById('jogo');
 if (!(canvas instanceof HTMLCanvasElement)) throw new Error('faltou o <canvas id="jogo"> na página');
@@ -503,6 +504,8 @@ async function principal(): Promise<void> {
   if (aparelhoMovel()) return telaSoNoComputador();
   // Janela pequena demais: o aviso cobre tudo e, na partida, abre o menu (inicio/janela.ts).
   vigiarJanela(() => menusDaPartida?.abrirMenu());
+  // A música das telas (começa no primeiro clique ou tecla: o navegador não deixa antes).
+  tocarMusica('telas');
   const { cenario, herois, online } = await carregar({
     carregarCenario: carregarFolhaCenario,
     carregarHerois,
@@ -513,7 +516,7 @@ async function principal(): Promise<void> {
   folhaCenario = cenario;
   prepararAnimais(cenario, Y_CHAO);
   prepararMinhocas(Y_CHAO, ALTURA_CHAO);
-  prepararCena(cenario);
+  prepararCena();
   requestAnimationFrame(loop);
 
   for (;;) {
@@ -527,7 +530,9 @@ async function principal(): Promise<void> {
       const online = atual.modo === 'online' ? { conexao: atual.conexao, oponente: atual.oponente } : undefined;
       const { saiu } = await telaTemporada({ ate, online });
       if (saiu) break;
+      tocarMusica('combate');
       const revanche = await jogar(atual);
+      tocarMusica('telas');
       // Jogar de novo: a escolha de personagem outra vez — sozinho, contra outra CPU sorteada;
       // online, na mesma sala, e os dois escolhendo começa outra rodada. Voltando, o menu.
       if (revanche === 'sozinho' && atual.modo === 'solo') {
