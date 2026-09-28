@@ -84,9 +84,9 @@ export const RAIZES = {
 // brilha por `toca.aviso` (dá para sair de perto) e ela sobe em `toca.sobe`. Embaixo da terra ela
 // não cospe, e esse tempo não conta na `duracao`.
 //
-// Balanceamento (BALANCEAMENTO.md): mais tempo de pé (14 s, eram 10) e a bola mais rápida (320
-// px/s, eram 230: mais difícil de desviar) renderiam demais; cada cusparada tira 35 (eram 45) e
-// a Leslie continua perto de 50% contra o Grow no simulador.
+// Balanceamento (BALANCEAMENTO.md): mais tempo de pé (14 s, eram 10), a bola mais rápida (320
+// px/s, eram 230) e o par (alta e baixa: o pulo simples não escapa) acertam bem mais; cada
+// cusparada tira 23 (eram 45) e a Leslie continua perto de 50% contra o Grow no simulador.
 export const FLOR = {
   nome: 'Flor Carnívora',
   recarga: 3, // curta: quem segura o especial é a barra de energia
@@ -100,6 +100,10 @@ export const FLOR = {
   intervalo: 1.6, // ~9 cusparadas
   prepara: 0.3,
   murcha: 1,
-  tiro: { dano: 35, velocidade: 320, alcance: 420, raio: 3 }, // ~9 × 35 = 315, e envenena
+  // Cada cusparada é um par de bolas: uma mirada nas pernas (`alturas[0]` px acima do chão, onde
+  // ele está) e outra na altura de quem pula (`alturas[1]`): parado, a baixa pega; num pulo
+  // simples (até ~45 px), a alta. Só o pulo duplo, na hora, passa por cima das duas. O par fere
+  // uma vez só: acertando uma, a outra atravessa quem foi acertado (o golem, alto, pegaria as duas).
+  tiro: { dano: 23, velocidade: 320, alcance: 420, raio: 3, alturas: [6, 42] }, // ~9 × 23 = 207, e envenena
   toca: { longe: 140, espera: 2.5, afunda: 0.45, velocidade: 220, aviso: 0.45, sobe: 0.4 },
 };

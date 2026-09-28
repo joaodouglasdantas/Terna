@@ -40,9 +40,10 @@ NUMEROS = {'vida': 2500,
  'furia': {'dano': 250, 'recarga': 3, 'ocupa': 0.4, 'p': 0.35, 'pPreso': 0.9, 'custo': 100, 'cura': 100},
  # A Flor Carnívora (a ult da Leslie no lugar da Fúria): brota, segue o outro (longe, por baixo
  # da terra) e cospe de longe, esteja a luta perto ou não. 'antes': segundos até a primeira
- # cusparada. 'p' 0,42 (era 0,35): a bola agora voa a 320 px/s (era 230), sobra menos tempo para
- # desviar; o aviso de agachar (0,3 s) continua.
- 'flor': {'dano': 35, 'envenena': True, 'duracao': 14, 'intervalo': 1.6, 'antes': 1.6, 'recarga': 3, 'ocupa': 0.4, 'p': 0.42, 'custo': 100},
+ # cusparada. 'p' 0,6 (era 0,35): cada cusparada é um par de bolas, uma baixa e uma alta, a
+ # 320 px/s (era uma, a 230) — o pulo simples não escapa; só o pulo duplo na hora, ou sair do
+ # alcance. O par fere uma vez só.
+ 'flor': {'dano': 23, 'envenena': True, 'duracao': 14, 'intervalo': 1.6, 'antes': 1.6, 'recarga': 3, 'ocupa': 0.4, 'p': 0.6, 'custo': 100},
  'aves': {'dano': 55, 'bicada': 6, 'recarga': 6.5, 'ocupa': 0.35, 'p': 0.35, 'custo': 2, 'tira': 2.0},
  'vento': {'tique': 0.3, 'dano': 5, 'duracao': 3.6, 'recarga': 8, 'p': 0.5, 'custo': 3, 'atrapalha': 0.5},
  'golem': {'duracao': 30, 'recarga': 10, 'defesa': 0.4, 'custo': 100},

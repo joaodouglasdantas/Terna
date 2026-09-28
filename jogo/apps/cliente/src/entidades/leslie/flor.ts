@@ -5,7 +5,8 @@
 //
 // A terra treme onde a Leslie mirou, a flor sobe de dentro dela e fica de pé um tempo: vai atrás
 // do outro (sem chegar colada) e, de tempos em tempos, agacha e cospe uma bola de veneno nele, que
-// voa reto, rápido e longe e deixa envenenado quem acerta. No fim, murcha e estoura num respingo de veneno (só a imagem).
+// voa reto, rápido e longe e deixa envenenado quem acerta. Cada cusparada é um par: uma bola baixa
+// e uma alta, e o pulo simples não escapa das duas. No fim, murcha e estoura num respingo de veneno (só a imagem).
 //
 // Com ele longe, ela entra na terra (a toca): afunda, corre por baixo — a terra estufa e solta
 // torrões por onde ela passa — e, perto dele, a terra racha e brilha onde ela vai sair (o aviso);
@@ -30,6 +31,7 @@ import {
   vivos,
   type Alvo,
   type Ameacas,
+  type CorpoAlvo,
   type Dono,
   type Nucleo,
 } from '../efeitos';
@@ -68,6 +70,7 @@ interface Tiro {
   vx: number;
   vy: number;
   percorrido: number;
+  par: { acertou: Set<CorpoAlvo> }; // o da outra bola da cusparada: o par fere cada um uma vez só
 }
 
 // A flor dentro da terra: afundando, correndo por baixo, avisando onde vai sair e subindo.
@@ -249,23 +252,27 @@ function atualizarToca(e: Efeitos, f: Flor, t: Toca, dt: number, alvos: readonly
   }
 }
 
+// Cospe o par de bolas na direção dele: uma nas pernas de quem está no chão e outra na altura de
+// quem pula (FLOR.tiro.alturas, acima do chão onde ele está) — o pulo simples cai numa delas.
 function cuspir(e: Efeitos, f: Flor, alvo: Alvo | null): void {
   if (!alvo) return;
   const bx = f.x + f.lado * BOCA.frente;
   const by = chao() - BOCA.altura;
-  // Na altura do peito dele.
-  let dx = alvo.corpo.x - bx;
-  let dy = alvo.corpo.y - alvo.corpo.medida.altura * 0.55 - by;
-  const d = Math.hypot(dx, dy);
-  [dx, dy] = d < 1 ? [f.lado, 0] : [dx / d, dy / d];
-  // Nunca para trás: ela cospe para o lado que olha.
-  if (dx * f.lado < 0.2) {
-    dx = f.lado * 0.2;
-    const n = Math.hypot(dx, dy);
-    [dx, dy] = [dx / n, dy / n];
+  const par = { acertou: new Set<CorpoAlvo>() };
+  for (const altura of FLOR.tiro.alturas) {
+    let dx = alvo.corpo.x - bx;
+    let dy = chao() - altura - by;
+    const d = Math.hypot(dx, dy);
+    [dx, dy] = d < 1 ? [f.lado, 0] : [dx / d, dy / d];
+    // Nunca para trás: ela cospe para o lado que olha.
+    if (dx * f.lado < 0.2) {
+      dx = f.lado * 0.2;
+      const n = Math.hypot(dx, dy);
+      [dx, dy] = [dx / n, dy / n];
+    }
+    f.tiros.push({ x: bx, y: by, vx: dx * FLOR.tiro.velocidade, vy: dy * FLOR.tiro.velocidade, percorrido: 0, par });
   }
-  f.tiros.push({ x: bx, y: by, vx: dx * FLOR.tiro.velocidade, vy: dy * FLOR.tiro.velocidade, percorrido: 0 });
-  for (let k = 0; k < 6; k++) gota(e, bx, by, 40);
+  for (let k = 0; k < 8; k++) gota(e, bx, by, 40);
 }
 
 function atualizarTiros(e: Efeitos, f: Flor, dt: number, alvos: readonly Alvo[]): void {
@@ -276,8 +283,10 @@ function atualizarTiros(e: Efeitos, f: Flor, dt: number, alvos: readonly Alvo[])
       t.x += (t.vx * dt) / partes;
       t.y += (t.vy * dt) / partes;
       t.percorrido += (FLOR.tiro.velocidade * dt) / partes;
-      const alvo = vivos(alvos, f.dono).find((a) => acertaCorpo(a.corpo, t.x, t.y, FLOR.tiro.raio));
+      // Quem a outra bola do par já acertou, esta atravessa.
+      const alvo = vivos(alvos, f.dono).find((a) => !t.par.acertou.has(a.corpo) && acertaCorpo(a.corpo, t.x, t.y, FLOR.tiro.raio));
       if (alvo) {
+        t.par.acertou.add(alvo.corpo);
         ferirAlvo(e, alvo, FLOR.tiro.dano);
         // Deixa envenenado, como o chicote (e o veneno cura a Leslie). Online, o veneno do outro
         // chega pela rede, com o estado dele.

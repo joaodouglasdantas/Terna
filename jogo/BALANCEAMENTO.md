@@ -33,7 +33,7 @@ O `simular-duelo.py` simula milhares de duelos com o mesmo modelo para todos os 
   | Espada, soco | 45% |
   | Chicote | 40% |
   | Arco, Revoada, Salto, Investida, Julgamento | 35% |
-  | Cada cusparada da Flor (a bola rápida, 320 px/s) | 42% |
+  | Cada cusparada da Flor (o par de bolas, alta e baixa, a 320 px/s) | 60% |
   | Pedra | 30% em cheio |
   | Cada explosão e cada coração do Anjo | 30% |
 
@@ -97,20 +97,23 @@ Antes:
 |---|---|---|---|---|
 | 1 · Chicote de Espinhos | 10 + veneno 6×6 = 46 → **8 + veneno 5×4 = 28**; o veneno cura a Leslie em **2 por pinguinho** (10) | 1,1% | 1,4 s | 10 → **2** |
 | 2 · Raízes | 14 por roda (até 42) | 1,7% | 9 s | 25 → **6** |
-| 3 · Flor Carnívora (no lugar da Fúria) | 45 → **35 por cusparada, ~9 cusparadas (até 315)**, e cada uma envenena | 1,4% cada | 3 s | 100 (barra cheia) |
+| 3 · Flor Carnívora (no lugar da Fúria) | 45 → **23 por cusparada, ~9 cusparadas (até ~207)**, e cada uma envenena | 0,9% cada | 3 s | 100 (barra cheia) |
 
 - **A Flor Carnívora:** brota a até 120 px dela, fica **14 s** de pé (eram 10), vai atrás do outro
-  a 42 px/s e para a 60 px; a cada **1,6 s** agacha (0,3 s de aviso) e cospe uma bola de veneno
-  que voa reto a **320 px/s** (eram 230) por até 420 px e deixa envenenado quem acerta (o mesmo
-  veneno do chicote, que também cura a Leslie). Com ele a mais de 140 px, ela **entra na terra**,
+  a 42 px/s e para a 60 px; a cada **1,6 s** agacha (0,3 s de aviso) e cospe **um par de bolas**
+  de veneno a **320 px/s** (eram uma, a 230), por até 420 px: uma nas pernas (6 px do chão) e uma
+  na altura de quem pula (42 px). Parado, a baixa pega; num pulo simples (até ~45 px), a alta.
+  Só o pulo duplo na hora passa por cima das duas. O par fere uma vez só (o golem, alto, pegaria
+  as duas). Quem é acertado fica envenenado (o mesmo veneno do chicote, que também cura a Leslie). Com ele a mais de 140 px, ela **entra na terra**,
   corre por baixo a 220 px/s e sai a 60 px dele: a terra racha e brilha 0,45 s antes, dá para
   sair de perto. Embaixo da terra ela não cospe, e esse tempo não conta nos 14 s. Não dá para
   matar a flor: é desviar das bolas. Ela continua cuspindo mesmo com a luta parada, e por isso
   foi medida valendo o tempo todo (fugir dela não adianta mais, o que o modelo já supunha).
-- **Flor mais longa e mais rápida:** com 14 s e a bola a 320 px/s (acerto de 35% para 42% no
-  modelo), a cusparada de 45 deixava a Leslie vencendo 55% do Grow e 58% do Anjo. Com **35**, em
-  2 000 duelos de cada: Leslie × Grow **51%** (era 47%), × Anjo 54% (era 53%), espelho 51%. A ult
-  tira mais por uso (até ~315, eram 270) sem desequilibrar a luta.
+- **Flor mais longa, mais rápida e em par:** com 14 s, a bola a 320 px/s e o par (acerto de 35%
+  para 60% no modelo), a cusparada de 35 deixava a Leslie vencendo 59% do Grow; a de 45, mais
+  ainda. Com **23**, em 2 000 duelos de cada: Leslie × Grow **52%** (era 51% com uma bola só, e
+  47% antes da Flor mais longa), × Anjo 54%, espelho 49%. A Flor acerta muito mais vezes, cada
+  acerto tira um pouco menos, e o veneno (que cura a Leslie) entra com mais constância.
 - **A cura:** a Fúria curava 100 de uma vez; agora quem cura é o veneno do chicote — **metade do
   que cada pinguinho tira** (4 de veneno, 2 de cura; no golem, que segura parte, a metade do que
   passou). Para a Leslie não ficar forte demais com a cura, o chicote tira 8 no acerto (era 10) e
