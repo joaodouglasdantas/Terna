@@ -28,7 +28,7 @@ import {
   prepararPoderes,
 } from './entidades/poderes';
 import { desenharLuzAtras, desenharLuzNaFrente } from './entidades/luz-da-vitoria';
-import { prepararCena } from './inicio/cena';
+import { esconderCena, prepararCena } from './inicio/cena';
 import { abrirCortina, fecharCortina } from './inicio/dom';
 import { aparelhoMovel, telaSoNoComputador } from './inicio/aparelho';
 import { carregar, escolherModo, type Escolha } from './inicio/inicio';
@@ -530,6 +530,7 @@ async function principal(): Promise<void> {
       const online = atual.modo === 'online' ? { conexao: atual.conexao, oponente: atual.oponente } : undefined;
       const { saiu } = await telaTemporada({ ate, online });
       if (saiu) break;
+      esconderCena(); // a arte do menu sai: a partida aparece atrás da tela do carregamento
       tocarMusica('combate');
       const revanche = await jogar(atual);
       tocarMusica('telas');

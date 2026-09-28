@@ -6,7 +6,8 @@
 //   da arte são redesenhados por cima dela em faixas finas, cada faixa um pouco deslocada por uma
 //   onda que corre (com a borda esfumada, para não mostrar o recorte);
 // - as luzes da fogueira, das tochas e das lanternas tremulam, e o sol pulsa;
-// - da fogueira e das tochas sobem fagulhas; bandos de pássaros cruzam o céu batendo as asas;
+// - da fogueira e das tochas sobem fagulhas; bandos de pássaros cruzam o céu batendo as asas,
+//   por trás das árvores das beiradas;
 //   o rio brilha e as cachoeiras soltam espuma;
 // - das copas caem folhas em pixel, balançando como pêndulo e rodopiando; flutua pólen na luz e
 //   piscam vagalumes perto do chão.
@@ -16,6 +17,7 @@
 //
 // Os lugares da arte são frações do quadro (a arte e o quadro são 16:9): x da largura, y da altura.
 
+import urlArvores from '../assets/tela-inicial-arvores.png';
 import urlArte from '../assets/tela-inicial.webp';
 import { carregarImagem, contexto2d, novoCanvas } from '../motor/imagens';
 import { elemento, palco } from './dom';
@@ -131,6 +133,10 @@ interface Bando {
   tempo: number;
 }
 
+// O lugar fixo da cena: um quadro do tamanho do #inicio, logo atrás dele, que fica na página o
+// tempo todo (as telas do menu passam por cima; entre uma e outra, a cena continua ali, e o jogo
+// atrás não aparece). Escondido durante a partida.
+let palcoDaCena: HTMLElement | null = null;
 let camada: HTMLElement | null = null;
 let arte: HTMLElement;
 let tela: HTMLCanvasElement;
@@ -151,12 +157,11 @@ const sortear = (min: number, max: number): number => min + Math.random() * (max
 const escolher = <T>(lista: readonly T[]): T => lista[Math.floor(Math.random() * lista.length)];
 const naArea = (a: Area): { x: number; y: number } => ({ x: sortear(a.x0, a.x1) * largura, y: sortear(a.y0, a.y1) * altura });
 
-// O tamanho do quadro do jogo (o #inicio). Quando a cena entra, a tela nova ainda pode não estar
-// na página e o #inicio, vazio, fica escondido (tamanho 0). Aí vale a mesma conta do CSS do
-// #inicio, e o observador acerta quando ele aparece.
+// O tamanho do quadro do jogo (o da cena, igual ao #inicio). Recém-mostrado ele pode ainda não ter
+// tamanho: aí vale a mesma conta do CSS, e o observador acerta depois.
 function tamanhoDoQuadro(): { w: number; h: number } {
-  const quadro = palco();
-  if (quadro.clientWidth > 0 && quadro.clientHeight > 0) return { w: quadro.clientWidth, h: quadro.clientHeight };
+  const quadro = palcoDaCena;
+  if (quadro && quadro.clientWidth > 0 && quadro.clientHeight > 0) return { w: quadro.clientWidth, h: quadro.clientHeight };
   return {
     w: Math.min(innerWidth, (innerHeight * 16) / 9),
     h: Math.min(innerHeight, Math.max((innerWidth * 9) / 16, 400)),
@@ -173,10 +178,12 @@ function medir(): void {
   tela.height = altura;
 }
 
-// Cada pedaço que se mexe, recortado da arte uma vez, com a borda esfumada (a elipse).
-let recortes: { pedaco: Pedaco; canvas: HTMLCanvasElement }[] = [];
+// Cada pedaço que se mexe, recortado da arte uma vez, com a borda esfumada (a elipse); e, dele,
+// só as árvores das beiradas (`frente`, pela máscara assets/tela-inicial-arvores.png), que são
+// redesenhadas por cima dos pássaros, com a mesma onda: eles passam por trás delas.
+let recortes: { pedaco: Pedaco; canvas: HTMLCanvasElement; frente: HTMLCanvasElement }[] = [];
 
-function recortar(img: HTMLImageElement): void {
+function recortar(img: HTMLImageElement, mascara: HTMLImageElement): void {
   recortes = PEDACOS.map((pedaco) => {
     const { x0, x1, y0, y1 } = pedaco.area;
     const sx = Math.round(x0 * img.naturalWidth);
@@ -195,13 +202,21 @@ function recortar(img: HTMLImageElement): void {
     g.addColorStop(1, 'rgba(0, 0, 0, 0)');
     c.fillStyle = g;
     c.fillRect(-1, -1, 2, 2);
-    return { pedaco, canvas };
+    const frente = novoCanvas(w, h);
+    const f = contexto2d(frente);
+    f.drawImage(img, sx, sy, w, h, 0, 0, w, h);
+    f.globalCompositeOperation = 'destination-in';
+    f.drawImage(mascara, Math.round(x0 * mascara.naturalWidth), Math.round(y0 * mascara.naturalHeight), Math.round((x1 - x0) * mascara.naturalWidth), Math.round((y1 - y0) * mascara.naturalHeight), 0, 0, w, h);
+    return { pedaco, canvas, frente };
   });
 }
 
-// Os pedaços por cima da arte, em faixas: cada faixa deslocada para o lado pela onda.
-function mexer(c: CanvasRenderingContext2D, tempo: number): void {
-  for (const { pedaco, canvas } of recortes) {
+// Os pedaços por cima da arte, em faixas: cada faixa deslocada para o lado pela onda. `frente`:
+// só as árvores deles (por cima dos pássaros).
+function mexer(c: CanvasRenderingContext2D, tempo: number, frente = false): void {
+  for (const recorte of recortes) {
+    const { pedaco } = recorte;
+    const canvas = frente ? recorte.frente : recorte.canvas;
     const { x0, x1, y0, y1 } = pedaco.area;
     const { forca, ritmo, passo, desce } = pedaco.onda;
     const dx = x0 * largura;
@@ -225,7 +240,7 @@ export function prepararCena(): void {
   camada.style.setProperty('--arte', `url("${urlArte}")`);
   arte = elemento('div', 'inicio-cena-arte');
   const fundo = elemento('div', 'inicio-cena-fundo');
-  void carregarImagem(urlArte).then(recortar);
+  void Promise.all([carregarImagem(urlArte), carregarImagem(urlArvores)]).then(([img, mascara]) => recortar(img, mascara));
   const luzesDaArte = LUZES_DA_ARTE.map(({ x, y, r, tipo }, i) => {
     const luz = elemento('div', `inicio-cena-luz inicio-cena-luz-${tipo}`);
     luz.style.setProperty('--x', `${x}%`);
@@ -237,6 +252,10 @@ export function prepararCena(): void {
   tela = elemento('canvas', 'inicio-cena-folhas');
   arte.append(fundo, tela, ...luzesDaArte);
   camada.append(arte);
+  palcoDaCena = elemento('div', 'inicio-cena-palco');
+  palcoDaCena.hidden = true;
+  palcoDaCena.append(camada);
+  palco().after(palcoDaCena);
   // A arte segue o mouse de leve.
   window.addEventListener('pointermove', (evento) => {
     mouse.x = Math.max(-1, Math.min(1, (evento.clientX / innerWidth) * 2 - 1));
@@ -244,16 +263,18 @@ export function prepararCena(): void {
   });
   // A camada cobre o quadro: mudou de tamanho (a janela, ou o quadro que apareceu), mede de novo.
   new ResizeObserver(() => {
-    if (camada?.isConnected) medir();
+    if (palcoDaCena && !palcoDaCena.hidden) medir();
   }).observe(camada);
 }
 
-// Põe a cena no fundo da tela (por baixo do conteúdo dela). `entrar`: a arte aparece chegando
-// (ao abrir a tela inicial); passando entre os menus, ela só muda de lugar.
-export function anexarCena(telaDoMenu: HTMLElement, entrar = false): void {
-  if (!camada) return;
-  telaDoMenu.prepend(camada);
-  largura = altura = 0; // mede de novo
+// Mostra a cena atrás das telas do menu. `entrar`: a arte aparece chegando (ao abrir a tela
+// inicial); passando entre os menus, ela só continua. (A tela não muda nada: a cena fica no lugar
+// dela, atrás do #inicio.)
+export function anexarCena(_telaDoMenu?: HTMLElement, entrar = false): void {
+  if (!camada || !palcoDaCena) return;
+  const estavaEscondida = palcoDaCena.hidden;
+  palcoDaCena.hidden = false;
+  if (estavaEscondida) largura = altura = 0; // mede de novo
   medir();
   if (entrar && !semMovimento()) {
     const el = camada;
@@ -274,9 +295,14 @@ export function anexarCena(telaDoMenu: HTMLElement, entrar = false): void {
   }
 }
 
+// Tira a cena (a partida vai começar): some e para de desenhar.
+export function esconderCena(): void {
+  if (palcoDaCena) palcoDaCena.hidden = true;
+}
+
 let ultimo = 0;
 function quadro(agora: number): void {
-  if (!camada?.isConnected) {
+  if (!palcoDaCena || palcoDaCena.hidden) {
     rodando = false;
     ultimo = 0;
     return;
@@ -457,6 +483,11 @@ function desenhar(tempo: number): void {
   for (const b of bandos) {
     for (const p of b.passaros) desenharPassaro(c, b.x + p.dx, b.y + p.dy, up, Math.sin(b.tempo * 9 + p.fase) > 0 ? 0 : 1);
   }
+  // As árvores das beiradas na frente deles.
+  c.globalAlpha = 1;
+  c.imageSmoothingEnabled = true;
+  if (bandos.length && !semMovimento()) mexer(c, tempo, true);
+  c.imageSmoothingEnabled = false;
 
   // As luzes, somando luz.
   c.globalCompositeOperation = 'lighter';
