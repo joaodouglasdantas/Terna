@@ -4,9 +4,8 @@
 // do anjo: ele é uma transformação curta que bate forte; ela tem os dela o tempo todo.
 // Distâncias em pixels, tempos em segundos, velocidades em px/s.
 //
-// A energia pixy (poderes.ts) é o combustível: começa vazia, enche com o dano que ela dá (no começo,
-// só com as armas) e cada poder só sai com a energia dele — o 1 pede pouco, o 2 mais e a Fúria a
-// barra cheia — e a gasta.
+// A energia pixy (poderes.ts) é o combustível: começa vazia e enche com o dano que ela dá. O 1 e o
+// 2 gastam quase nada; a Fúria pede a barra cheia.
 //
 // Cada um se desvia de um jeito:
 // - 1 · Chicote de Espinhos: uma vinha com espinhos sai da mão dela em linha reta na direção do
@@ -40,7 +39,7 @@ export const CHICOTE = {
 export const VENENO = {
   duracao: 3,
   intervalo: 0.5,
-  dano: 6,
+  dano: 4, // por tique: 24 no total
 };
 
 export const RAIZES = {
@@ -68,11 +67,11 @@ export const RAIZES = {
 
 export const FURIA = {
   nome: 'Fúria da Floresta',
-  dano: 180,
+  dano: 250,
   recarga: 3, // curta: quem segura o especial é a barra de energia
   alcance: 260,
   aviso: 1, // a terra tremendo antes das trepadeiras: andando, dá para sair ~90 px
   raio: 50, // metade da largura da área
   duracao: 0.9,
-  cura: 60, // vida que a Leslie recupera ao usar
+  cura: 100, // vida que a Leslie recupera ao usar
 };

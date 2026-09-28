@@ -10,6 +10,7 @@ import {
   MensagemPartidaDoCliente,
   QUEDA_DE_ARMAS,
   TAMANHO_CODIGO,
+  VIDA_MAXIMA,
   cabeOutraArma,
   sortearArma,
   sortearIntervaloDeArma,
@@ -107,6 +108,7 @@ interface SalaPartida {
   // escolha).
   fase: 'esperando' | 'escolher' | 'jogando' | 'fim';
   revanche: Record<Lado, boolean>; // no fim: quem já pediu para jogar de novo
+  vidas: Record<Lado, number>; // a última vida que cada um avisou (no fim por tempo, ganha a maior)
 }
 
 // Uma conexão dentro de uma sala. A rota guarda e devolve em `receber` e `sair`.
@@ -150,6 +152,7 @@ export class Salas {
       herois: { anfitriao: null, convidado: null },
       fase: 'esperando',
       revanche: { anfitriao: false, convidado: false },
+      vidas: { anfitriao: VIDA_MAXIMA, convidado: VIDA_MAXIMA },
     } as SalaPartida;
     sala.anfitriao = { nome, conexao, sala, janela: 0, mensagens: 0, latencia: 0 };
     sala.timer = setTimeout(() => this.fechar(sala, 'ninguém entrou na sala a tempo'), this.opcoes.esperaMaxMs);
@@ -206,6 +209,7 @@ export class Salas {
     // As armas da rodada anterior não passam para esta.
     sala.armas.chao.clear();
     sala.armas.mao = { anfitriao: null, convidado: null };
+    sala.vidas = { anfitriao: VIDA_MAXIMA, convidado: VIDA_MAXIMA };
     const herois: Record<Lado, Heroi> = {
       anfitriao: sala.herois.anfitriao ?? HEROI_PADRAO,
       convidado: sala.herois.convidado ?? HEROI_PADRAO,
@@ -213,7 +217,7 @@ export class Salas {
     clearTimeout(sala.timer);
     // O carregamento e a contagem 3, 2, 1 vêm antes do relógio: o fim é depois deles (`restanteMs`
     // é o relógio).
-    sala.timer = setTimeout(() => this.encerrar(sala, 'tempo'), this.opcoes.contagemMs + this.opcoes.duracaoMs);
+    sala.timer = setTimeout(() => this.acabouOTempo(sala), this.opcoes.contagemMs + this.opcoes.duracaoMs);
     const restanteMs = this.opcoes.duracaoMs;
     this.mandar(sala.anfitriao.conexao, {
       tipo: 'comecou',
@@ -322,6 +326,9 @@ export class Salas {
         return this.mandar(outro.conexao, { tipo: 'arma-descartada', lado });
       case 'morri':
         return this.encerrar(sala, 'morte', undefined, outro === sala.anfitriao ? 'anfitriao' : 'convidado');
+      case 'vida':
+        sala.vidas[lado] = m.vida;
+        return;
     }
   }
 
@@ -353,6 +360,13 @@ export class Salas {
     if (sala.convidado) return this.encerrar(sala, 'oponente-saiu', p);
     clearTimeout(sala.timer);
     this.salas.delete(sala.codigo);
+  }
+
+  // O relógio zerou: vence quem tiver mais vida (a última que cada um avisou); igual, empate.
+  private acabouOTempo(sala: SalaPartida): void {
+    const { anfitriao, convidado } = sala.vidas;
+    const vencedor: Lado | undefined = anfitriao > convidado ? 'anfitriao' : convidado > anfitriao ? 'convidado' : undefined;
+    this.encerrar(sala, 'tempo', undefined, vencedor);
   }
 
   // Termina a partida e avisa os dois. Por tempo ou morte a sala fica aberta um tempo, para a

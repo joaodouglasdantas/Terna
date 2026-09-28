@@ -2,7 +2,8 @@
 // em quando, com uma coluna de luz dourada marcando onde vão cair e um brilho em volta enquanto
 // esperam no chão; a arma na mão, com o braço segurando; o golpe da espada, que varre
 // de cima para a frente, e a flecha do arco; a arma quebrando quando o tempo dela acaba, e a
-// jogada fora (tecla E), que cai e some.
+// jogada fora (tecla E), que cai e some. E, sem arma na mão, o soco: o braço estica rápido com o
+// punho fechado na ponta e volta.
 //
 // Sozinho, o próprio jogo sorteia as quedas; online, elas chegam do servidor, que também decide
 // quem pega. Como nos poderes, cada um confere só o que acerta o próprio personagem.
@@ -13,6 +14,7 @@ import {
   ESPADA,
   MUNDO,
   QUEDA_DE_ARMAS,
+  SOCO,
   cabeOutraArma,
   danoNaZona,
   sortearArma,
@@ -21,6 +23,7 @@ import {
   type ArmaNoMapa,
   type AtaqueUsado,
   type TipoArma,
+  type TipoAtaque,
   type ZonaDoCorpo,
 } from '@terna/compartilhado';
 import {
@@ -42,9 +45,9 @@ export interface ArmaNaMao {
   recarga: number; // segundos até o próximo ataque
 }
 
-// O ataque em curso, no corpo: o golpe da espada ou o arco esticado na direção da mira.
+// O ataque em curso, no corpo: o golpe da espada, o arco esticado na direção da mira ou o soco.
 export interface Ataque {
-  tipo: TipoArma;
+  tipo: TipoAtaque;
   mira: number; // ângulo da mira no corpo (0 = para a frente, positivo = para baixo)
   idade: number;
   atingidos: CorpoAlvo[]; // a espada acerta cada um uma vez por golpe
@@ -56,6 +59,7 @@ export interface CorpoArmado extends CorpoAlvo {
   dash: number; // no dash o lado já está decidido: o ataque não vira o corpo
   arma: ArmaNaMao | null;
   ataque: Ataque | null;
+  recargaSoco: number; // segundos até o próximo soco
 }
 
 // As poses, em ângulos do corpo (0 = frente, positivo = para baixo) e pixels. Parado com a arma,
@@ -71,8 +75,11 @@ const POSE = {
   golpeAte: 0.7,
   miraEspada: 0.8, // a espada mira no máximo isto para cima ou para baixo
   miraArco: 1.35,
+  miraSoco: 0.7,
+  punhoRecolhido: 3, // o braço do soco, antes de esticar
 };
-const DURACAO_ATAQUE: Record<TipoArma, number> = { espada: ESPADA.golpe + 0.08, arco: 0.4 };
+const DURACAO_ATAQUE: Record<TipoAtaque, number> = { espada: ESPADA.golpe + 0.08, arco: 0.4, soco: SOCO.golpe + 0.04 };
+const LIMITE_DA_MIRA: Record<TipoAtaque, number> = { espada: POSE.miraEspada, arco: POSE.miraArco, soco: POSE.miraSoco };
 const LAMINA = { de: 3, ate: 14 }; // pixels da mão até o começo e a ponta da lâmina
 const ACABANDO = 3; // segundos: com menos que isto de durabilidade, a arma pisca
 
@@ -307,6 +314,7 @@ export function quebrarArma(a: Arsenal, c: CorpoArmado): void {
 // Passa o tempo da arma na mão: a recarga entre ataques e a durabilidade. Devolve se quebrou agora.
 // `podeQuebrar`: o seu e o da CPU; o do outro online só quebra quando ele avisa.
 export function gastarArma(a: Arsenal, c: CorpoArmado, dt: number, podeQuebrar: boolean): boolean {
+  c.recargaSoco = Math.max(0, c.recargaSoco - dt);
   if (!c.arma) return false;
   c.arma.recarga = Math.max(0, c.arma.recarga - dt);
   c.arma.durabilidade = Math.max(0, c.arma.durabilidade - dt);
@@ -316,9 +324,17 @@ export function gastarArma(a: Arsenal, c: CorpoArmado, dt: number, podeQuebrar: 
 }
 
 // Botão esquerdo com uma arma na mão: ataca na direção de `alvo` se a recarga deixar (clique
-// antes disso não faz nada). Volta o ataque, para lançar aqui e mandar pela rede.
+// antes disso não faz nada); sem arma, dá um soco. Volta o ataque, para lançar aqui e mandar pela
+// rede.
 export function tentarAtacar(c: CorpoArmado, alvo: Ponto): AtaqueUsado | null {
-  if (!c.arma || c.arma.recarga > 0) return null;
+  if (!c.arma) {
+    if (c.recargaSoco > 0) return null;
+    c.recargaSoco = SOCO.recarga;
+    virarPara(c, alvo);
+    const ombro = ombroDe(c);
+    return { arma: 'soco', x: Math.max(0, Math.min(MUNDO, ombro.x)), y: ombro.y, alvoX: alvo.x, alvoY: alvo.y };
+  }
+  if (c.arma.recarga > 0) return null;
   c.arma.recarga = DADOS_ARMA[c.arma.tipo].recarga;
   virarPara(c, alvo);
   const mao = c.arma.tipo === 'arco' ? maoMirando(c, alvo) : ombroDe(c);
@@ -334,8 +350,7 @@ function virarPara(c: CorpoArmado, alvo: Ponto): void {
 export function lancarAtaque(a: Arsenal, c: CorpoArmado, uso: AtaqueUsado): void {
   const alvo = { x: uso.alvoX, y: uso.alvoY };
   virarPara(c, alvo);
-  const limite = uso.arma === 'espada' ? POSE.miraEspada : POSE.miraArco;
-  c.ataque = { tipo: uso.arma, mira: anguloDaMira(c, alvo, limite), idade: 0, atingidos: [] };
+  c.ataque = { tipo: uso.arma, mira: anguloDaMira(c, alvo, LIMITE_DA_MIRA[uso.arma]), idade: 0, atingidos: [] };
   if (uso.arma !== 'arco') return;
   let dx = uso.alvoX - uso.x;
   let dy = uso.alvoY - uso.y;
@@ -382,6 +397,32 @@ function golpear(e: Efeitos, a: Arsenal, c: CorpoArmado, ataque: Ataque, alvos: 
       for (let n = 0; n < 12; n++) faisca(a, x, y, 70, 0, n % 3 ? cores.lamina : cores.ponta);
       break;
     }
+  }
+}
+
+// O quanto o braço do soco está esticado (0 a 1) em `t` (0 a 1): sai rápido e volta.
+const esticadoDoSoco = (t: number): number => (t < 0.4 ? 1 - (1 - t / 0.4) ** 2 : Math.max(0, 1 - (t - 0.4) / 0.6));
+
+// A ponta do punho no mapa, com o braço `esticado`.
+function pontaDoPunho(c: CorpoArmado, mira: number, esticado: number): Ponto {
+  const ombro = ombroDe(c);
+  const ang = anguloNoMapa(mira, c.direcao);
+  const comprimento = POSE.punhoRecolhido + (SOCO.alcance - POSE.punhoRecolhido) * esticado;
+  return { x: ombro.x + Math.cos(ang) * comprimento, y: ombro.y + Math.sin(ang) * comprimento };
+}
+
+// O soco: enquanto o braço está quase todo esticado, o punho confere os corpos (cada um uma vez).
+// Dano fixo, sem crítico na cabeça: é o ataque mais fraco do jogo.
+function socar(e: Efeitos, a: Arsenal, c: CorpoArmado, ataque: Ataque, alvos: readonly Alvo[]): void {
+  const t = ataque.idade / SOCO.golpe;
+  if (t < 0.25 || t > 0.75) return;
+  const punho = pontaDoPunho(c, ataque.mira, esticadoDoSoco(t));
+  for (const alvo of vivos(alvos, c)) {
+    if (ataque.atingidos.includes(alvo.corpo) || !acertaCorpo(alvo.corpo, punho.x, punho.y, 2)) continue;
+    ataque.atingidos.push(alvo.corpo);
+    ferirAlvo(e, alvo, SOCO.dano);
+    // O impacto: um estalo branco e poeirinha.
+    for (let n = 0; n < 7; n++) faisca(a, punho.x, punho.y, 45, 0, n % 2 ? cores.ponta : cores.corda);
   }
 }
 
@@ -473,6 +514,7 @@ export function atualizarArsenal(
     if (!ataque) continue;
     ataque.idade += dt;
     if (ataque.tipo === 'espada') golpear(e, a, c, ataque, alvos);
+    if (ataque.tipo === 'soco') socar(e, a, c, ataque, alvos);
     if (ataque.idade >= DURACAO_ATAQUE[ataque.tipo]) c.ataque = null;
   }
   a.flechas = a.flechas.filter((f) => atualizarFlecha(e, a, f, dt, alvos));
@@ -672,6 +714,42 @@ export function desenharArmaNaMao(
     desenharMao(ctx, mao, braco);
   }
   ctx.restore();
+}
+
+// O punho fechado (4×3), na ponta do braço, olhando para a frente: os dedos dobrados em cima, o
+// nó dos dedos claro, a sombra embaixo e o contorno escuro na frente.
+const PUNHO = ['.mmk', 'mmnk', '.ssk'];
+const CONTORNO_DO_PUNHO = '#3a2418';
+
+// O soco, por cima do sprite: o braço esticando na direção da mira com o punho na ponta.
+export function desenharSoco(ctx: CanvasRenderingContext2D, c: CorpoArmado, braco: CoresBraco = BRACO_BASE): void {
+  const ataque = c.ataque;
+  if (!ataque || ataque.tipo !== 'soco') return;
+  const t = Math.min(1, ataque.idade / SOCO.golpe);
+  const esticado = esticadoDoSoco(t);
+  const ombro = ombroDe(c);
+  const ang = anguloNoMapa(ataque.mira, c.direcao);
+  const comprimento = Math.round(POSE.punhoRecolhido + (SOCO.alcance - POSE.punhoRecolhido) * esticado);
+  const ponta = desenharBracoEsticado(ctx, ombro, ang, comprimento, braco);
+  const px = Math.round(ponta.x);
+  const py = Math.round(ponta.y) - 1;
+  const cor: Record<string, string> = { m: braco.mao, n: cores.ponta, s: braco.sombra, k: CONTORNO_DO_PUNHO };
+  PUNHO.forEach((linha, y) =>
+    [...linha].forEach((ch, x) => {
+      if (ch === '.') return;
+      ctx.fillStyle = cor[ch];
+      // Olhando para a esquerda, o punho é espelhado.
+      ctx.fillRect(c.direcao === 1 ? px + x - 1 : px - x + 1, py + y, 1, 1);
+    }),
+  );
+  // Esticando, dois risquinhos de vento atrás do punho.
+  if (t < 0.4) {
+    ctx.save();
+    ctx.globalAlpha = 0.5 * (1 - t / 0.4);
+    ctx.fillStyle = cores.ponta;
+    for (const d of [3, 5]) ctx.fillRect(Math.round(ponta.x - Math.cos(ang) * d), Math.round(ponta.y - Math.sin(ang) * d) - 2, 1, 1);
+    ctx.restore();
+  }
 }
 
 // O risco de luz que a ponta da espada deixa no golpe: um arco que se apaga para trás.

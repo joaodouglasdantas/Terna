@@ -30,21 +30,36 @@ export const QUEDA_DE_ARMAS = {
 
 export const ESPADA = {
   nome: 'Espada',
-  dano: 35,
-  recarga: 0.6, // entre dois golpes
+  dano: 26,
+  recarga: 1.15, // entre dois golpes
   durabilidade: 30, // segundos na mão até quebrar
   golpe: 0.26, // o movimento do golpe, de cima para a frente
 };
 
 export const ARCO = {
   nome: 'Arco',
-  dano: 30,
-  recarga: 0.9, // entre duas flechas
+  dano: 22,
+  recarga: 1.4, // entre duas flechas
   durabilidade: 30,
   velocidade: 340, // da flecha, ao sair
   gravidade: 200, // a flecha cai um pouco no caminho
   alcance: 300, // some depois de voar isto
 };
+
+// O soco: sem arma na mão (no modo arma), o clique esquerdo dá um soco curto na direção do cursor.
+// É o ataque mais fraco do jogo — tira menos que qualquer arma ou poder, sem crítico na cabeça — e,
+// como tira pouco, enche bem pouco a energia pixy.
+export const SOCO = {
+  nome: 'Soco',
+  dano: 4,
+  recarga: 0.45, // entre dois socos
+  golpe: 0.2, // o braço indo e voltando
+  alcance: 9, // do ombro até o punho esticado
+};
+
+// Tudo o que o clique esquerdo faz na forma base (e vai pela rede como `golpe`): as armas e o soco.
+export const ATAQUES = [...ARMAS, 'soco'] as const;
+export type TipoAtaque = (typeof ATAQUES)[number];
 
 export const DADOS_ARMA: Record<TipoArma, { dano: number; recarga: number; durabilidade: number }> = {
   espada: ESPADA,

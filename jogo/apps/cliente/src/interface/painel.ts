@@ -380,6 +380,24 @@ const ICONES_ARMAS: Record<TipoArma, HTMLCanvasElement> = {
   espada: criarSprite(DESENHO_ICONE.espada, PALETA_ICONE),
   arco: criarSprite(DESENHO_ICONE.arco, PALETA_ICONE),
 };
+// Sem arma na mão, o quadrinho mostra o punho fechado: o clique esquerdo dá um soco.
+const PUNHO = criarSprite(
+  [
+    '...........',
+    '...........',
+    '...kkkkk...',
+    '..kPpPpPk..',
+    '.kpppppppk.',
+    '.kpppppppk.',
+    '.kttpppppk.',
+    '..kttppppk.',
+    '...kkkkkk..',
+    '...........',
+    '...........',
+  ],
+  { k: '#5a3a28', p: '#e0b08a', P: '#f6d3bd', t: '#c08a66' },
+);
+
 // A moldura do escolhido é da interface (verde); a dos outros, clara e apagada. A da arma, com
 // uma na mão, é o roxo da interface.
 const MOLDURA_ESCOLHIDO = '#7fd66b';
@@ -413,8 +431,8 @@ function desenharEspaco(
   p.imagem(segundos, x + 1 + ((ESPACO - 2 - segundos.width) >> 1), y + 1 + ((ESPACO - 2 - ALTURA_FONTE) >> 1));
 }
 
-// O quadrinho da arma: vazio e apagado sem arma; com ela, o ícone e, embaixo, a barrinha do tempo
-// que ela ainda dura, que se esvazia até quebrar. `ativo`: o clique esquerdo usa a arma agora
+// O quadrinho da arma: sem arma, o punho do soco; com ela, o ícone e, embaixo, a barrinha do
+// tempo que ela ainda dura, que se esvazia até quebrar. `ativo`: o clique esquerdo usa a arma agora
 // (a Leslie no modo poderes a deixa apagada).
 function desenharEspacoDaArma(p: Pincel, arma: ArmaNaMao | null, tempo: number, ativo = true): void {
   const ARMA_X = BARRA_X; // a arma abre a fileira
@@ -422,7 +440,11 @@ function desenharEspacoDaArma(p: Pincel, arma: ArmaNaMao | null, tempo: number, 
   const apaga = acabando && Math.floor(tempo * 8) % 2 === 0;
   p.arredondado(ARMA_X, ESPACOS_Y, ESPACO, ESPACO, arma && ativo ? MOLDURA_ARMA : MOLDURA_ESPACO);
   p.retangulo(ARMA_X + 1, ESPACOS_Y + 1, ESPACO - 2, ESPACO - 2, 'rgba(26, 10, 22, 0.85)');
-  if (!arma) return;
+  if (!arma) {
+    // Sem arma: o soco (apagadinho — é o ataque mais fraco).
+    p.imagem(PUNHO, ARMA_X + 1, ESPACOS_Y + 1, ativo ? 0.7 : 0.25);
+    return;
+  }
   p.imagem(ICONES_ARMAS[arma.tipo], ARMA_X + 1, ESPACOS_Y + 1, !ativo ? 0.3 : apaga ? 0.45 : 1);
   const largura = ESPACO - 2;
   const cheia = Math.ceil(largura * Math.min(1, arma.durabilidade / DADOS_ARMA[arma.tipo].durabilidade));

@@ -118,6 +118,7 @@ const TELEPORTE = 64; // pixels de diferença a partir dos quais pula direto par
 const EXTRAPOLAR_ATE = 0.3;
 const FORMA_DIVERGE = 0.6; // segundos numa forma diferente da recebida até trocar
 const REPEDIR_ARMA = 0.5; // segundos: pediu uma arma e o servidor não deu, pede de novo depois disso
+const AVISO_DE_VIDA = 0.25; // segundos: no máximo uns quatro avisos de vida ao servidor por segundo
 
 const PARADO: Controles = { esquerda: false, direita: false, pular: false, transformar: false };
 
@@ -145,6 +146,8 @@ interface Remoto {
   ultimoEnvio: number; // performance.now() do último estado mandado
   enviados: Controles;
   vidaEnviada: number; // a vida no último estado mandado (mudou: manda sem esperar o intervalo parado)
+  vidaAvisada: number; // a última vida avisada ao servidor (para o fim por tempo)
+  avisouVidaHa: number; // segundos desde esse aviso
   // Pulo e R apertados desde o último envio: um toque mais rápido que o intervalo entre dois
   // estados não se perde — vai como apertado no próximo.
   apertados: { pular: boolean; transformar: boolean };
@@ -222,6 +225,8 @@ export function criarPartida(
       ultimoEnvio: 0,
       enviados: { ...PARADO },
       vidaEnviada: VIDA_MAXIMA,
+      vidaAvisada: VIDA_MAXIMA,
+      avisouVidaHa: 0,
       apertados: { pular: false, transformar: false },
       lado: escolha.lado,
       morteEnviada: false,
@@ -469,12 +474,24 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
   } else if (p.outro.vida <= 0) {
     return terminar(p, 'morte', true);
   }
-  if (p.online) {
-    // O fim chega do servidor; aqui o relógio só mostra quanto falta.
+  if (p.remoto) {
+    // O fim chega do servidor; aqui o relógio só mostra quanto falta. A sua vida vai para ele
+    // quando muda (umas vezes por segundo, no máximo): no fim por tempo, ganha quem tiver mais.
+    const r = p.remoto;
     p.restanteMs = Math.max(0, p.fimEm - performance.now());
+    r.avisouVidaHa += dt;
+    if (p.jogador.vida !== r.vidaAvisada && r.avisouVidaHa >= AVISO_DE_VIDA) {
+      r.vidaAvisada = p.jogador.vida;
+      r.avisouVidaHa = 0;
+      r.conexao.avisarVida(p.jogador.vida);
+    }
   } else {
     p.restanteMs = Math.max(0, p.restanteMs - dt * 1000);
-    if (p.restanteMs === 0) terminar(p, 'tempo', null);
+    // O tempo acabou: ganha quem tiver mais vida (igual, empate).
+    if (p.restanteMs === 0) {
+      const { jogador, outro } = p;
+      terminar(p, 'tempo', jogador.vida > outro.vida ? true : jogador.vida < outro.vida ? false : null);
+    }
   }
 }
 

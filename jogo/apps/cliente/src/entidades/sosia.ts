@@ -75,6 +75,8 @@ const SOSIA = {
   buscarArma: 260, // pixels: vai pegar uma arma que caiu até esta distância
   guardarArma: 5, // segundos de arma: com mais que isto na mão, não vira anjo
   espada: { perto: 14, golpe: 24 }, // chega a esta distância e golpeia a partir desta
+  soco: 16, // sem arma: soca quem está a esta distância (de vez em quando)
+  socosPorSegundo: 2.5, // a chance, por segundo, de soltar o soco pronto com você perto
   arco: { longe: 150, de: 40, ate: 250 }, // fica a esta distância e atira neste intervalo
   entreGolpes: [0.05, 0.35] as Intervalo, // segundos de hesitação depois da arma ficar pronta
   soprar: [0.8, 2.2] as Intervalo, // segundos segurando o Vendaval
@@ -307,6 +309,11 @@ export function pensarSosia(
   const buscar = podePegarArma(corpo) ? armaParaBuscar(corpo, armas) : null;
   const luta = corpo.arma && formaDo(corpo) === 'base' && !usaPoderes(corpo) ? lutarComArma(c, corpo, oponente, dt) : null;
   decisao.golpe = luta?.golpe ?? null;
+  // Sem arma e sem os poderes na mão, de perto: um soco de vez em quando.
+  if (!corpo.arma && formaDo(corpo) === 'base' && !usaPoderes(corpo) && armaPronta(corpo) && oponente.vida > 0) {
+    const perto = Math.abs(oponente.x - corpo.x) <= SOSIA.soco && Math.abs(oponente.y - corpo.y) < 20;
+    if (perto && Math.random() < dt * SOSIA.socosPorSegundo) decisao.golpe = { x: oponente.x, y: oponente.y - 16 };
+  }
   if (fuga) {
     c.alvo = fuga.x;
   } else if (buscar !== null) {

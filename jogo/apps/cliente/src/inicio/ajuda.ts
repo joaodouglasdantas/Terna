@@ -27,13 +27,14 @@ type Linha = [teclas: string[], texto: string];
 const MOVIMENTO: Linha[] = [
   [['A', 'D', '/', '←', '→'], 'Andar'],
   [['W', '/', '↑', '/', 'Espaço'], 'Pular'],
-  [['Pular no ar'], 'Pulo duplo: um segundo pulo no meio do primeiro'],
-  [['2× A', '/', '2× D'], 'Dash: dois toques rápidos para o mesmo lado dão um arranco, no chão ou no ar'],
+  [['Pular no ar'], 'Pulo duplo'],
+  [['2× A', '/', '2× D'], 'Dash: um arranco curto, no chão ou no ar'],
 ];
 
 const ARMAS: Linha[] = [
-  [['Encostar'], 'Pegar a espada ou o arco que caiu do céu (com a mão livre)'],
+  [['Encostar'], 'Pegar a espada ou o arco que caiu do céu'],
   [['Clique esq.'], 'Atacar com a arma, na direção da mira'],
+  [['Sem arma'], 'Clique esq. dá um soco: curto e fraquinho'],
   [['E'], 'Jogar fora a arma da mão (ela some)'],
 ];
 
@@ -150,7 +151,7 @@ export function montarAjuda(heroi: Heroi, aoFechar: () => void): HTMLElement {
       PODERES,
       'A energia pixy (a barra de baixo, no painel) enche com o dano que você dá, e cada poder gasta a dele. A mira fica verde quando o clique está pronto.',
     ),
-    secao('Partida', PARTIDA, 'Derrube o outro antes de o relógio zerar.'),
+    secao('Partida', PARTIDA, 'Derrube o outro antes de o relógio zerar; zerando, vence quem tiver mais vida.'),
   );
   colunas.append(esquerda, direita);
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ARMAS } from './conteudo/armas';
+import { ARMAS, ATAQUES } from './conteudo/armas';
 import { HEROIS } from './conteudo/herois';
 import { ENERGIA_PIXY, PODERES, PODERES_POR_HEROI, VIDA_MAXIMA } from './conteudo/poderes';
 import { MUNDO } from './mundo';
@@ -114,7 +114,7 @@ export type PoderUsado = z.infer<typeof PoderUsado>;
 // saiu (a mão) e para onde o cursor apontava. Quem recebe faz o golpe no corpo do outro e confere
 // se ele acerta o seu personagem.
 export const AtaqueUsado = z.object({
-  arma: z.enum(ARMAS),
+  arma: z.enum(ATAQUES), // a arma da mão, ou 'soco' (sem arma)
   x: z.number().min(0).max(MUNDO),
   y: z.number().min(-1000).max(1000),
   alvoX: z.number().min(-MUNDO).max(2 * MUNDO),
@@ -155,6 +155,9 @@ export const MensagemPartidaDoCliente = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('descartar-arma') }),
   // A vida de quem manda chegou a 0: a partida acaba e o outro vence.
   z.object({ tipo: z.literal('morri') }),
+  // A própria vida, quando muda (no máximo umas vezes por segundo, e sempre direto ao servidor,
+  // mesmo ligados pela rede local): no fim por tempo, ganha quem tiver mais.
+  z.object({ tipo: z.literal('vida'), vida: z.number().min(0).max(VIDA_MAXIMA) }),
   // Depois do fim: quer jogar de novo com o mesmo oponente (os dois pedindo, voltam à escolha).
   z.object({ tipo: z.literal('revanche') }),
   // Um recado para a ligação direta com o outro (mesma rede).
@@ -162,7 +165,8 @@ export const MensagemPartidaDoCliente = z.discriminatedUnion('tipo', [
 ]);
 export type MensagemPartidaDoCliente = z.infer<typeof MensagemPartidaDoCliente>;
 
-// `morte`: a vida de alguém chegou a 0; o fim diz quem venceu.
+// `morte`: a vida de alguém chegou a 0; o fim diz quem venceu. `tempo`: o relógio zerou — vence
+// quem tiver mais vida (o fim diz quem; sem `vencedor`, empate).
 export const MotivoFim = z.enum(['tempo', 'oponente-saiu', 'morte']);
 export type MotivoFim = z.infer<typeof MotivoFim>;
 

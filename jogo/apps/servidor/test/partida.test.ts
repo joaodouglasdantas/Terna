@@ -317,6 +317,40 @@ describe('salas de partida', () => {
     expect(salas.quantidade).toBe(1); // aberta para a revanche
   });
 
+  it('no fim por tempo, vence quem avisou mais vida; a vida avisada não vai para o outro', () => {
+    vi.useFakeTimers();
+    const salas = new Salas({ duracaoMs: 1000, contagemMs: 0, gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    const anfitriao = salas.criar('Ana', a.conexao)!;
+    const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+    escolherLeslie(salas, anfitriao, convidado);
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'vida', vida: 1800 }));
+    salas.receber(convidado, JSON.stringify({ tipo: 'vida', vida: 2100 }));
+    expect(b.ultima()?.tipo).toBe('comecou');
+    vi.advanceTimersByTime(1000);
+    expect(a.ultima()).toEqual({ tipo: 'fim', motivo: 'tempo', vencedor: 'convidado' });
+    expect(b.ultima()).toEqual({ tipo: 'fim', motivo: 'tempo', vencedor: 'convidado' });
+  });
+
+  it('na revanche a vida volta a contar cheia: sem avisos, o fim por tempo é empate', () => {
+    vi.useFakeTimers();
+    const salas = new Salas({ duracaoMs: 1000, contagemMs: 0, gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    const anfitriao = salas.criar('Ana', a.conexao)!;
+    const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+    escolherLeslie(salas, anfitriao, convidado);
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'vida', vida: 900 }));
+    vi.advanceTimersByTime(1000);
+    expect(a.ultima()).toEqual({ tipo: 'fim', motivo: 'tempo', vencedor: 'convidado' });
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'revanche' }));
+    salas.receber(convidado, JSON.stringify({ tipo: 'revanche' }));
+    escolherLeslie(salas, anfitriao, convidado);
+    vi.advanceTimersByTime(1000);
+    expect(a.ultima()).toEqual({ tipo: 'fim', motivo: 'tempo' });
+  });
+
   it('o relógio só corre depois da contagem 3, 2, 1', () => {
     vi.useFakeTimers();
     const salas = new Salas({ duracaoMs: 1000, contagemMs: 3000, gerarCodigo: () => 'K7P2Q' });

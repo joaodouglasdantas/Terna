@@ -12,21 +12,25 @@ export * from './anjo';
 export * from './leslie';
 export * from './grow';
 
-export const VIDA_MAXIMA = 1000;
+// A vida de cada um. Os números do jogo foram acertados juntos (BALANCEAMENTO.md, na pasta jogo/)
+// para uma luta entre dois do mesmo nível durar uns 3 a 4 minutos, dos 5 do relógio.
+export const VIDA_MAXIMA = 2500;
 
-// A energia pixy vem do dano que o personagem dá no adversário (com poder ou com arma): com 0,3
-// por ponto de dano, enche com ~333 de dano dado — um terço da vida do outro, uns 10 golpes de
-// espada; a do Grow, com 0,4, enche com 250 (a barra cheia dele é o golem). Ela começa vazia. O Anjo a gasta para virar anjo (e de anjo ela não carrega, para uma
-// forma de anjo não emendar na outra). Cada poder da Leslie só sai com a energia dele, e a gasta:
-// o 1 pede pouco (um golpe de espada dá), o 2 mais e a Fúria da Floresta a barra cheia. O Grow,
-// de gente, gasta quase nada na Revoada e no Vendaval e a barra cheia para virar golem; de golem
-// não gasta nada (a barra desce com o tempo da forma) e ela não carrega.
+// A energia pixy vem do dano que o personagem dá no adversário (com poder, arma ou soco): com 0,2
+// por ponto de dano, enche com 500 de dano dado — um quinto da vida do outro; a do Grow, com 0,3,
+// enche com ~333 (a barra cheia dele é o golem, e de gente ele bate pouco); a do Anjo, com 0,45,
+// com ~222 (na forma base ele só tem as armas e o soco). Numa luta, cada um usa a barra cheia umas
+// 2 vezes. Ela começa vazia. O Anjo a gasta para virar anjo (e de anjo ela não carrega, para uma
+// forma de anjo não emendar na outra). Os poderes 1 e 2 da Leslie e do Grow gastam quase nada (a
+// barra é da ult); a Fúria da Floresta e o golem pedem a barra cheia. De golem não gasta nada (a
+// barra desce com o tempo da forma) e ela não carrega.
 export const ENERGIA_PIXY = {
   maxima: 100,
-  porDano: 0.3, // por ponto de dano dado no adversário
-  porDanoGrow: 0.4, // o Grow enche mais depressa
+  porDano: 0.2, // por ponto de dano dado no adversário
+  porDanoGrow: 0.3, // o Grow enche mais depressa
+  porDanoAnjo: 0.45, // e o Anjo mais ainda (a forma base só tem arma e soco)
   custoAnjo: 100,
-  custoLeslie: { chicote: 10, raizes: 25, furia: 100 },
+  custoLeslie: { chicote: 2, raizes: 6, furia: 100 }, // o 1 e o 2: quase nada
   custoGrow: { aves: 2, vento: 3, golem: 100 }, // a Revoada e o Vendaval: quase nada
 };
 

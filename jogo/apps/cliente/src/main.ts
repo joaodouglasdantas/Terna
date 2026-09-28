@@ -413,15 +413,21 @@ function loop(tempoAtual: number): void {
   requestAnimationFrame(loop);
 }
 
-// Título e texto da tela de fim. `venceu` só vale no fim por morte.
+// Título e texto da tela de fim. `venceu` vale no fim por morte e no por tempo (quem tinha mais
+// vida; null, empate).
 function textoDoFim(motivo: FimDaPartida, venceu: boolean | null, oponente: string): { titulo: string; texto: string } {
   if (motivo === 'morte') {
     return venceu
       ? { titulo: 'Vitória', texto: `${oponente} caiu. Você venceu!` }
       : { titulo: 'Derrota', texto: `${oponente} venceu.` };
   }
+  if (motivo === 'tempo' && venceu !== null) {
+    return venceu
+      ? { titulo: 'Vitória', texto: 'O tempo acabou, e você tinha mais vida!' }
+      : { titulo: 'Derrota', texto: `O tempo acabou, e ${oponente === 'A CPU' ? 'a CPU' : oponente} tinha mais vida.` };
+  }
   const texto = {
-    tempo: 'O tempo acabou.',
+    tempo: 'O tempo acabou empatado.',
     'oponente-saiu': `${oponente} saiu da partida.`,
     conexao: 'A conexão com o servidor caiu.',
   }[motivo];

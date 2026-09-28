@@ -79,6 +79,8 @@ export interface ConexaoPartida {
   descartarArma(): void;
   // A vida chegou a 0: o servidor encerra a partida para os dois, com o outro de vencedor.
   enviarMorte(): void;
+  // A própria vida mudou: sempre ao servidor (é ele quem decide o fim por tempo).
+  avisarVida(vida: number): void;
   // Depois do fim: quer jogar de novo com o mesmo oponente (os dois pedindo, a escolha volta).
   pedirRevanche(): void;
   fechar(): void;
@@ -179,6 +181,9 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
     },
     enviarMorte() {
       mandar({ tipo: 'morri' });
+    },
+    avisarVida(vida) {
+      mandar({ tipo: 'vida', vida: Math.max(0, Math.round(vida)) });
     },
     pedirRevanche() {
       mandar({ tipo: 'revanche' });

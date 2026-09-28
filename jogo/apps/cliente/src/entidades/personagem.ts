@@ -55,7 +55,7 @@ import {
   type Anjo,
 } from './anjo/anjo';
 import { PAIRAR_NO_AR, criarVoo, decolar, voarNoAr, type Voo } from './anjo/voo';
-import { desenharArmaNaMao, type ArmaNaMao, type Ataque } from './armas';
+import { desenharArmaNaMao, desenharSoco, type ArmaNaMao, type Ataque } from './armas';
 import { BRACO_ANJO, BRACO_BASE, BRACO_GROW, BRACO_LESLIE, desenharBracoEsticado, desenharMao, ombroDe, type CoresBraco } from './braco';
 import { CORPO, manobraAcabou, pontoDaManobra, type Manobra, type Medida } from './efeitos';
 import { carregarAguias } from './grow/aguia';
@@ -247,7 +247,8 @@ export interface Personagem {
   gesto: { resta: number; angulo: number } | null; // o braço soltando um poder
   poderes: Poderes;
   arma: ArmaNaMao | null; // a espada ou o arco na mão (só a forma base)
-  ataque: Ataque | null; // o golpe ou a flechada em curso
+  ataque: Ataque | null; // o golpe, a flechada ou o soco em curso
+  recargaSoco: number; // segundos até o próximo soco (sem arma)
   energia: number; // energia pixy, de 0 a ENERGIA_PIXY.maxima: vem do dano dado, enche a barra do anjo
   daRede: boolean; // o outro jogador online: a forma, o modo e a energia dele vêm da rede
   voo: Voo; // o voo com pairada do anjo (anjo/voo.ts)
@@ -311,6 +312,7 @@ export function criarPersonagem(heroi: Heroi, x: number, direcao: 1 | -1 = 1): P
     poderes: criarPoderes(heroi),
     arma: null,
     ataque: null,
+    recargaSoco: 0,
     energia: 0,
     daRede: false,
     voo: criarVoo(),
@@ -383,14 +385,13 @@ export function podeUsarPoderes(p: Personagem): boolean {
 export function bloqueioDaArma(p: Personagem): string | null {
   if (p.vida <= 0) return 'CAIU';
   if (p.encanto) return 'ENFEITICADO';
-  if (!p.arma) return 'SEM ARMA';
   if (!personagemLivre(p)) return 'TRANSFORMANDO';
   return null;
 }
 
-// A arma sai pronta se clicar agora?
+// A arma (ou, sem ela, o soco) sai pronta se clicar agora?
 export function armaPronta(p: Personagem): boolean {
-  return bloqueioDaArma(p) === null && (p.arma?.recarga ?? 1) <= 0;
+  return bloqueioDaArma(p) === null && (p.arma ? p.arma.recarga : p.recargaSoco) <= 0;
 }
 
 // Só a forma base pega arma: vivo, com a mão livre e fora da transformação.
@@ -668,7 +669,7 @@ export function podeVirarGolem(p: Personagem): boolean {
 // golem, não).
 export function ganharEnergia(p: Personagem, dano: number): void {
   if (dano <= 0 || formaDo(p) !== 'base' || !personagemLivre(p)) return;
-  const porDano = p.heroi === 'grow' ? ENERGIA_PIXY.porDanoGrow : ENERGIA_PIXY.porDano;
+  const porDano = p.heroi === 'grow' ? ENERGIA_PIXY.porDanoGrow : p.heroi === 'anjo' ? ENERGIA_PIXY.porDanoAnjo : ENERGIA_PIXY.porDano;
   p.energia = Math.min(ENERGIA_PIXY.maxima, p.energia + dano * porDano);
 }
 
@@ -878,7 +879,10 @@ export function desenharPersonagem(ctx: CanvasRenderingContext2D, p: Personagem,
   const mao = MAO_DE_FRENTE[p.heroi];
   const maoDeFrente = pose.deFrente ? { x: x + p.direcao * mao.lado, y: topo + mao.linha } : undefined;
   // No modo poderes, a arma da Leslie e do Grow fica guardada (a mão é dos poderes).
-  if (p.vida > 0 && !(p.heroi !== 'anjo' && p.modo === 'poderes') && !golem) desenharArmaNaMao(ctx, p, tempo, maoDeFrente, BRACO_DA_ARMA[p.heroi]);
+  if (p.vida > 0 && !(p.heroi !== 'anjo' && p.modo === 'poderes') && !golem) {
+    desenharArmaNaMao(ctx, p, tempo, maoDeFrente, BRACO_DA_ARMA[p.heroi]);
+    desenharSoco(ctx, p, BRACO_DA_ARMA[p.heroi]); // sem arma na mão
+  }
   if (p.heroi === 'anjo') desenharAnjoNaFrente(ctx, p.anjo, tempo, pose);
   if (p.heroi === 'grow') desenharGolemNaFrente(ctx, p.golem, tempo, pose);
   desenharEncanto(ctx, p, tempo);

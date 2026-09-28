@@ -35,6 +35,7 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 | `npm run arte:cenario` | regera o cenário a partir de `fontes/` (a paisagem com o rio, e onde fica a água que o jogo anima) |
 | `npm run arte:leslie` | regera a Leslie a partir de `fontes/leslie.png` |
 | `npm run arte:grow` | regera o Grow (com o musgo pintado no cajado), o golem e as águias a partir de `fontes/grow.png`, `golem.png` e `aguia.png` |
+| `python3 ferramentas/simular-duelo.py` | simula duelos entre os personagens (duração e quem vence) com os números do balanceamento; `antes` compara com os de antes (BALANCEAMENTO.md) |
 | `node ferramentas/tirar-fundo.cjs <folha.png> <nome>` | tira o fundo preto de uma folha nova de personagem e grava em `fontes/` (os pretos de dentro do desenho — olhos, contornos — ficam); com `--cor-do-canto`, o fundo é a cor do canto da folha (as águias vieram num azul-escuro) |
 | `npm run arte:anjo` | regera o Anjo (desligado por enquanto) a partir de `fontes/SpriteBase.png` |
 
@@ -42,11 +43,11 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 
 - **Leslie**, a dríade da floresta: pega as armas que caem do céu e, com **R**, troca o clique
   esquerdo entre a arma e os poderes dela (Chicote de Espinhos, Raízes e Fúria da Floresta; o
-  botão direito troca o poder escolhido). Cada poder gasta energia pixy (mais, quanto mais forte), dar
-  dano enche, e a Fúria só sai com a barra cheia. Números em `packages/compartilhado/src/conteudo/leslie.ts`
+  botão direito troca o poder escolhido). O Chicote e as Raízes gastam quase nada de energia pixy;
+  dar dano enche a barra, e a Fúria só sai com ela cheia. Números em `packages/compartilhado/src/conteudo/leslie.ts`
   e, os custos de energia, em `conteudo/poderes.ts`.
 - **Grow**, o metamorfo: de gente é como a Leslie (arma ou poderes na **R**), mas os poderes dele
-  quase não tiram vida — servem para afastar: a Revoada de Águias (três águias levam o outro bem alto
+  tiram pouca vida — servem para afastar: a Revoada de Águias (três águias levam o outro bem alto
   e para longe, e o largam) e o Vendaval (segurando o botão, o vento empurra para longe). Os dois quase não gastam
   energia, e a barra dele enche um pouco mais rápido que a da Leslie. Com a barra cheia, o terceiro vira **golem de pedra** por 30 s: Salto Esmagador,
   Investida e Pedra, que batem forte e não gastam energia (a barra só desce com o tempo). O golem
@@ -56,6 +57,12 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 - **Anjo**: pronto, mas desligado até a atualização dele. Não aparece na seleção (fica guardado, fora da vista do público).
   Para ligar, `LIBERADO.anjo = true` em `packages/compartilhado/src/conteudo/herois.ts`. O código
   dele mora em `apps/cliente/src/entidades/anjo/` e os números em `conteudo/anjo.ts`.
+
+Sem arma na mão (no modo arma), o clique esquerdo dá um **soco**: curto, o ataque mais fraco do
+jogo, que enche bem pouco a energia. A vida é 2500, e os danos, as recargas e a energia foram
+acertados juntos para uma luta durar uns 3 a 4 minutos dos 5 do relógio; se ele zerar, vence quem
+tiver mais vida. A tabela anotada e o porquê de cada número estão em **[BALANCEAMENTO.md](BALANCEAMENTO.md)**
+(o simulador usado: `python3 ferramentas/simular-duelo.py`).
 
 A escolha é feita na tela de seleção, depois do Singleplayer (a CPU fica com outro personagem, sorteado)
 ou, no Multiplayer, com os dois já na sala: a partida só começa quando os dois escolhem.
@@ -162,7 +169,7 @@ Tudo sob `/api`. Rotas com 🔒 pedem `Authorization: Bearer <token>`.
 | `GET /ranking/:categoria` · `POST /ranking` 🔒 | top 50 · enviar `{ categoria, valor }` |
 | `WS /tempo-real?token=…` | mundo aberto com conta: `bem-vindo`, `entrou`, `saiu`, `posicao` (ver `protocolo.ts`) |
 | `WS /partida?acao=criar&nome=…` | cria uma sala 1v1 e recebe `sala-criada` com o código (sem conta) |
-| `WS /partida?acao=entrar&codigo=…&nome=…` | entra na sala: `comecou` para os dois, depois `estado`, `poder` e `golpe` de um para o outro; as armas caem pelo servidor (`arma-caiu`, `arma-pega`, `arma-quebrou`: ele sorteia a queda e decide quem pega); `morri` (vida em 0) ou o tempo mandam `fim` para os dois, com o `vencedor` no fim por morte (ver `partida.ts`) |
+| `WS /partida?acao=entrar&codigo=…&nome=…` | entra na sala: `comecou` para os dois, depois `estado`, `poder` e `golpe` de um para o outro; as armas caem pelo servidor (`arma-caiu`, `arma-pega`, `arma-quebrou`: ele sorteia a queda e decide quem pega); `vida` (a própria, quando muda); `morri` (vida em 0) ou o tempo mandam `fim` para os dois, com o `vencedor` (por morte, o outro; por tempo, quem avisou mais vida; sem ele, empate — ver `partida.ts`) |
 
 Criar conta e entrar aceitam 10 tentativas por minuto por endereço; criar ou entrar em sala, 30.
 
@@ -229,8 +236,6 @@ instalador bem maior.
 
 ## Pontos em aberto
 
-- A partida ainda não tem objetivo nem vencedor: o tempo acaba e pronto. Quando entrar dano,
-  o servidor da sala é o lugar de decidir quem venceu.
 - Contas, saves e o mundo aberto (`rede/api.ts`, `rede/tempo-real.ts`, `save/save.ts`) estão
   prontos e testados, mas o jogo ainda não os usa: faltam tela de entrar/criar conta e quando
   salvar.
