@@ -4,10 +4,23 @@
 // novo. Enquanto ele está na tela, o resto da página não recebe clique, foco nem tecla (só as do
 // próprio navegador, como o Ctrl e a tecla - do zoom). Na partida, ele abre o menu: sozinho, o
 // jogo pausa; online, o personagem fica parado.
+//
+// O zoom do navegador pelo teclado (Ctrl e + ou -) e pela roda do mouse com o Ctrl (e a pinça do
+// touchpad) fica desligado na página: no meio da luta ele desmontava o quadro. O Ctrl 0 (voltar ao
+// 100%) continua valendo e, com o aviso na tela, diminuir também (é o que ele pede). O zoom pelo
+// menu do navegador não dá para impedir.
 
 import { elemento } from './dom';
 
 export const JANELA_MINIMA = { largura: 960, altura: 540 };
+
+// As teclas do zoom (com o Ctrl, ou o Cmd no Mac): 'mais' e 'menos', também as do teclado numérico.
+function teclaDoZoom(evento: KeyboardEvent): 'mais' | 'menos' | null {
+  if (!evento.ctrlKey && !evento.metaKey) return null;
+  if (evento.key === '+' || evento.key === '=' || evento.code === 'Equal' || evento.code === 'NumpadAdd') return 'mais';
+  if (evento.key === '-' || evento.key === '_' || evento.code === 'Minus' || evento.code === 'NumpadSubtract') return 'menos';
+  return null;
+}
 
 const pequena = (): boolean => innerWidth < JANELA_MINIMA.largura || innerHeight < JANELA_MINIMA.altura;
 
@@ -50,9 +63,19 @@ export function vigiarJanela(aoFicarPequena: () => void): void {
   window.addEventListener(
     'keydown',
     (evento) => {
+      const zoom = teclaDoZoom(evento);
+      if (zoom && !(bloqueada && zoom === 'menos')) evento.preventDefault();
       if (bloqueada) evento.stopImmediatePropagation();
     },
     true,
+  );
+  // A roda com o Ctrl (e a pinça do touchpad, que chega assim): só diminuir com o aviso na tela.
+  window.addEventListener(
+    'wheel',
+    (evento) => {
+      if ((evento.ctrlKey || evento.metaKey) && !(bloqueada && evento.deltaY > 0)) evento.preventDefault();
+    },
+    { passive: false, capture: true },
   );
   window.addEventListener('resize', conferir);
   conferir();
