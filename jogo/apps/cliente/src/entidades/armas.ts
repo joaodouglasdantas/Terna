@@ -77,7 +77,14 @@ const POSE = {
   miraArco: 1.35,
   miraSoco: 0.7,
   punhoRecolhido: 3, // o braço do soco, antes de esticar
+  ombroDoSoco: 2, // o soco sai do peito: um pouco abaixo do ombro das armas
 };
+
+// De onde sai o braço do soco.
+function ombroDoSoco(c: CorpoArmado): Ponto {
+  const ombro = ombroDe(c);
+  return { x: ombro.x, y: ombro.y + POSE.ombroDoSoco };
+}
 const DURACAO_ATAQUE: Record<TipoAtaque, number> = { espada: ESPADA.golpe + 0.08, arco: 0.4, soco: SOCO.golpe + 0.04 };
 const LIMITE_DA_MIRA: Record<TipoAtaque, number> = { espada: POSE.miraEspada, arco: POSE.miraArco, soco: POSE.miraSoco };
 const LAMINA = { de: 3, ate: 14 }; // pixels da mão até o começo e a ponta da lâmina
@@ -405,7 +412,7 @@ const esticadoDoSoco = (t: number): number => (t < 0.4 ? 1 - (1 - t / 0.4) ** 2 
 
 // A ponta do punho no mapa, com o braço `esticado`.
 function pontaDoPunho(c: CorpoArmado, mira: number, esticado: number): Ponto {
-  const ombro = ombroDe(c);
+  const ombro = ombroDoSoco(c);
   const ang = anguloNoMapa(mira, c.direcao);
   const comprimento = POSE.punhoRecolhido + (SOCO.alcance - POSE.punhoRecolhido) * esticado;
   return { x: ombro.x + Math.cos(ang) * comprimento, y: ombro.y + Math.sin(ang) * comprimento };
@@ -720,6 +727,31 @@ export function desenharArmaNaMao(
 // nó dos dedos claro, a sombra embaixo e o contorno escuro na frente.
 const PUNHO = ['.mmk', 'mmnk', '.ssk'];
 const CONTORNO_DO_PUNHO = '#3a2418';
+const MANGA_DO_SOCO = 4; // pixels do ombro em que o braço ainda é a manga (quem tem)
+
+// O braço do soco: sai de dentro do ombro (2 px atrás dele, por cima do corpo, para não parecer
+// solto), com 3 px de grossura — o contorno escuro em cima, a cor e a sombra embaixo — e a manga
+// perto do ombro. Devolve a ponta.
+function desenharBracoDoSoco(ctx: CanvasRenderingContext2D, ombro: Ponto, ang: number, comprimento: number, braco: CoresBraco): Ponto {
+  const cos = Math.cos(ang);
+  const sin = Math.sin(ang);
+  const pontos: { x: number; y: number; manga: boolean }[] = [];
+  for (let i = -2; i < comprimento; i++) {
+    pontos.push({ x: Math.round(ombro.x + cos * i), y: Math.round(ombro.y + sin * i), manga: i < MANGA_DO_SOCO });
+  }
+  // Em três passadas, para a diagonal não apagar a linha de cima com a de baixo.
+  ctx.fillStyle = CONTORNO_DO_PUNHO;
+  for (const p of pontos) ctx.fillRect(p.x, p.y - 1, 1, 1);
+  for (const p of pontos) {
+    ctx.fillStyle = (p.manga && braco.manga ? braco.manga : braco).sombra;
+    ctx.fillRect(p.x, p.y + 1, 1, 1);
+  }
+  for (const p of pontos) {
+    ctx.fillStyle = (p.manga && braco.manga ? braco.manga : braco).cima;
+    ctx.fillRect(p.x, p.y, 1, 1);
+  }
+  return { x: ombro.x + cos * comprimento, y: ombro.y + sin * comprimento };
+}
 
 // O soco, por cima do sprite: o braço esticando na direção da mira com o punho na ponta.
 export function desenharSoco(ctx: CanvasRenderingContext2D, c: CorpoArmado, braco: CoresBraco = BRACO_BASE): void {
@@ -727,10 +759,10 @@ export function desenharSoco(ctx: CanvasRenderingContext2D, c: CorpoArmado, brac
   if (!ataque || ataque.tipo !== 'soco') return;
   const t = Math.min(1, ataque.idade / SOCO.golpe);
   const esticado = esticadoDoSoco(t);
-  const ombro = ombroDe(c);
+  const ombro = ombroDoSoco(c);
   const ang = anguloNoMapa(ataque.mira, c.direcao);
   const comprimento = Math.round(POSE.punhoRecolhido + (SOCO.alcance - POSE.punhoRecolhido) * esticado);
-  const ponta = desenharBracoEsticado(ctx, ombro, ang, comprimento, braco);
+  const ponta = desenharBracoDoSoco(ctx, ombro, ang, comprimento, braco);
   const px = Math.round(ponta.x);
   const py = Math.round(ponta.y) - 1;
   const cor: Record<string, string> = { m: braco.mao, n: cores.ponta, s: braco.sombra, k: CONTORNO_DO_PUNHO };
