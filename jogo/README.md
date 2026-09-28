@@ -45,7 +45,7 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
   esquerdo entre a arma e os poderes dela (Chicote de Espinhos, Raízes e Flor Carnívora; o
   botão direito troca o poder escolhido). O veneno do Chicote cura a Leslie em metade do que tira.
   O Chicote e as Raízes gastam quase nada de energia pixy; dar dano enche a barra, e a Flor
-  Carnívora (brota do chão, persegue o outro e cospe veneno de longe) só sai com ela cheia. Números em `packages/compartilhado/src/conteudo/leslie.ts`
+  Carnívora (brota do chão, persegue o outro — longe, por baixo da terra — e cospe bolas rápidas de veneno de longe) só sai com ela cheia. Números em `packages/compartilhado/src/conteudo/leslie.ts`
   e, os custos de energia, em `conteudo/poderes.ts`.
 - **Grow**, o metamorfo: de gente é como a Leslie (arma ou poderes na **R**), mas os poderes dele
   tiram pouca vida — servem para afastar: a Revoada de Águias (três águias levam o outro bem alto

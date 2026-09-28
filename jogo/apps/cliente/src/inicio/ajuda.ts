@@ -90,7 +90,7 @@ function dicasDo(heroi: Heroi): { dicas: string[]; outra?: { titulo: string; pod
         'O Chicote envenena: o outro vai perdendo vida aos poucos.',
         'O veneno do Chicote cura você: a metade do que ele tira.',
         'A última roda das Raízes prende por mais tempo — dá para emendar a Flor.',
-        `A Flor Carnívora só sai com a barra cheia: fica ${FLOR.duracao} s de pé, persegue o outro e cospe veneno de longe (cada bola envenena, e o veneno cura você).`,
+        `A Flor Carnívora só sai com a barra cheia: fica ${FLOR.duracao} s de pé, persegue o outro — longe, vai por baixo da terra e sai perto dele — e cospe veneno de longe (cada bola envenena, e o veneno cura você).`,
       ],
     };
   }

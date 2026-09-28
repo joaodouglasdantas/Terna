@@ -5,7 +5,11 @@
 //
 // A terra treme onde a Leslie mirou, a flor sobe de dentro dela e fica de pé um tempo: vai atrás
 // do outro (sem chegar colada) e, de tempos em tempos, agacha e cospe uma bola de veneno nele, que
-// voa reto e longe e deixa envenenado quem acerta. No fim, murcha e estoura num respingo de veneno (só a imagem).
+// voa reto, rápido e longe e deixa envenenado quem acerta. No fim, murcha e estoura num respingo de veneno (só a imagem).
+//
+// Com ele longe, ela entra na terra (a toca): afunda, corre por baixo — a terra estufa e solta
+// torrões por onde ela passa — e, perto dele, a terra racha e brilha onde ela vai sair (o aviso);
+// aí ela sobe de novo e volta a cuspir.
 //
 // Online, a flor dos dois lados sai do mesmo uso e anda atrás do mesmo corpo; quem confere se a
 // bola acertou é o lado de quem apanha (efeitos.ts), como nos outros poderes.
@@ -66,6 +70,12 @@ interface Tiro {
   percorrido: number;
 }
 
+// A flor dentro da terra: afundando, correndo por baixo, avisando onde vai sair e subindo.
+interface Toca {
+  fase: 'afundando' | 'embaixo' | 'saindo' | 'subindo';
+  tempo: number; // segundos nesta fase
+}
+
 export interface Flor {
   tipo: 'flor';
   dono: Dono;
@@ -78,6 +88,8 @@ export interface Flor {
   andando: boolean;
   tiros: Tiro[];
   rachaduras: number[];
+  toca: Toca | null; // dentro da terra (null: fora dela)
+  foraDaTerra: number; // segundos de pé desde a última vez que saiu da terra
 }
 
 type Efeitos = Nucleo<{ dono: Dono }>;
@@ -98,6 +110,8 @@ export function criarFlor(dono: Dono, uso: PoderUsado): Flor {
     andando: false,
     tiros: [],
     rachaduras: Array.from({ length: 6 }, (_, i) => Math.round((i / 5 - 0.5) * 34 + sortear(-2, 2))),
+    toca: null,
+    foraDaTerra: 0,
   };
 }
 
@@ -130,8 +144,13 @@ function respingar(e: Efeitos, x: number, y: number): void {
 
 // Passa o tempo da flor e das bolas dela; devolve se ainda tem algo dela no mapa.
 export function atualizarFlor(e: Efeitos, f: Flor, dt: number, alvos: readonly Alvo[]): boolean {
-  f.idade += dt;
   atualizarTiros(e, f, dt, alvos);
+  // Dentro da terra, o tempo de pé não corre.
+  if (f.toca) {
+    atualizarToca(e, f, f.toca, dt, alvos);
+    return true;
+  }
+  f.idade += dt;
   if (f.idade < FLOR.aviso) {
     // A terra treme e solta torrões pelas rachaduras, mais perto da hora.
     if (Math.random() < dt * 18 * (0.4 + f.idade / FLOR.aviso)) particulaDeTerra(e, f.x + aoAcaso(f.rachaduras), 30 + 40 * (f.idade / FLOR.aviso));
@@ -145,6 +164,7 @@ export function atualizarFlor(e: Efeitos, f: Flor, dt: number, alvos: readonly A
   if (f.idade < FIM) {
     const alvo = presa(f, alvos);
     f.andando = false;
+    f.foraDaTerra += dt;
     if (f.cuspindo >= 0) {
       const antes = f.cuspindo;
       f.cuspindo += dt;
@@ -156,6 +176,12 @@ export function atualizarFlor(e: Efeitos, f: Flor, dt: number, alvos: readonly A
       }
     } else if (alvo) {
       const dx = alvo.corpo.x - f.x;
+      // Ele longe: ela entra na terra e vai sair perto dele.
+      if (Math.abs(dx) > FLOR.toca.longe && f.foraDaTerra >= FLOR.toca.espera) {
+        f.toca = { fase: 'afundando', tempo: 0 };
+        for (let k = 0; k < 10; k++) particulaDeTerra(e, f.x + sortear(-14, 14), 80);
+        return true;
+      }
       if (Math.abs(dx) >= 1) f.lado = dx > 0 ? 1 : -1;
       // Vai atrás dele, sem chegar colada.
       if (Math.abs(dx) > FLOR.distancia + 4) {
@@ -175,6 +201,52 @@ export function atualizarFlor(e: Efeitos, f: Flor, dt: number, alvos: readonly A
     for (let k = 0; k < 26; k++) gota(e, f.x + sortear(-10, 10), chao() - sortear(4, 16), 110);
   }
   return f.idade < FIM + FLOR.murcha || f.tiros.length > 0;
+}
+
+// A toca: afunda, corre por baixo da terra até perto dele, avisa onde vai sair e sobe.
+function atualizarToca(e: Efeitos, f: Flor, t: Toca, dt: number, alvos: readonly Alvo[]): void {
+  const T = FLOR.toca;
+  t.tempo += dt;
+  if (t.fase === 'afundando') {
+    if (Math.random() < dt * 30) particulaDeTerra(e, f.x + sortear(-12, 12), 70);
+    if (t.tempo >= T.afunda) Object.assign(t, { fase: 'embaixo', tempo: 0 });
+    return;
+  }
+  if (t.fase === 'embaixo') {
+    const alvo = presa(f, alvos);
+    // Sai a `distancia` dele, do lado de onde vem (ele caiu: sai onde está). Correndo atrás dele,
+    // desiste depois de um tempo e sai onde chegou.
+    const destino = alvo ? Math.max(20, Math.min(MUNDO - 20, alvo.corpo.x - (alvo.corpo.x >= f.x ? 1 : -1) * FLOR.distancia)) : f.x;
+    const falta = destino - f.x;
+    const passo = T.velocidade * dt;
+    if (Math.abs(falta) <= passo || !alvo || t.tempo > 6) {
+      f.x = Math.abs(falta) <= passo ? destino : f.x;
+      if (alvo) f.lado = alvo.corpo.x >= f.x ? 1 : -1;
+      Object.assign(t, { fase: 'saindo', tempo: 0 });
+    } else {
+      f.x += Math.sign(falta) * passo;
+      f.lado = falta > 0 ? 1 : -1;
+    }
+    // A terra estufando por onde ela passa solta torrões.
+    if (Math.random() < dt * 22) particulaDeTerra(e, f.x + sortear(-4, 4), 55);
+    return;
+  }
+  if (t.fase === 'saindo') {
+    // O aviso: a terra treme e racha onde ela vai sair.
+    const p = Math.min(1, t.tempo / T.aviso);
+    if (Math.random() < dt * 18 * (0.4 + p)) particulaDeTerra(e, f.x + aoAcaso(f.rachaduras), 30 + 40 * p);
+    if (t.tempo >= T.aviso) {
+      Object.assign(t, { fase: 'subindo', tempo: 0 });
+      for (let k = 0; k < 16; k++) particulaDeTerra(e, f.x + sortear(-16, 16), 110);
+    }
+    return;
+  }
+  // Subindo: de pé de novo, cospe logo depois.
+  if (t.tempo >= T.sobe) {
+    f.toca = null;
+    f.foraDaTerra = 0;
+    f.proximo = Math.max(f.proximo, FLOR.primeiro);
+  }
 }
 
 function cuspir(e: Efeitos, f: Flor, alvo: Alvo | null): void {
@@ -231,9 +303,17 @@ export function ameacasDaFlor(f: Flor, ameacas: Ameacas): void {
 
 // ---- Desenho ----
 
-// O quadro de agora e quanto dele fica abaixo do chão (subindo da terra).
+// O quadro de agora e quanto dele fica abaixo do chão (subindo da terra, ou afundando nela).
 function quadroDe(f: Flor, tempo: number): { sprite: Sprite; enterrado: number; alfa: number; balanco: number } | null {
   if (!quadros || f.idade < FLOR.aviso) return null;
+  if (f.toca) {
+    const sprite = quadros.brotando[0];
+    const h = sprite.imagem.height;
+    const { fase, tempo: t } = f.toca;
+    if (fase === 'afundando') return { sprite, enterrado: Math.round(h * Math.min(1, t / FLOR.toca.afunda) ** 2), alfa: 1, balanco: 0 };
+    if (fase === 'subindo') return { sprite, enterrado: Math.round(h * (1 - Math.min(1, t / FLOR.toca.sobe)) ** 2), alfa: 1, balanco: 0 };
+    return null; // correndo por baixo, ou avisando onde vai sair
+  }
   if (f.idade < DE_PE) {
     const u = (f.idade - FLOR.aviso) / FLOR.brota;
     const sprite = quadros.brotando[0];
@@ -250,12 +330,37 @@ function quadroDe(f: Flor, tempo: number): { sprite: Sprite; enterrado: number; 
   return { sprite: quadros.murchando[u < 0.45 ? 0 : 1], enterrado: 0, alfa: u < 0.6 ? 1 : 1 - (u - 0.6) / 0.4, balanco: 0 };
 }
 
+// Quanto a terra está rachada em volta dela (0 a 1), ou null sem rachaduras: brotando, e na toca
+// afundando, avisando onde vai sair e subindo.
+function rachado(f: Flor): number | null {
+  if (f.toca) {
+    const { fase, tempo } = f.toca;
+    if (fase === 'embaixo') return null;
+    return fase === 'saindo' ? Math.min(1, tempo / FLOR.toca.aviso) : 1;
+  }
+  return f.idade < DE_PE ? Math.min(1, f.idade / FLOR.aviso) : null;
+}
+
+// Por baixo da terra: um calombo que anda, a terra estufada com a grama por cima.
+function desenharCalombo(ctx: CanvasRenderingContext2D, f: Flor, tempo: number): void {
+  const yChao = chao();
+  const x = Math.round(f.x);
+  const sobe = Math.sin(tempo * 18) > 0 ? 1 : 0; // a terra mexe enquanto ela passa
+  ctx.fillStyle = TERRA[1];
+  ctx.fillRect(x - 6, yChao - 1 - sobe, 13, 2);
+  ctx.fillRect(x - 4, yChao - 2 - sobe, 9, 1);
+  ctx.fillStyle = TERRA[3];
+  ctx.fillRect(x - 2, yChao - 3 - sobe, 5, 1);
+  redesenharGrama(ctx, x - 4, x + 5, 2 + sobe, 1);
+}
+
 // Antes dos personagens (eles passam na frente dela): as rachaduras do aviso e a flor.
 export function desenharFlorNoChao(ctx: CanvasRenderingContext2D, f: Flor, tempo: number): void {
   const yChao = chao();
-  if (f.idade < DE_PE) {
-    // As rachaduras abrindo e a luz verde saindo delas.
-    const p = Math.min(1, f.idade / FLOR.aviso);
+  if (f.toca?.fase === 'embaixo') desenharCalombo(ctx, f, tempo);
+  const p = rachado(f);
+  if (p !== null) {
+    // As rachaduras abrindo e a luz saindo delas.
     ctx.save();
     ctx.fillStyle = '#2a180c';
     for (const [i, rx] of f.rachaduras.entries()) {
@@ -275,8 +380,9 @@ export function desenharFlorNoChao(ctx: CanvasRenderingContext2D, f: Flor, tempo
       ctx.fillRect(Math.round(f.x + rx) - 2, yChao - 24, 5, 26);
     }
     ctx.restore();
-    // A grama tremendo.
-    if (f.idade < FLOR.aviso && p > 0.3 && Math.sin(tempo * 45 + f.x) > 0) redesenharGrama(ctx, f.x - 20, f.x + 20, 1, 1);
+    // A grama tremendo (no aviso de brotar e no de sair da toca).
+    const avisando = f.toca ? f.toca.fase === 'saindo' : f.idade < FLOR.aviso;
+    if (avisando && p > 0.3 && Math.sin(tempo * 45 + f.x) > 0) redesenharGrama(ctx, f.x - 20, f.x + 20, 1, 1);
   }
   const q = quadroDe(f, tempo);
   if (!q) return;

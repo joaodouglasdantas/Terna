@@ -21,9 +21,10 @@
 //   última, o bastante para a Flor acertar umas cusparadas. Pulando na hora, ou saindo da rachadura, escapa.
 // - 3 · Flor Carnívora: só com a barra de energia pixy cheia, e gasta a barra. A terra treme onde
 //   ela mirou e brota uma flor carnívora enorme, que fica um tempo de pé: vai atrás do outro (sem
-//   chegar colada) e cospe bolas de veneno nele, de muito longe (cada uma envenena, como o
-//   chicote). Não dá para matar a flor: é
-//   desviar das bolas (pular, andar) até ela murchar.
+//   chegar colada) — e, se ele foge para longe, entra na terra e sai perto dele — e cospe bolas
+//   de veneno nele, rápidas e de muito longe (cada uma envenena, como o chicote). Não dá para
+//   matar a flor: é desviar das bolas (pular, andar; ela agacha antes de cuspir) e sair de cima
+//   da terra rachando onde ela vai sair, até ela murchar.
 
 export const PODERES_LESLIE = ['chicote', 'raizes', 'flor'] as const;
 
@@ -76,18 +77,29 @@ export const RAIZES = {
 // `tiro.alcance` (quase a tela inteira) ou até bater em alguém ou no chão; quem ela acerta fica
 // envenenado (VENENO, o mesmo do chicote). No fim, murcha e estoura
 // em veneno (só a imagem: não tira vida).
+//
+// A toca: com ele mais longe que `toca.longe` (e ela há pelo menos `toca.espera` segundos fora da
+// terra), ela afunda em `toca.afunda`, corre por baixo da terra a `toca.velocidade` (a terra
+// estufa por onde ela passa) e para a `distancia` dele, do lado de onde veio; ali a terra racha e
+// brilha por `toca.aviso` (dá para sair de perto) e ela sobe em `toca.sobe`. Embaixo da terra ela
+// não cospe, e esse tempo não conta na `duracao`.
+//
+// Balanceamento (BALANCEAMENTO.md): mais tempo de pé (14 s, eram 10) e a bola mais rápida (320
+// px/s, eram 230: mais difícil de desviar) renderiam demais; cada cusparada tira 35 (eram 45) e
+// a Leslie continua perto de 50% contra o Grow no simulador.
 export const FLOR = {
   nome: 'Flor Carnívora',
   recarga: 3, // curta: quem segura o especial é a barra de energia
   alcance: 120,
   aviso: 0.6,
   brota: 0.5,
-  duracao: 10,
-  velocidade: 42, // a Leslie anda a 90: dá para fugir dela, não dos tiros
+  duracao: 14,
+  velocidade: 42, // a pé (a Leslie anda a 90); longe, ela vai por baixo da terra (toca)
   distancia: 60,
   primeiro: 0.5, // segundos de pé até a primeira cusparada
-  intervalo: 1.6, // ~6 cusparadas
+  intervalo: 1.6, // ~9 cusparadas
   prepara: 0.3,
   murcha: 1,
-  tiro: { dano: 45, velocidade: 230, alcance: 420, raio: 3 }, // até 6 × 45 = 270, e envenena
+  tiro: { dano: 35, velocidade: 320, alcance: 420, raio: 3 }, // ~9 × 35 = 315, e envenena
+  toca: { longe: 140, espera: 2.5, afunda: 0.45, velocidade: 220, aviso: 0.45, sobe: 0.4 },
 };

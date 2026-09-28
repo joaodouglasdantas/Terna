@@ -24,13 +24,13 @@ import { contexto2d } from '../motor/imagens';
 import { iconeDoPoder } from '../interface/painel';
 import type { ConexaoPartida } from '../rede/partida';
 import { anexarCena } from './cena';
-import { botao, elemento, palco, sairComEsmaecer } from './dom';
+import { botao, elemento, mostrarTela, sairComEsmaecer } from './dom';
 
 // Uma linha sobre cada poder, para o cartão.
 export const SOBRE_PODER: Record<IdPoder, string> = {
   chicote: 'uma vinha de espinhos que envenena; o veneno cura você',
   raizes: 'uma fileira de raízes rompe a terra e prende; a última, por mais tempo',
-  flor: 'com a energia cheia: uma flor carnívora brota, persegue e cospe de longe bolas que envenenam',
+  flor: 'com a energia cheia: uma flor carnívora brota, persegue (até por baixo da terra) e cospe de longe bolas que envenenam',
   impacto: 'uma fileira de explosões correndo pelo chão',
   rajada: 'dois corações que enfeitiçam quem acertam',
   julgamento: 'um pilar de luz desce do céu',
@@ -225,7 +225,7 @@ export function telaSelecao(sala?: SalaNaSelecao, anterior?: Heroi): Promise<Res
 
     tela.append(titulo, sub, grade, estado, acoes);
     anexarCena(tela);
-    palco().replaceChildren(tela);
+    mostrarTela(tela);
     escolher(escolhido);
 
     // Os sprites dos cartões andam enquanto a tela estiver aberta. Na mesma rede, avisa quando os
