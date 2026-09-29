@@ -4,7 +4,6 @@ import {
   CARREGAMENTO_MS,
   CONTAGEM_MS,
   DURACAO_PARTIDA_MS,
-  HEROI_PADRAO,
   LETRAS_DO_CODIGO,
   LIBERADO,
   MensagemPartidaDoCliente,
@@ -28,9 +27,12 @@ import type { Conexao } from '../tempo-real/sala';
 // sala. Hospedando na mesma rede, a sala guarda a rede de quem hospedou (rede.ts): ela aparece
 // na lista de quem está nessa rede, só entra quem está nela, e os dois tentam se ligar direto
 // (WebRTC), com o servidor levando os recados (`sinal`) até a ligação abrir.
-// Com os dois lá, cada um escolhe o personagem (`escolher` → `heroi`): até o outro escolher, dá
-// para trocar (mandando de novo), e ninguém vê o do outro antes de a partida começar. Com as duas
-// escolhas (ou acabando o tempo de escolher: quem não escolheu fica com o padrão) a partida começa. O
+// Com os dois lá, cada um escolhe o personagem (`escolher` → `heroi`), e cada personagem é de um
+// só: o que um escolhe o outro vê na hora (`oponente-escolheu`) e não pode pegar — os dois pedindo
+// o mesmo juntos, leva quem chegou primeiro. Até o outro escolher, dá para trocar (mandando de
+// novo) por um que esteja livre. Com as duas escolhas a partida começa; acabando o tempo de
+// escolher antes (`escolhaMaxMs`), ninguém entra no jogo e a sala cai. Alguém saindo da sala — na
+// escolha ou na partida —, ela também cai para o outro. O
 // servidor marca o tempo (a partida acaba para os dois ao mesmo tempo) e só repassa o estado de
 // um jogador para o outro — cada um simula o próprio personagem —, dizendo quanto ele demorou
 // para chegar (o ping de cada um vem do batimento: batimento.ts).
@@ -61,7 +63,7 @@ export interface OpcoesSalas {
   revancheMaxMs: number;
   // Quanto tempo uma sala espera o segundo jogador antes de fechar.
   esperaMaxMs: number;
-  // Quanto tempo os dois têm para escolher o personagem.
+  // Quanto tempo os dois têm para escolher o personagem (acabou sem os dois escolherem, a sala cai).
   escolhaMaxMs: number;
   // Salas abertas ao mesmo tempo (protege a memória do servidor grátis).
   maxSalas: number;
@@ -194,26 +196,37 @@ export class Salas {
     sala.herois = { anfitriao: null, convidado: null };
     sala.revanche = { anfitriao: false, convidado: false };
     clearTimeout(sala.timer);
-    sala.timer = setTimeout(() => this.comecar(sala), this.opcoes.escolhaMaxMs);
+    sala.timer = setTimeout(() => this.acabouAEscolha(sala), this.opcoes.escolhaMaxMs);
     // Na mesma rede, os dois tentam a ligação direta (quem hospedou começa).
     const direto = sala.rede !== null ? { direto: true } : {};
-    this.mandar(sala.anfitriao.conexao, { tipo: 'escolher', lado: 'anfitriao', oponente: convidado.nome, ...direto });
-    this.mandar(convidado.conexao, { tipo: 'escolher', lado: 'convidado', oponente: sala.anfitriao.nome, ...direto });
+    const prazoMs = this.opcoes.escolhaMaxMs;
+    this.mandar(sala.anfitriao.conexao, { tipo: 'escolher', lado: 'anfitriao', oponente: convidado.nome, prazoMs, ...direto });
+    this.mandar(convidado.conexao, { tipo: 'escolher', lado: 'convidado', oponente: sala.anfitriao.nome, prazoMs, ...direto });
   }
 
-  // Os dois escolheram (ou o tempo de escolher acabou): a partida começa, com o relógio todo.
-  private comecar(sala: SalaPartida): void {
+  // O tempo de escolher acabou sem os dois escolherem (os dois escolhendo, a partida já teria
+  // começado): ninguém entra no jogo e a sala cai, dizendo a cada um quem não escolheu.
+  private acabouAEscolha(sala: SalaPartida): void {
     const convidado = sala.convidado;
     if (sala.fase !== 'escolher' || !convidado || this.salas.get(sala.codigo) !== sala) return;
+    this.salas.delete(sala.codigo);
+    const faltou = (lado: Lado, outro: Participante): string =>
+      sala.herois[lado] ? `${outro.nome} não escolheu o personagem a tempo` : 'você não escolheu o personagem a tempo';
+    this.recusar(sala.anfitriao.conexao, faltou('anfitriao', convidado));
+    this.recusar(convidado.conexao, faltou('convidado', sala.anfitriao));
+  }
+
+  // Os dois escolheram: a partida começa, com o relógio todo.
+  private comecar(sala: SalaPartida): void {
+    const convidado = sala.convidado;
+    const { anfitriao: heroiAnfitriao, convidado: heroiConvidado } = sala.herois;
+    if (sala.fase !== 'escolher' || !convidado || !heroiAnfitriao || !heroiConvidado || this.salas.get(sala.codigo) !== sala) return;
     sala.fase = 'jogando';
     // As armas da rodada anterior não passam para esta.
     sala.armas.chao.clear();
     sala.armas.mao = { anfitriao: null, convidado: null };
     sala.vidas = { anfitriao: VIDA_MAXIMA, convidado: VIDA_MAXIMA };
-    const herois: Record<Lado, Heroi> = {
-      anfitriao: sala.herois.anfitriao ?? HEROI_PADRAO,
-      convidado: sala.herois.convidado ?? HEROI_PADRAO,
-    };
+    const herois: Record<Lado, Heroi> = { anfitriao: heroiAnfitriao, convidado: heroiConvidado };
     clearTimeout(sala.timer);
     // O carregamento e a contagem 3, 2, 1 vêm antes do relógio: o fim é depois deles (`restanteMs`
     // é o relógio).
@@ -275,13 +288,16 @@ export class Salas {
     if (m.tipo === 'heroi') {
       if (sala.fase !== 'escolher') return;
       if (!LIBERADO[m.heroi]) return this.mandar(p.conexao, { tipo: 'erro', erro: 'esse personagem ainda não está liberado' });
-      // Mandando de novo, troca (o outro ainda não escolheu: senão a partida já teria começado).
-      const primeira = sala.herois[lado] === null;
+      // Já é do outro (os dois pediram juntos e o dele chegou antes): não vale, e quem pediu fica
+      // sabendo de novo qual é o do outro, para escolher outro.
+      const doOutro = sala.herois[lado === 'anfitriao' ? 'convidado' : 'anfitriao'];
+      if (m.heroi === doOutro) return this.mandar(p.conexao, { tipo: 'oponente-escolheu', heroi: doOutro });
+      if (m.heroi === sala.herois[lado]) return;
+      // Mandando outro, troca (o outro ainda não escolheu: senão a partida já teria começado).
       sala.herois[lado] = m.heroi;
       if (sala.herois.anfitriao && sala.herois.convidado) return this.comecar(sala);
-      // O outro fica sabendo que já tem escolha, mas não qual: essa só na partida.
-      if (primeira) this.mandar(outro.conexao, { tipo: 'oponente-escolheu' });
-      return;
+      // O outro vê na hora qual foi, e esse fica bloqueado para ele.
+      return this.mandar(outro.conexao, { tipo: 'oponente-escolheu', heroi: m.heroi });
     }
     if (m.tipo === 'revanche') {
       if (sala.fase !== 'fim' || sala.revanche[lado]) return;

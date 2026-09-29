@@ -5,12 +5,13 @@
 // - Pela internet: criar uma sala (o servidor dá um código para passar ao outro jogador) ou
 //   entrar numa com o código.
 // Com os dois na sala, abre a tela de seleção de personagem (a mesma do Singleplayer), e termina
-// quando os dois escolheram — a partida começou — ou com null, se a pessoa voltar.
+// quando os dois escolheram — a partida começou — ou de volta à tela inicial: a pessoa voltou,
+// ou a sala caiu na escolha (saiu alguém, o tempo de escolher acabou, a rede caiu), com o aviso.
 
 import { CodigoSala, TAMANHO_CODIGO, type Heroi, type Lado, type PartidaNaRede, type PedidoPartida } from '@terna/compartilhado';
 import { buscarPartidasNaRede, conectarPartida, type ConexaoPartida } from '../rede/partida';
 import { anexarCena } from './cena';
-import { botao, elemento, mostrarTela, sairComEsmaecer } from './dom';
+import { botao, elemento, mostrarTela } from './dom';
 import { telaSelecao } from './selecao';
 
 export interface EscolhaOnline {
@@ -25,10 +26,13 @@ export interface EscolhaOnline {
   conexao: ConexaoPartida;
 }
 
+// Como a tela termina: a partida começou, ou de volta à tela inicial (com `aviso`, a sala caiu).
+export type FimDoMultiplayer = { tipo: 'jogar'; escolha: EscolhaOnline } | { tipo: 'voltar'; aviso?: string };
+
 const SEM_SERVIDOR = 'Não consegui falar com o servidor. Tente de novo.';
 const PROCURAR_MS = 2500; // a lista das partidas na rede se atualiza sozinha a cada tanto
 
-export function telaMultiplayer(nome: string): Promise<EscolhaOnline | null> {
+export function telaMultiplayer(nome: string): Promise<FimDoMultiplayer> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-multi-tela');
     const caixa = elemento('div', 'inicio-caixa');
@@ -42,15 +46,14 @@ export function telaMultiplayer(nome: string): Promise<EscolhaOnline | null> {
       busca = null;
     };
 
-    const terminar = (escolha: EscolhaOnline | null): void => {
+    const terminar = (): void => {
       pararBusca();
       window.removeEventListener('keydown', aoTeclar);
-      if (escolha) void sairComEsmaecer(tela).then(() => resolver(escolha));
-      else resolver(null);
+      resolver({ tipo: 'voltar' });
     };
     // Esc volta um passo: da espera para o modo, do modo para a primeira vista, dela para a
     // tela inicial.
-    let voltar = (): void => terminar(null);
+    let voltar = (): void => terminar();
     const aoTeclar = (evento: KeyboardEvent): void => {
       if (evento.code === 'Escape') {
         evento.preventDefault();
@@ -69,18 +72,14 @@ export function telaMultiplayer(nome: string): Promise<EscolhaOnline | null> {
     const voltarAoModo = (erro = ''): void => (modo === 'rede' ? naRede(erro) : internet(erro));
 
     // Os dois na sala: a seleção de personagem. Os dois escolheram, a partida começa; saiu da
-    // sala (ou ela acabou), volta para cá.
-    const selecionar = (c: ConexaoPartida, oponente: string): void => {
+    // sala, ou ela caiu, de volta à tela inicial (a sala não existe mais).
+    const selecionar = (c: ConexaoPartida, oponente: string, prazoAte: number): void => {
       pararBusca();
       window.removeEventListener('keydown', aoTeclar);
-      void telaSelecao({ conexao: c, oponente }).then((r) => {
-        if (r.tipo === 'comecou') {
-          resolver({ modo: 'online', nome, ...r.partida, conexao: c });
-          return;
-        }
+      void telaSelecao({ conexao: c, oponente, prazoAte }).then((r) => {
+        if (r.tipo === 'comecou') return resolver({ tipo: 'jogar', escolha: { modo: 'online', nome, ...r.partida, conexao: c } });
         conexao = null;
-        window.addEventListener('keydown', aoTeclar);
-        voltarAoModo(r.tipo === 'caiu' ? primeiraMaiuscula(r.erro ?? SEM_SERVIDOR) : '');
+        resolver({ tipo: 'voltar', aviso: r.tipo === 'caiu' ? r.aviso : undefined });
       });
     };
 
@@ -91,7 +90,7 @@ export function telaMultiplayer(nome: string): Promise<EscolhaOnline | null> {
       c.ouvir(
         (m) => {
           if (m.tipo === 'sala-criada') aoCriar(m.codigo);
-          if (m.tipo === 'escolher') selecionar(c, m.oponente);
+          if (m.tipo === 'escolher') selecionar(c, m.oponente, performance.now() + m.prazoMs);
         },
         (erro) => {
           conexao = null;
@@ -108,7 +107,7 @@ export function telaMultiplayer(nome: string): Promise<EscolhaOnline | null> {
     // Primeira vista: os dois jeitos de jogar.
     const inicio = (): void => {
       pararBusca();
-      voltar = () => terminar(null);
+      voltar = () => terminar();
       const rede = botao('Na mesma rede', 'inicio-botao', () => naRede());
       const internetBotao = botao('Pela internet', 'inicio-botao', () => internet());
       mostrar(

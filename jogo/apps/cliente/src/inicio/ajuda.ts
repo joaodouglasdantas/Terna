@@ -20,7 +20,23 @@ import {
 import { iconeDoPoder } from '../interface/painel';
 import { contexto2d } from '../motor/imagens';
 import { elemento } from './dom';
-import { SOBRE_PODER } from './selecao';
+
+// Uma linha sobre cada poder. Só o Tab mostra (e só os do seu personagem): na escolha de
+// personagem não aparece o que cada um faz.
+const SOBRE_PODER: Record<IdPoder, string> = {
+  chicote: 'uma vinha de espinhos que envenena; o veneno cura você',
+  raizes: 'uma fileira de raízes rompe a terra e prende; a última, por mais tempo',
+  flor: 'com a energia cheia: uma flor carnívora brota, persegue (até por baixo da terra) e cospe de longe bolas de veneno, uma alta e uma baixa',
+  impacto: 'uma fileira de explosões correndo pelo chão',
+  rajada: 'dois corações que enfeitiçam quem acertam',
+  julgamento: 'um pilar de luz desce do céu',
+  aves: 'três águias agarram, levam bem alto e para longe e largam lá de cima',
+  vento: 'segurando o botão, uma ventania com folhas empurra para longe',
+  golem: 'com a energia cheia: vira golem de pedra (Salto, Investida e Pedra) e segura parte do dano',
+  salto: 'pula alto e esmaga quem está embaixo',
+  investida: 'corre em linha reta atropelando quem estiver na frente',
+  pedra: 'arremessa um pedregulho que estoura em lascas',
+};
 
 // Uma linha: as teclas (cada item vira uma tecla desenhada; '/' vira "ou") e o que fazem.
 type Linha = [teclas: string[], texto: string];

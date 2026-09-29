@@ -5,6 +5,7 @@ import {
   CriarConta,
   DadosSave,
   ESPADA,
+  HEROIS_LIBERADOS,
   MensagemDoCliente,
   MensagemDoServidor,
   MUNDO,
@@ -56,6 +57,12 @@ describe('partida', () => {
   it('entrar numa sala pede o código', () => {
     expect(PedidoPartida.safeParse({ acao: 'criar', nome: 'ana' }).success).toBe(true);
     expect(PedidoPartida.safeParse({ acao: 'entrar', nome: 'ana' }).success).toBe(false);
+  });
+});
+
+describe('personagens', () => {
+  it('há liberados para os dois lados: cada personagem é de um só na partida', () => {
+    expect(HEROIS_LIBERADOS.length).toBeGreaterThanOrEqual(2);
   });
 });
 

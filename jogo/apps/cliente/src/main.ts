@@ -480,7 +480,7 @@ function jogar(escolha: Escolha): Promise<SalaNaSelecao | 'sozinho' | null> {
         void menus.mostrarFim(titulo, texto, revanche).then((como) => {
           if (como !== 'revanche' || !revanche) return sair();
           if (revanche === 'sozinho' || escolha.modo !== 'online') return sair('sozinho');
-          sair({ conexao: escolha.conexao, oponente: escolha.oponente, pendentes: revanche.pendentes });
+          sair({ conexao: escolha.conexao, oponente: escolha.oponente, prazoAte: revanche.prazoAte, pendentes: revanche.pendentes });
         });
       if (motivo === 'morte') setTimeout(mostrar, ESPERA_FIM_MORTE);
       else mostrar();
@@ -519,8 +519,12 @@ async function principal(): Promise<void> {
   prepararCena();
   requestAnimationFrame(loop);
 
+  // A sala da revanche caindo na escolha (o outro saiu, o tempo de escolher acabou), a tela
+  // inicial diz por quê.
+  let aviso: string | undefined;
   for (;;) {
-    let escolha: Escolha | null = await escolherModo(online);
+    let escolha: Escolha | null = await escolherModo(online, aviso);
+    aviso = undefined;
     while (escolha) {
       const atual: Escolha = escolha;
       escolha = null;
@@ -542,6 +546,7 @@ async function principal(): Promise<void> {
       } else if (revanche && revanche !== 'sozinho' && atual.modo === 'online') {
         const r = await telaSelecao(revanche, atual.heroi);
         if (r.tipo === 'comecou') escolha = { modo: 'online', nome: atual.nome, ...r.partida, conexao: atual.conexao };
+        else if (r.tipo === 'caiu') aviso = r.aviso;
       }
     }
   }

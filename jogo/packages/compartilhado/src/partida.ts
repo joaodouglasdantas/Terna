@@ -5,8 +5,9 @@ import { ENERGIA_PIXY, PODERES, PODERES_POR_HEROI, VIDA_MAXIMA } from './conteud
 import { MUNDO } from './mundo';
 
 // Partida: uma rodada com tempo marcado, sozinho (contra a CPU) ou 1v1 numa sala com código.
-// Na 1v1, com os dois na sala, cada um escolhe o personagem; o cronômetro é do servidor e só
-// começa com as duas escolhas feitas: ele manda o tempo que resta ao começar e avisa o fim.
+// Na 1v1, com os dois na sala, cada um escolhe o personagem — um diferente do outro, e cada um vê
+// a escolha do outro na hora; o cronômetro é do servidor e só começa com as duas escolhas feitas:
+// ele manda o tempo que resta ao começar e avisa o fim.
 
 export const DURACAO_PARTIDA_MS = 5 * 60 * 1000;
 // Antes do relógio correr: a tela de carregamento da temporada (a mesma duração para os dois) e,
@@ -141,7 +142,8 @@ export const ArmaNoMapa = z.object({
 export type ArmaNoMapa = z.infer<typeof ArmaNoMapa>;
 
 export const MensagemPartidaDoCliente = z.discriminatedUnion('tipo', [
-  // Com os dois na sala, antes de começar: o personagem escolhido (só os liberados valem).
+  // Com os dois na sala, antes de começar: o personagem escolhido (só os liberados valem, e não o
+  // que o outro já escolheu: cada personagem é de um só na partida).
   z.object({ tipo: z.literal('heroi'), heroi: IdHeroi }),
   z.object({ tipo: z.literal('estado'), estado: EstadoJogador }),
   z.object({ tipo: z.literal('poder'), uso: PoderUsado }),
@@ -174,10 +176,19 @@ export const MensagemPartidaDoServidor = z.discriminatedUnion('tipo', [
   // Para quem criou: o código para passar ao outro jogador.
   z.object({ tipo: z.literal('sala-criada'), codigo: CodigoSala }),
   // Os dois estão na sala: cada um escolhe o personagem (e manda `heroi`; até o outro escolher,
-  // pode mandar de novo e trocar). `direto`: estão na mesma rede — tentem a ligação direta.
-  z.object({ tipo: z.literal('escolher'), lado: Lado, oponente: z.string(), direto: z.boolean().optional() }),
-  // Só para o outro: quem mandou já escolheu. Qual, ele só vê quando a partida começa (`comecou`).
-  z.object({ tipo: z.literal('oponente-escolheu'), heroi: IdHeroi.optional() }),
+  // pode mandar de novo e trocar). `prazoMs`: o tempo para os dois escolherem; acabando antes,
+  // ninguém entra no jogo e a sala cai. `direto`: estão na mesma rede — tentem a ligação direta.
+  z.object({
+    tipo: z.literal('escolher'),
+    lado: Lado,
+    oponente: z.string(),
+    prazoMs: z.number().int().positive(),
+    direto: z.boolean().optional(),
+  }),
+  // O personagem que o outro escolheu (a cada escolha e troca dele): fica bloqueado para quem
+  // recebe. Volta também para quem pediu um personagem que o outro já tinha (os dois clicaram
+  // juntos e o dele chegou antes): essa escolha não valeu.
+  z.object({ tipo: z.literal('oponente-escolheu'), heroi: IdHeroi }),
   // Os dois escolheram: a partida começou e termina em `restanteMs`.
   z.object({
     tipo: z.literal('comecou'),

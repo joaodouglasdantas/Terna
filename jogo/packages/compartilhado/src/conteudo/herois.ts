@@ -3,6 +3,10 @@
 // em anjo na tecla R) está pronto, mas fica desligado até a atualização dele: `LIBERADO.anjo` é a
 // chave. Desligado, ele não aparece na tela de seleção, a CPU não o sorteia e o servidor não
 // aceita que alguém o escolha.
+//
+// Numa partida, cada personagem é de um jogador só: não há dois iguais em campo. Online, o que um
+// escolhe fica bloqueado para o outro; sozinho, a CPU espera a sua escolha e fica com outro. Por
+// isso precisa haver sempre pelo menos dois liberados.
 
 export const HEROIS = ['leslie', 'grow', 'anjo'] as const;
 export type Heroi = (typeof HEROIS)[number];
@@ -15,24 +19,22 @@ export const LIBERADO: Record<Heroi, boolean> = {
 
 export const HEROIS_LIBERADOS: readonly Heroi[] = HEROIS.filter((h) => LIBERADO[h]);
 
-// O personagem de quem não escolheu a tempo (e o da CPU, quando for preciso um).
-export const HEROI_PADRAO: Heroi = 'leslie';
-
-// Para a tela de seleção: nome, um título curto e uma frase.
-export const SOBRE_HEROI: Record<Heroi, { nome: string; titulo: string; frase: string }> = {
+// O nome e o codinome aparecem no cartão da tela de seleção. A frase fica para a futura seção
+// dos personagens: na escolha não aparece o que cada um faz (os poderes do seu estão no Tab).
+export const SOBRE_HEROI: Record<Heroi, { nome: string; codinome: string; frase: string }> = {
   leslie: {
     nome: 'Leslie',
-    titulo: 'Dríade da floresta',
+    codinome: 'A Primeira Semente',
     frase: 'Nasceu de uma semente do bosque e luta com espinhos, raízes e trepadeiras. Pega as armas que caem do céu e, com R, troca a arma pelos poderes. A energia começa vazia: dar dano enche, e cada poder gasta a dele.',
   },
   grow: {
     nome: 'Grow',
-    titulo: 'Metamorfo da floresta',
+    codinome: 'A Rocha Profunda',
     frase: 'Druida de cajado: chama pássaros e vento para afastar quem chega perto. Com a energia cheia, vira um golem de pedra e musgo, duro de ferir e de golpes fortes.',
   },
   anjo: {
     nome: 'Anjo',
-    titulo: 'Guerreiro celestial',
+    codinome: 'Guerreiro celestial',
     frase: 'Luta com as armas que caem do céu e, com a energia pixy cheia, vira anjo por um tempo.',
   },
 };

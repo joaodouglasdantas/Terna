@@ -196,9 +196,13 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
 // Singleplayer, depois da seleção de personagem; Multiplayer, depois de criar ou entrar numa sala
 // e dos dois escolherem (as telas deles voltam para cá se ela desistir). Sem conexão com o
 // servidor, o Multiplayer fica apagado.
-export function escolherModo(online: boolean): Promise<Escolha> {
+// `aviso`: a sala da partida online caiu (o outro saiu, o tempo de escolher acabou, a rede caiu):
+// aparece em cima do nome até a pessoa escolher um modo.
+export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-titulo-tela');
+    const avisoDaSala = elemento('p', 'inicio-sala-caiu', aviso);
+    avisoDaSala.setAttribute('role', 'status');
 
     const campo = elemento('label', 'inicio-campo');
     const rotulo = elemento('span', 'inicio-rotulo', 'Seu nome');
@@ -235,8 +239,9 @@ export function escolherModo(online: boolean): Promise<Escolha> {
       return null;
     };
 
-    // Desistiu numa das telas seguintes: a tela inicial volta como estava.
-    const voltarParaCa = (foco: HTMLElement): void => {
+    // Desistiu numa das telas seguintes (ou a sala caiu: `aviso`): a tela inicial volta como estava.
+    const voltarParaCa = (foco: HTMLElement, aviso = ''): void => {
+      avisoDaSala.textContent = aviso;
       anexarCena(tela);
       mostrarTela(tela);
       logo.ligar();
@@ -247,6 +252,7 @@ export function escolherModo(online: boolean): Promise<Escolha> {
     const solo = botao('Singleplayer', 'inicio-botao inicio-jogar', () => {
       const nome = nomeValido();
       if (!nome) return;
+      avisoDaSala.textContent = '';
       window.removeEventListener('keydown', aoTeclar);
       void telaSelecao().then((r) => {
         if (r.tipo === 'escolheu') resolver({ modo: 'solo', nome, heroi: r.heroi });
@@ -258,9 +264,10 @@ export function escolherModo(online: boolean): Promise<Escolha> {
       const nome = nomeValido();
       if (!nome) return;
       window.removeEventListener('keydown', aoTeclar);
-      void telaMultiplayer(nome).then((escolha) => {
-        if (escolha) return resolver(escolha);
-        voltarParaCa(multiplayer);
+      avisoDaSala.textContent = '';
+      void telaMultiplayer(nome).then((fim) => {
+        if (fim.tipo === 'jogar') return resolver(fim.escolha);
+        voltarParaCa(multiplayer, fim.aviso);
       });
     });
     if (!online) {
@@ -280,7 +287,7 @@ export function escolherModo(online: boolean): Promise<Escolha> {
     window.addEventListener('keydown', aoTeclar);
 
     const modos = elemento('div', 'inicio-modos');
-    modos.append(campo, erroNome, solo, multiplayer);
+    modos.append(avisoDaSala, campo, erroNome, solo, multiplayer);
     const logo = logoViva();
     tela.append(logo.palco, modos, elemento('p', 'inicio-versao', VERSAO), botaoDaMusica('inicio-botao inicio-botao-claro inicio-musica'));
     anexarCena(tela, true);

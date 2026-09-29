@@ -13,9 +13,10 @@ export interface Revanche {
   saiu: boolean; // o outro saiu (ou a sala fechou): não dá mais
   pedir(): void;
   aoMudar: (() => void) | null;
-  // Os dois pediram: chega a escolha de personagem. `pendentes` guarda o que a sala mandar até a
-  // tela de seleção abrir (o outro pode escolher antes).
+  // Os dois pediram: chega a escolha de personagem, com prazo (`prazoAte`, em performance.now()).
+  // `pendentes` guarda o que a sala mandar até a tela de seleção abrir (o outro pode escolher antes).
   pronta: Promise<void>;
+  prazoAte: number;
   pendentes: MensagemPartidaDoServidor[];
 }
 
@@ -29,6 +30,7 @@ export function ouvirRevanche(conexao: ConexaoPartida, oponente: string): Revanc
     saiu: false,
     aoMudar: null,
     pronta: new Promise((resolver) => (liberar = resolver)),
+    prazoAte: 0,
     pendentes: [],
     pedir() {
       if (r.pedi || r.saiu) return;
@@ -52,6 +54,7 @@ export function ouvirRevanche(conexao: ConexaoPartida, oponente: string): Revanc
       r.aoMudar?.();
     } else if (m.tipo === 'escolher') {
       escolhendo = true;
+      r.prazoAte = performance.now() + m.prazoMs;
       liberar();
     } else if (m.tipo === 'fim' || m.tipo === 'erro') {
       acabou();

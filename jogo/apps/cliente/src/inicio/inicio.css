@@ -616,6 +616,7 @@
 
 /* Os modos de jogo, um embaixo do outro, com a mesma largura. */
 .inicio-modos {
+  position: relative; /* o aviso de sala que caiu flutua em cima */
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -773,6 +774,31 @@
   margin: 0;
 }
 
+/* A sala caiu (o outro saiu, o tempo de escolher acabou, a rede caiu): o aviso na tela inicial,
+   flutuando logo acima do nome (sobre o pé da logo), sem empurrar os botões para baixo. */
+.inicio-sala-caiu {
+  position: absolute;
+  bottom: calc(100% + 0.6rem);
+  left: 50%;
+  z-index: 1;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(30rem, 92vw);
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0.45rem 0.7rem;
+  font-size: 1.05rem;
+  line-height: 1.3;
+  text-align: center;
+  color: #ffd8dc;
+  background: rgba(40, 10, 14, 0.8);
+  box-shadow: 0 0 0 2px var(--contorno), inset 0 0 0 2px rgba(255, 90, 103, 0.7);
+}
+
+.inicio-sala-caiu:empty {
+  display: none;
+}
+
 /* ---- caixas (multiplayer, menu da partida, fim) ---- */
 
 /* O multiplayer tem o fundo da tela inicial (o cenário e as árvores continuam à vista); a
@@ -903,19 +929,19 @@
   max-width: 100%;
 }
 
-/* Cada personagem: o sprite grande à esquerda e o texto à direita, numa caixa de madeira. */
+/* Cada personagem: o sprite em cima e, embaixo, o nome e o codinome, numa caixa de madeira. */
 .inicio-cartao {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto 1fr;
-  column-gap: 0.9rem;
-  row-gap: 0.5rem;
-  align-items: start;
-  width: min(23rem, 100%);
-  padding: 0.8rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  /* Largura fixa (e não em %): a grade toma a largura dos cartões lado a lado, sem quebrar linha. */
+  width: 12rem;
+  max-width: 100%;
+  padding: 0.7rem 0.7rem 0.8rem;
   box-sizing: border-box;
   font: inherit;
-  text-align: left;
+  text-align: center;
   color: var(--tinta);
   background: linear-gradient(to bottom, rgba(90, 58, 26, 0.35), rgba(0, 0, 0, 0) 3.5rem), rgba(26, 16, 10, 0.9);
   border: 3px solid var(--marrom);
@@ -924,7 +950,7 @@
   transition: border-color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease, opacity 0.2s ease;
 }
 
-.inicio-cartao:hover:not(.inicio-cartao-bloqueado) {
+.inicio-cartao:hover:not(.inicio-cartao-bloqueado, .inicio-cartao-do-outro) {
   transform: translateY(-2px);
 }
 
@@ -939,6 +965,17 @@
   box-shadow: 0 0 0 3px var(--contorno), 0 0 24px rgba(127, 214, 107, 0.45), 0 10px 30px rgba(0, 0, 0, 0.45);
 }
 
+/* O do outro (online): borda na cor dele na partida, com o nome dele em cima, e não dá para pegar. */
+.inicio-cartao-do-outro {
+  cursor: not-allowed;
+  border-color: var(--vermelho);
+  box-shadow: 0 0 0 3px var(--contorno), 0 0 22px rgba(255, 90, 103, 0.35), 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.inicio-cartao-do-outro .inicio-cartao-sprite {
+  opacity: 0.7;
+}
+
 /* Ainda não liberado: apagado, sem cor, com o selo "Em breve". */
 .inicio-cartao-bloqueado {
   cursor: not-allowed;
@@ -948,10 +985,11 @@
 
 .inicio-cartao-palco {
   position: relative;
-  grid-row: 1 / 3;
+  flex-grow: 1; /* os cartões têm a mesma altura: o nome fica na mesma linha nos dois */
+  align-self: stretch;
   display: grid;
   place-items: end center;
-  padding: 0.3rem 0.4rem 0.2rem;
+  padding: 1.5rem 0.4rem 0.2rem; /* em cima, lugar para a etiqueta de quem está com ele */
   background: radial-gradient(ellipse at 50% 90%, rgba(127, 214, 107, 0.18), rgba(0, 0, 0, 0) 70%),
     rgba(0, 0, 0, 0.25);
   border: 2px solid rgba(230, 201, 160, 0.18);
@@ -979,53 +1017,70 @@
   box-shadow: 0 0 0 2px var(--contorno);
 }
 
+/* Quem está com ele: "Você" (azul, como o seu nome na partida) ou o nome do outro (vermelho). */
+.inicio-cartao-dono {
+  position: absolute;
+  top: 0.3rem;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 0.6rem);
+  overflow: hidden;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #0c1a2c;
+  background: var(--azul);
+  box-shadow: 0 0 0 2px var(--contorno);
+}
+
+.inicio-cartao-dono-outro {
+  color: #2c0c10;
+  background: var(--vermelho);
+}
+
 .inicio-cartao-nome {
-  margin: 0;
-  font-size: 1.7rem;
+  margin: 0.2rem 0 0;
+  font-size: 1.6rem;
   font-weight: 400;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   text-shadow: 0 3px 0 var(--marrom-escuro);
 }
 
-.inicio-cartao-poderes {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+.inicio-cartao-codinome {
   margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.inicio-cartao-poder {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  line-height: 1.2;
-}
-
-.inicio-cartao-poder strong {
-  display: block;
-  font-weight: 400;
-  color: var(--tinta);
-}
-
-.inicio-cartao-poder span > span {
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
   color: var(--suave);
-}
-
-.inicio-cartao-icone {
-  flex-shrink: 0;
-  width: 22px; /* 11 px × 2 */
-  height: 22px;
-  image-rendering: pixelated;
-  background: rgba(26, 10, 22, 0.85);
-  box-shadow: 0 0 0 1px rgba(255, 250, 240, 0.32);
 }
 
 .inicio-selecao-estado:empty {
   display: none;
+}
+
+/* O prazo para escolher (online): uma plaquinha com a contagem, vermelha nos últimos segundos. */
+.inicio-selecao-prazo {
+  margin: 0;
+  padding: 0.15rem 0.6rem;
+  font-size: 1rem;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: var(--tinta);
+  background: rgba(26, 16, 10, 0.85);
+  box-shadow: 0 0 0 2px var(--contorno), inset 0 0 0 1px rgba(239, 220, 162, 0.25);
+}
+
+.inicio-selecao-prazo[hidden] {
+  display: none;
+}
+
+.inicio-selecao-prazo-fim {
+  color: #ffd8dc;
+  background: rgba(70, 14, 20, 0.9);
+  box-shadow: 0 0 0 2px var(--contorno), inset 0 0 0 1px var(--vermelho);
 }
 
 /* ---- dentro da partida ---- */

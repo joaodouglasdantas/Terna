@@ -65,8 +65,11 @@ acertados juntos para uma luta durar uns 3 a 4 minutos dos 5 do relógio; se ele
 tiver mais vida. A tabela anotada e o porquê de cada número estão em **[BALANCEAMENTO.md](BALANCEAMENTO.md)**
 (o simulador usado: `python3 ferramentas/simular-duelo.py`).
 
-A escolha é feita na tela de seleção, depois do Singleplayer (a CPU fica com outro personagem, sorteado)
-ou, no Multiplayer, com os dois já na sala: a partida só começa quando os dois escolhem.
+A escolha é feita na tela de seleção, depois do Singleplayer (a CPU espera a sua escolha e fica com
+outro personagem) ou, no Multiplayer, com os dois já na sala: a partida só começa quando os dois
+escolhem. Cada personagem é de um jogador só na partida (não há dois iguais em campo). O cartão de
+cada um mostra só o sprite, o nome e o codinome (**Leslie, a Primeira Semente**; **Grow, a Rocha
+Profunda**): o que cada um faz não aparece na escolha, só no Tab da partida, e só o seu.
 
 Antes de cada partida vem o carregamento da temporada atual (**Temporada 1 — A Primeira
 Semente**), com a arte num outdoor, os nomes dos personagens e o do mapa (**Floresta da Divisa**);
@@ -191,8 +194,13 @@ em cima da cabeça sem acento, porque a fonte de pixels não tem acentos.
     tudo vai pelo servidor.
   - **Pela internet:** um cria a sala e passa o código de 5 caracteres; o outro entra com ele.
 
-  Na escolha de personagem, depois de apertar Jogar ainda dá para trocar até o outro escolher, e
-  ninguém vê o personagem do outro antes de a partida começar.
+  Na escolha de personagem, os dois escolhem ao mesmo tempo e cada um vê na hora o que o outro
+  escolheu (apertando Jogar): esse fica bloqueado, com o nome de quem pegou. Os dois apertando
+  juntos no mesmo, fica com quem chegou primeiro ao servidor, e o outro volta a escolher. Depois de
+  apertar Jogar ainda dá para trocar por um livre até o outro escolher. A escolha tem prazo (90 s,
+  `escolhaMaxMs` em `apps/servidor/src/partida/salas.ts`), com a contagem na tela: acabando antes
+  de os dois escolherem, ninguém entra no jogo e a sala cai. Alguém saindo da sala — na escolha ou
+  no combate —, ela cai para o outro, que volta à tela inicial com o aviso do porquê.
   O servidor marca o tempo e avisa o fim aos dois ao mesmo tempo. Cada cliente simula o próprio
   personagem e manda os botões segurados e a posição ~20 vezes por segundo andando (~5 parado); o
   outro lado move o corpo com os mesmos botões e corrige a posição aos poucos, adiantada pelo
