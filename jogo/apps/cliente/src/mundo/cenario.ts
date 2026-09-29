@@ -7,6 +7,8 @@ import { QUADROS_CENARIO } from '../gerado/cenario-quadros';
 import { carregarImagem, contexto2d, criarSprite, desenharQuadro, novoCanvas, reduzirSprite } from '../motor/imagens';
 import { sortear, suavizar } from '../motor/matematica';
 import { paisagemViva } from './agua';
+import { criarCeu, desenharCirros, desenharSerraDeLonge } from './ceu';
+import { graduarImagem, type Graduacao } from './cor';
 import type { Luz, Paleta, Recorte } from '../motor/tipos';
 
 // Quanto cada camada anda quando a câmera anda 1px: as distantes andam menos (paralaxe).
@@ -184,7 +186,7 @@ export const ARVORES_CHAO: PlantaNoMapa[] = [
   { indice: 16, x: 1400 },
 ];
 
-const ARBUSTOS_CHAO: PlantaNoMapa[] = [
+export const ARBUSTOS_CHAO: PlantaNoMapa[] = [
   { indice: 0, x: 72 },
   { indice: 8, x: 98 },
   { indice: 1, x: 162 },
@@ -224,23 +226,51 @@ const VENTO = {
 
 // Intensidades máximas (alfa) da luz do sol sobre a cena; tudo bem suave.
 const LUZ = {
-  lateral: 0.22, // lado das plantas virado para o sol clareia, o outro escurece
-  topo: 0.12, // copa clareia por cima quando o sol está alto
-  base: 0.18, // pé das plantas mais escuro (luz que não chega embaixo)
-  nevoa: 'rgba(56, 96, 110, 0.32)', // véu azulado das árvores de trás
-  sombra: 0.34, // sombra no chão, embaixo de plantas e do personagem
+  lateral: 0.28, // lado das plantas virado para o sol clareia, o outro escurece
+  topo: 0.14, // copa clareia por cima quando o sol está alto
+  base: 0.3, // pé das plantas mais escuro (luz que não chega embaixo)
+  contorno: 0.55, // filete de luz quente na borda das plantas virada para o sol
+  contornoSombra: 0.22, // e a borda do outro lado, um pouco mais escura
+  nevoa: 'rgba(92, 140, 188, 0.34)', // véu azul da distância nas árvores de trás
+  sombra: 0.44, // sombra no chão, embaixo de plantas e do personagem
   calor: 0.3, // brilho quente em volta do sol, espalhado na cena
   ladoEscuro: 0.12, // o lado da tela longe do sol fica um pouco mais escuro
   entardecer: 0.22, // tom alaranjado quando o sol está baixo
+  vinheta: 0.28, // cantos da tela mais escuros
+  raios: 0.11, // fachos de luz saindo do sol
 };
 
-export function carregarFolhaCenario(): Promise<HTMLImageElement> {
-  return carregarImagem(urlCenario);
+// O acabamento de cor das nuvens e das plantas (cor.ts), feito uma vez numa cópia da folha: verdes
+// mais vivos com a sombra puxando para o azul, e nuvens com o topo claro e a barriga azulada. A
+// paisagem é acertada à parte (realce.ts), e o sol fica como está.
+const COR_PLANTAS: Graduacao = { saturacao: 1.2, contraste: 1.14, pivo: 0.42, sombraFria: 0.7, luzQuente: 0.65 };
+const COR_NUVENS: Graduacao = { saturacao: 1.08, contraste: 1.18, pivo: 0.72, sombraFria: 0.9, luzQuente: 0.5 };
+
+export async function carregarFolhaCenario(): Promise<CanvasImageSource> {
+  const imagem = await carregarImagem(urlCenario);
+  const folha = novoCanvas(imagem.width, imagem.height);
+  const c = contexto2d(folha, { willReadFrequently: true });
+  c.drawImage(imagem, 0, 0);
+  const graduar = (q: Recorte, cor: Graduacao): void => {
+    const dados = c.getImageData(q.x, q.y, q.w, q.h);
+    graduarImagem(dados, cor);
+    c.putImageData(dados, q.x, q.y);
+  };
+  try {
+    QUADROS_CENARIO.nuvens.forEach((q) => graduar(q, COR_NUVENS));
+    [...QUADROS_CENARIO.arvores, ...QUADROS_CENARIO.arbustos].flat().forEach((q) => graduar(q, COR_PLANTAS));
+  } catch {
+    return imagem; // folha protegida (página aberta do disco): segue com as cores da arte
+  }
+  // O canvas lido pixel a pixel fica na memória comum; como bitmap, a folha vai para a placa de
+  // vídeo e as nuvens e o sol desenhados a cada quadro saem dela sem custo.
+  return typeof createImageBitmap === 'function' ? createImageBitmap(folha).catch(() => folha) : folha;
 }
 
 // A paisagem fica um pouco acima da base da tela: assim o rio do vale aparece por cima do chão e
 // entre as árvores de trás (a faixa de baixo dela fica escondida atrás do chão).
 const PAISAGEM_ACIMA = 26;
+const CIRROS_Y = 6; // topo da faixa dos cirros na tela
 
 // Quanto a paisagem desliza com a câmera em `camX`, em pixels inteiros.
 function deslocamentoPaisagem(camX: number, largura: number): number {
@@ -388,24 +418,13 @@ function desenharPassaros(ctx: CanvasRenderingContext2D, camX: number, atrasDasN
   });
 }
 
-let ceu: HTMLCanvasElement | null = null;
-
-// Degradê do céu pintado uma vez, linha a linha, com as cores tiradas da paisagem.
-function criarCeu(largura: number, altura: number): HTMLCanvasElement {
-  const canvas = novoCanvas(largura, altura);
-  const ctxCeu = contexto2d(canvas);
-  QUADROS_CENARIO.ceu.forEach((cor, y) => {
-    ctxCeu.fillStyle = cor;
-    ctxCeu.fillRect(0, y, largura, 1);
-  });
-  return canvas;
-}
+let ceu: HTMLCanvasElement | null = null; // o degradê (ceu.ts), pintado uma vez
 
 // Quanto cada camada de trás acompanha a câmera quando ela sobe atrás do seu personagem (a
 // fração de `olharY`): o que está longe mexe menos — é a paralaxe na vertical, e lá de cima a
 // paisagem parece subir por trás das árvores, mostrando mais do vale e do rio. A fileira de
 // árvores de trás anda junto com o chão, que cobre a base dela. O céu (a faixa de cores) fica.
-const ACOMPANHA = { sol: 0.3, paisagem: 0.45, ceu: 0.6, arvoresFundo: 1 };
+const ACOMPANHA = { sol: 0.3, cirros: 0.25, serra: 0.35, paisagem: 0.45, ceu: 0.6, arvoresFundo: 1 };
 
 // Tudo o que fica atrás do chão, em coordenadas de tela: céu (parado), sol e paisagem
 // (deslizando devagar, com a água do rio e das cascatas se mexendo: agua.ts), pássaros e nuvens e
@@ -431,6 +450,10 @@ export function desenharFundo(
   descer('sol');
   desenharSol(ctx, folha, luz, tempo);
   ctx.restore();
+  descer('cirros');
+  desenharCirros(ctx, tempo, camX, largura, CIRROS_Y);
+  ctx.restore();
+  desenharSerraDeLonge(ctx, camX, largura, Math.round(olharY * ACOMPANHA.serra));
   ctx.drawImage(
     paisagemViva(folha, tempo),
     -deslocamentoPaisagem(camX, largura),
@@ -470,8 +493,9 @@ function plantaIluminada(
   const canvas = guardada ? guardada.canvas : novoCanvas(q.w, q.h);
   canvas.width = q.w;
   canvas.height = q.h;
-  const c = contexto2d(canvas);
+  const c = contexto2d(canvas, { willReadFrequently: true });
   c.drawImage(folha, q.x, q.y, q.w, q.h, 0, 0, q.w, q.h);
+  contornoDeLuz(c, q.w, q.h, luz, nevoa);
   // 'source-atop' pinta só por cima dos pixels da planta, sem sair do contorno.
   c.globalCompositeOperation = 'source-atop';
 
@@ -498,6 +522,47 @@ function plantaIluminada(
   }
   plantasIluminadas.set(chave, { canvas, degrau });
   return canvas;
+}
+
+// Pixel art de luz: a borda da planta virada para o sol (do lado dele e em cima, com o sol alto)
+// ganha um filete quente; a borda do lado de lá, um pouco de sombra. Na fileira de trás, mais fraco.
+const LUZ_CONTORNO = [255, 232, 160];
+
+function contornoDeLuz(c: CanvasRenderingContext2D, w: number, h: number, luz: Luz, nevoa: boolean): void {
+  let dados: ImageData;
+  try {
+    dados = c.getImageData(0, 0, w, h);
+  } catch {
+    return; // folha protegida: sem o filete
+  }
+  const d = dados.data;
+  const original = Uint8ClampedArray.from(d);
+  const opaco = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < w && y < h && original[(y * w + x) * 4 + 3] > 0;
+  const lado = luz.lado >= 0 ? 1 : -1;
+  const fraco = nevoa ? 0.5 : 1;
+  const deLado = LUZ.contorno * luz.forca * (0.35 + 0.65 * Math.abs(luz.lado)) * fraco;
+  const deCima = LUZ.contorno * 0.7 * luz.forca * luz.elevacao * fraco;
+  const sombra = LUZ.contornoSombra * (0.4 + 0.6 * luz.forca) * fraco;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (!original[i + 3]) continue;
+      let k = 0;
+      if (!opaco(x + lado, y)) k = Math.max(k, deLado);
+      if (!opaco(x, y - 1)) k = Math.max(k, deCima);
+      if (!opaco(x + lado, y - 1) && !opaco(x + 2 * lado, y)) k = Math.max(k, deLado * 0.5);
+      if (k > 0) {
+        d[i] += (LUZ_CONTORNO[0] - d[i]) * k;
+        d[i + 1] += (LUZ_CONTORNO[1] - d[i + 1]) * k;
+        d[i + 2] += (LUZ_CONTORNO[2] - d[i + 2]) * k;
+      } else if (!opaco(x - lado, y)) {
+        d[i] *= 1 - sombra;
+        d[i + 1] *= 1 - sombra;
+        d[i + 2] *= 1 - sombra * 0.6;
+      }
+    }
+  }
+  c.putImageData(dados, 0, 0);
 }
 
 // A copa só verga para o lado do vento (esquerda, como as nuvens) e volta ao repouso, sem
@@ -594,8 +659,9 @@ export function desenharVegetacao(
 }
 
 // Última camada, em coordenadas de tela: calor em volta do sol, o lado longe dele um pouco
-// mais escuro e um tom alaranjado quando ele está baixo. Tudo bem de leve.
-export function desenharLuz(ctx: CanvasRenderingContext2D, luz: Luz, largura: number, altura: number): void {
+// mais escuro, um tom alaranjado quando ele está baixo, a vinheta nos cantos e os raios de sol.
+// Tudo bem de leve.
+export function desenharLuz(ctx: CanvasRenderingContext2D, luz: Luz, largura: number, altura: number, tempo = 0): void {
   ctx.save();
   ctx.globalCompositeOperation = 'soft-light';
   const calor = ctx.createRadialGradient(luz.x, luz.y, 0, luz.x, luz.y, largura * 1.1);
@@ -617,5 +683,50 @@ export function desenharLuz(ctx: CanvasRenderingContext2D, luz: Luz, largura: nu
   lado.addColorStop(1, `rgba(40, 50, 90, ${escuro})`);
   ctx.fillStyle = lado;
   ctx.fillRect(0, 0, largura, altura);
+
+  // Vinheta: os cantos um pouco mais escuros, puxando o olho para o meio da cena.
+  const vinheta = ctx.createRadialGradient(largura / 2, altura * 0.45, altura * 0.35, largura / 2, altura * 0.45, largura * 0.62);
+  vinheta.addColorStop(0, 'rgba(30, 26, 60, 0)');
+  vinheta.addColorStop(1, `rgba(30, 26, 60, ${LUZ.vinheta})`);
+  ctx.fillStyle = vinheta;
+  ctx.fillRect(0, 0, largura, altura);
+  ctx.restore();
+
+  desenharRaios(ctx, luz, tempo, largura, altura);
+}
+
+// Raios de sol: fachos claros em leque saindo do disco para baixo, cada um respirando no seu
+// ritmo e balançando devagar. Somem com o sol baixo (luz.forca).
+const RAIOS = [
+  { angulo: 0.62, largura: 0.07, periodo: 11, fase: 0 },
+  { angulo: 0.95, largura: 0.05, periodo: 7, fase: 1.3 },
+  { angulo: 1.22, largura: 0.09, periodo: 13, fase: 2.1 },
+  { angulo: 1.52, largura: 0.045, periodo: 9, fase: 0.7 },
+  { angulo: 1.86, largura: 0.08, periodo: 12, fase: 3.2 },
+  { angulo: 2.2, largura: 0.05, periodo: 8, fase: 4.4 },
+  { angulo: 2.5, largura: 0.07, periodo: 10, fase: 5.1 },
+];
+
+function desenharRaios(ctx: CanvasRenderingContext2D, luz: Luz, tempo: number, largura: number, altura: number): void {
+  const forca = LUZ.raios * luz.forca;
+  if (forca < 0.005) return;
+  const alcance = Math.hypot(largura, altura);
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  for (const r of RAIOS) {
+    const respira = 0.55 + 0.45 * Math.sin((2 * Math.PI * tempo) / r.periodo + r.fase);
+    const a = r.angulo + 0.04 * Math.sin(tempo * 0.07 + r.fase);
+    const g = ctx.createLinearGradient(luz.x, luz.y, luz.x + Math.cos(a) * alcance * 0.8, luz.y + Math.sin(a) * alcance * 0.8);
+    g.addColorStop(0, `rgba(255, 244, 205, ${forca * respira})`);
+    g.addColorStop(0.45, `rgba(255, 238, 190, ${forca * respira * 0.35})`);
+    g.addColorStop(1, 'rgba(255, 238, 190, 0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(luz.x, luz.y);
+    ctx.lineTo(luz.x + Math.cos(a - r.largura) * alcance, luz.y + Math.sin(a - r.largura) * alcance);
+    ctx.lineTo(luz.x + Math.cos(a + r.largura) * alcance, luz.y + Math.sin(a + r.largura) * alcance);
+    ctx.closePath();
+    ctx.fill();
+  }
   ctx.restore();
 }

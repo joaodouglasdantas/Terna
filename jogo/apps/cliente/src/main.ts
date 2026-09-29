@@ -56,6 +56,7 @@ import {
   luzDoSol,
 } from './mundo/cenario';
 import { TILE, criarChao } from './mundo/chao';
+import { desenharRaizes } from './mundo/raizes';
 import { atualizarMinhocas, desenharMinhocas, prepararMinhocas } from './mundo/minhocas';
 import {
   atualizarPartida,
@@ -82,7 +83,7 @@ const chao = criarChao(MUNDO, ALTURA_CHAO, FOLGA_TUFOS);
 
 const SEGUIR_CAMERA = 5; // quanto maior, mais rápido a câmera alcança o personagem
 
-let folhaCenario: HTMLImageElement;
+let folhaCenario: CanvasImageSource;
 // A partida em andamento. Sem ela (nas telas de menu), só o cenário roda ao fundo: sem
 // personagens, nomes, painéis nem cronômetro.
 let partida: Partida | null = null;
@@ -375,7 +376,7 @@ function desenhar(tempo: number): void {
   } else {
     desenharVista(tempo, luz, esquerda, altos.esquerda, 0, LARGURA);
   }
-  desenharLuz(ctx, luz, LARGURA, ALTURA);
+  desenharLuz(ctx, luz, LARGURA, ALTURA, tempo);
   const p = partida;
   if (!p) return;
   // Os nomes vêm depois da luz, para o sol não tingir o azul e o vermelho.
@@ -522,6 +523,7 @@ async function principal(): Promise<void> {
   prepararPoderes(Y_CHAO, chao, FOLGA_TUFOS);
   prepararArmas(Y_CHAO);
   folhaCenario = cenario;
+  desenharRaizes(chao, cenario, FOLGA_TUFOS); // as raízes das plantas, no chão (mundo/raizes.ts)
   prepararAnimais(cenario, Y_CHAO);
   prepararMinhocas(Y_CHAO, ALTURA_CHAO);
   prepararCena();

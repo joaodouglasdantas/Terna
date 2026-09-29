@@ -5,6 +5,7 @@
 
 import { QUADROS_CENARIO } from '../gerado/cenario-quadros';
 import { contexto2d, novoCanvas } from '../motor/imagens';
+import { realcarPaisagem } from './realce';
 
 const PASSO = 1 / 20; // segundos entre uma repintura e outra
 const CLARO = [206, 234, 255];
@@ -23,6 +24,8 @@ function preparar(folha: CanvasImageSource): void {
   ctx = contexto2d(canvas);
   ctx.drawImage(folha, x, y, w, h, 0, 0, w, h);
   quadro = ctx.getImageData(0, 0, w, h);
+  realcarPaisagem(quadro); // as cores e o relevo acertados uma vez (realce.ts)
+  ctx.putImageData(quadro, 0, 0);
   base = Uint8ClampedArray.from(quadro.data);
   const lista: number[] = [];
   for (const [fy, fx, n, tipo] of QUADROS_CENARIO.agua) {
