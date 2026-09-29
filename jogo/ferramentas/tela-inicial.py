@@ -9,6 +9,9 @@ Lê fontes/tela-inicial.png (a arte original, 1672x940) e grava:
 - apps/cliente/src/assets/tela-inicial-arvores.png: a máscara das árvores grandes das beiradas
   (branco onde é árvore, transparente no céu), para os pássaros que o jogo desenha passarem por
   trás delas (inicio/cena.ts).
+
+Depois dele, rode npm run arte:tela-inicial-feixes (ferramentas/tela-inicial-sem-feixes.cjs): tira do
+céu da arte gravada os feixes de luz parados, que brigavam com os raios da logo.
 """
 import os
 import cv2

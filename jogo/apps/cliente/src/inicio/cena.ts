@@ -89,7 +89,7 @@ const RIO: Area = { x0: 0.46, x1: 0.8, y0: 0.72, y1: 0.8 };
 const CEU: Area = { x0: 0, x1: 1, y0: 0.06, y1: 0.3 };
 
 // Verdes das copas da arte, para as folhas que caem.
-const VERDES = ['#2f6b2a', '#3f8a32', '#57a83a', '#7cc44a', '#9ad04a'];
+const VERDES = ['#1f4a18', '#2f5e1a', '#446914', '#6f9424', '#95bb2d'];
 
 // Quantos de cada ficam no ar ao mesmo tempo, no máximo.
 const POLENS = 34;
@@ -119,18 +119,28 @@ interface Luz {
   duracao: number;
 }
 
-// Um bando de pássaros cruzando o céu.
+// Um bando de pássaros cruzando o céu. Cada pássaro tem o seu jeito: bate as asas no ritmo dele
+// por um tempo e plana outro (caindo um pouco, e recuperando a altura quando volta a bater), e o
+// lugar dele no V vai e volta devagar — o bando respira em vez de voar travado.
 interface Passaro {
-  dx: number; // lugar no bando, em px
+  dx: number; // lugar no V, em pixels do pássaro
   dy: number;
-  fase: number;
+  batida: number; // onde está a volta das asas, de 0 a 1 (0: lá em cima)
+  ritmo: number; // batidas por segundo
+  batendo: number; // s até querer planar
+  planando: number; // s de planeio que faltam (0: batendo)
+  queda: number; // quanto desceu planando, em pixels do pássaro
+  fase: number; // do vaivém no V
 }
 interface Bando {
   x: number;
   y: number;
   vx: number;
+  escala: number; // os mais longe são menores, mais lentos e mais apagados
+  cor: string;
   passaros: Passaro[];
   tempo: number;
+  curva: number; // fase da curva do caminho
 }
 
 // O lugar fixo da cena: um quadro do tamanho do #inicio, logo atrás dele, que fica na página o
@@ -406,19 +416,70 @@ function soltarFolha(copa: Area): void {
   });
 }
 
-// Um bando de 3 a 6 pássaros em V, entrando por um lado do céu e saindo pelo outro.
+// Um bando de 3 a 6 pássaros em V (às vezes um par, ou um sozinho), entrando por um lado do céu
+// e saindo pelo outro. Os mais longe são menores, mais lentos e somem mais no céu.
 function soltarBando(): void {
   const daDireita = Math.random() < 0.6;
-  const n = 3 + Math.floor(Math.random() * 4);
-  const u = pixel * 0.55;
+  const sorteio = Math.random();
+  const n = sorteio < 0.12 ? 1 : sorteio < 0.25 ? 2 : 3 + Math.floor(Math.random() * 4);
+  const escala = sortear(0.7, 1.1);
   const passaros: Passaro[] = [];
   for (let i = 0; i < n; i++) {
     const fileira = Math.ceil(i / 2);
     const lado = i % 2 ? -1 : 1;
-    passaros.push({ dx: fileira * 9 * u * (daDireita ? 1 : -1), dy: lado * fileira * 5 * u + sortear(-1, 1) * u, fase: sortear(0, Math.PI * 2) });
+    passaros.push({
+      dx: fileira * sortear(10, 13) * (daDireita ? 1 : -1),
+      dy: lado * fileira * sortear(5, 7),
+      batida: Math.random(),
+      ritmo: sortear(2.1, 2.9),
+      batendo: sortear(0.6, 2.2),
+      planando: 0,
+      queda: 0,
+      fase: sortear(0, Math.PI * 2),
+    });
   }
   const { y } = naArea(CEU);
-  bandos.push({ x: daDireita ? largura + 40 * u : -40 * u, y, vx: (daDireita ? -1 : 1) * sortear(0.05, 0.08) * largura, passaros, tempo: 0 });
+  const u = passo(escala);
+  const perto = (escala - 0.7) / 0.4; // 0 longe, 1 perto
+  bandos.push({
+    x: daDireita ? largura + 30 * u : -30 * u,
+    y,
+    vx: (daDireita ? -1 : 1) * sortear(0.045, 0.065) * (0.75 + 0.35 * perto) * largura,
+    escala,
+    // O roxo das silhuetas da arte, clareando para o céu quanto mais longe.
+    cor: `rgb(${Math.round(78 - 36 * perto)}, ${Math.round(56 - 32 * perto)}, ${Math.round(104 - 56 * perto)})`,
+    passaros,
+    tempo: 0,
+    curva: sortear(0, Math.PI * 2),
+  });
+}
+
+// Um pixel do pássaro na tela: inteiro, para o desenho ficar nítido.
+const passo = (escala: number): number => Math.max(1, Math.round(pixel * 0.5 * escala));
+
+// A volta das asas: a descida (a batida que empurra) é mais rápida que a subida.
+const DESCIDA = 0.42;
+
+// O pássaro batendo as asas ou planando.
+function voar(p: Passaro, dt: number): void {
+  if (p.planando > 0) {
+    p.planando -= dt;
+    p.queda += 2.2 * dt;
+    // Voltou a bater: começa subindo as asas, de onde elas estão (abertas).
+    if (p.planando <= 0) {
+      p.planando = 0;
+      p.batida = DESCIDA + (1 - DESCIDA) * 0.5;
+      p.batendo = sortear(1, 2.6);
+    }
+    return;
+  }
+  const antes = p.batida;
+  p.batida = (p.batida + p.ritmo * dt) % 1;
+  p.queda = Math.max(0, p.queda - 3 * dt); // batendo, recupera a altura
+  p.batendo -= dt;
+  // Quer planar: espera as asas passarem abertas, descendo, e para nelas.
+  const meioDaDescida = DESCIDA / 2;
+  if (p.batendo <= 0 && antes < meioDaDescida && p.batida >= meioDaDescida) p.planando = sortear(0.5, 1.4);
 }
 
 function atualizar(dt: number, tempo: number): void {
@@ -448,25 +509,46 @@ function atualizar(dt: number, tempo: number): void {
 
   for (const b of bandos) {
     b.tempo += dt;
-    b.x += b.vx * dt;
-    b.y += Math.sin(b.tempo * 0.8) * 4 * u * dt;
+    // O bando acelera e freia de leve, e o caminho faz uma curva larga no céu.
+    b.x += b.vx * (1 + 0.1 * Math.sin(b.tempo * 0.5 + b.curva)) * dt;
+    b.y += Math.cos(b.tempo * 0.45 + b.curva) * 5 * u * b.escala * dt;
+    for (const p of b.passaros) voar(p, dt);
   }
   bandos = bandos.filter((b) => (b.vx < 0 ? b.x > -60 * pixel : b.x < largura + 60 * pixel));
 }
 
-// Um pássaro em pixel, de asas para cima ou para baixo (a batida), na cor das silhuetas da arte.
-const ASAS = [
-  ['x.....x', '.x...x.', '..x.x..', '...x...'],
-  ['.......', '...x...', '.xx.xx.', 'x.....x'],
-];
+// O pássaro em pixel, visto de longe, em seis poses (o corpo na linha do meio): as cinco da
+// batida, de cima a baixo, e a asa aberta arqueada do planeio.
+const POSES = {
+  cima: ['x.......x', '.x.....x.', '..xxxxx..', '....x....', '.........'],
+  meioCima: ['.........', 'xx.....xx', '..xxxxx..', '....x....', '.........'],
+  reta: ['.........', '.........', 'xxxxxxxxx', '...xxx...', '.........'],
+  meioBaixo: ['.........', '.........', '..xxxxx..', 'xx..x..xx', '.........'],
+  baixo: ['.........', '.........', '..xxxxx..', '.x..x..x.', 'x.......x'],
+  planando: ['.........', '.xx...xx.', 'x..xxx..x', '....x....', '.........'],
+} as const;
+const BATIDA = [POSES.cima, POSES.meioCima, POSES.reta, POSES.meioBaixo, POSES.baixo] as const;
 
-function desenharPassaro(c: CanvasRenderingContext2D, x: number, y: number, u: number, batida: number): void {
-  c.fillStyle = '#2a1830';
-  ASAS[batida].forEach((linha, j) =>
-    [...linha].forEach((ch, i) => {
-      if (ch === 'x') c.fillRect(Math.round(x + (i - 3) * u), Math.round(y + (j - 2) * u), Math.ceil(u), Math.ceil(u));
-    }),
-  );
+// A pose e quanto o corpo sobe (em pixels do pássaro) neste ponto da batida: a descida das asas
+// levanta o corpo, a subida deixa ele cair um pouco.
+function pose(p: Passaro): { desenho: readonly string[]; sobe: number } {
+  if (p.planando > 0) return { desenho: POSES.planando, sobe: 0 };
+  const descendo = p.batida < DESCIDA;
+  const s = descendo ? p.batida / DESCIDA : (p.batida - DESCIDA) / (1 - DESCIDA);
+  const quadro = Math.min(4, Math.floor(s * 5));
+  return {
+    desenho: BATIDA[descendo ? quadro : 4 - quadro],
+    sobe: -0.6 * Math.cos(Math.PI * (descendo ? s : 1 + s)),
+  };
+}
+
+function desenharPassaro(c: CanvasRenderingContext2D, x: number, y: number, u: number, desenho: readonly string[]): void {
+  desenho.forEach((linha, j) => {
+    // Um retângulo por trecho aceso da linha.
+    for (const trecho of linha.matchAll(/x+/g)) {
+      c.fillRect(Math.round(x) + ((trecho.index ?? 0) - 4) * u, Math.round(y) + (j - 2) * u, trecho[0].length * u, u);
+    }
+  });
 }
 
 function desenhar(tempo: number): void {
@@ -480,10 +562,17 @@ function desenhar(tempo: number): void {
   c.imageSmoothingEnabled = false;
 
   // Os pássaros, lá longe no céu.
-  const up = Math.max(1, pixel * 0.55);
-  c.globalAlpha = 0.9;
+  c.globalAlpha = 0.92;
   for (const b of bandos) {
-    for (const p of b.passaros) desenharPassaro(c, b.x + p.dx, b.y + p.dy, up, Math.sin(b.tempo * 9 + p.fase) > 0 ? 0 : 1);
+    const up = passo(b.escala);
+    c.fillStyle = b.cor;
+    for (const p of b.passaros) {
+      const { desenho, sobe } = pose(p);
+      // O lugar no V vai e volta devagar.
+      const x = b.x + (p.dx + Math.sin(b.tempo * 0.6 + p.fase) * 1.5) * up;
+      const y = b.y + (p.dy + Math.cos(b.tempo * 0.8 + p.fase) * 1.2 + p.queda - sobe) * up;
+      desenharPassaro(c, x, y, up, desenho);
+    }
   }
   // As árvores das beiradas na frente deles.
   c.globalAlpha = 1;

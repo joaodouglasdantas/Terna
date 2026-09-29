@@ -357,7 +357,7 @@
   width: 100%;
   height: 100%;
   user-select: none;
-  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.6));
+  filter: drop-shadow(0 8px 24px rgba(16, 8, 32, 0.65));
 }
 
 /* Luz dourada do sol do verão atrás do cristal do pico (em 50% × 13,5% da arte), respirando. O
@@ -665,8 +665,8 @@
 }
 
 .inicio-jogar {
-  --b-fundo: linear-gradient(to bottom, #6fcf55 0 30%, #3f9a3a 30% 88%, #2f7a2e 88%);
-  --b-hover: linear-gradient(to bottom, #82de66 0 30%, #4aab44 30% 88%, #368836 88%);
+  --b-fundo: linear-gradient(to bottom, #86c84e 0 30%, #4a9434 30% 88%, #36742a 88%);
+  --b-hover: linear-gradient(to bottom, #98d85a 0 30%, #55a43c 30% 88%, #3e8230 88%);
   --b-degrau: #1f5424;
 }
 
@@ -679,32 +679,84 @@
   background: var(--b-hover);
 }
 
-/* Os ramos de folhas nas pontas, saindo por cima da moldura. */
+/* Os ramos de folhas nas pontas (ramos.ts): um galho abraça cada canto de fora — os dois de cima
+   no botão verde, os dois de baixo no de madeira (o mesmo ramo, virado), para os dois botões
+   empilhados não cruzarem folhas no vão entre eles —, com a brisa mexendo de leve a ponta das
+   folhas. --ramo-px é um pixel da arte do ramo; o canto do botão fica no pixel (6, 9) do quadro
+   de 26 × 18. */
+.inicio-jogar,
+.inicio-multiplayer {
+  --ramo-px: 0.1em;
+}
+
 .inicio-jogar::before,
 .inicio-jogar::after,
 .inicio-multiplayer::before,
 .inicio-multiplayer::after {
   content: '';
   position: absolute;
-  top: -0.75em;
-  width: 1.6em;
-  height: 1.92em;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 12' shape-rendering='crispEdges'%3E%3Crect x='3' y='0' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='4' y='0' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='2' y='1' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='3' y='1' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='4' y='1' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='5' y='1' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='2' y='2' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='3' y='2' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='4' y='2' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='5' y='2' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='3' y='3' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='4' y='3' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='4' y='4' width='1' height='1' fill='%236b4424'/%3E%3Crect x='6' y='4' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='7' y='4' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='4' y='5' width='1' height='1' fill='%236b4424'/%3E%3Crect x='6' y='5' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='7' y='5' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='8' y='5' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='3' y='6' width='1' height='1' fill='%236b4424'/%3E%3Crect x='4' y='6' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='6' y='6' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='7' y='6' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='8' y='6' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='9' y='6' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='1' y='7' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='2' y='7' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='4' y='7' width='1' height='1' fill='%236b4424'/%3E%3Crect x='7' y='7' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='8' y='7' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='0' y='8' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='1' y='8' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='2' y='8' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='3' y='8' width='1' height='1' fill='%233f8a32'/%3E%3Crect x='4' y='8' width='1' height='1' fill='%236b4424'/%3E%3Crect x='0' y='9' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='1' y='9' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='2' y='9' width='1' height='1' fill='%238fd45a'/%3E%3Crect x='3' y='9' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='5' y='9' width='1' height='1' fill='%236b4424'/%3E%3Crect x='1' y='10' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='2' y='10' width='1' height='1' fill='%231f4a1c'/%3E%3Crect x='5' y='10' width='1' height='1' fill='%236b4424'/%3E%3Crect x='6' y='11' width='1' height='1' fill='%236b4424'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  z-index: 1;
+  width: calc(26 * var(--ramo-px));
+  height: calc(18 * var(--ramo-px));
+  background: var(--ramo) 0% 0 / 300% 100% no-repeat;
   image-rendering: pixelated;
   pointer-events: none;
+  animation: inicio-ramo 5s steps(1, end) infinite;
+}
+
+.inicio-jogar::before,
+.inicio-jogar::after {
+  top: calc(-9 * var(--ramo-px));
+}
+
+.inicio-multiplayer::before,
+.inicio-multiplayer::after {
+  bottom: calc(-9 * var(--ramo-px));
 }
 
 .inicio-jogar::before,
 .inicio-multiplayer::before {
-  left: -0.95em;
+  left: calc(-6 * var(--ramo-px));
 }
 
 .inicio-jogar::after,
 .inicio-multiplayer::after {
-  right: -0.95em;
-  top: auto;
-  bottom: -0.75em;
+  right: calc(-6 * var(--ramo-px));
+  animation-delay: -2.9s;
+}
+
+.inicio-jogar::after {
+  transform: scale(-1, 1);
+}
+
+.inicio-multiplayer::before {
+  transform: scale(1, -1);
+}
+
+.inicio-multiplayer::after {
   transform: scale(-1, -1);
+}
+
+/* A brisa nos ramos: quase sempre parados; de vez em quando a ponta de metade das folhas mexe
+   um pixel, e depois a da outra metade. Os três quadros estão lado a lado na tira (0%, 50% e
+   100%) e trocam aos saltos, como pixel art. */
+@keyframes inicio-ramo {
+  0% {
+    background-position: 0% 0;
+  }
+  40% {
+    background-position: 50% 0;
+  }
+  47% {
+    background-position: 0% 0;
+  }
+  72% {
+    background-position: 100% 0;
+  }
+  79%,
+  100% {
+    background-position: 0% 0;
+  }
 }
 
 .inicio-multiplayer {
@@ -727,7 +779,7 @@
 .inicio-multiplayer:disabled::after,
 .inicio-jogar:disabled:not(.inicio-jogar-pronto)::before,
 .inicio-jogar:disabled:not(.inicio-jogar-pronto)::after {
-  filter: grayscale(1) brightness(0.6);
+  filter: saturate(0.25) sepia(0.35) brightness(0.55); /* murchos */
 }
 
 .inicio-multiplayer:disabled,
@@ -1246,7 +1298,11 @@
   .inicio-logo-raios,
   .inicio-logo-reluz::before,
   .inicio-jogar,
+  .inicio-jogar::before,
+  .inicio-jogar::after,
   .inicio-multiplayer,
+  .inicio-multiplayer::before,
+  .inicio-multiplayer::after,
   .inicio-aguarde,
   .inicio-cena-arte,
   .inicio-cena-luz {

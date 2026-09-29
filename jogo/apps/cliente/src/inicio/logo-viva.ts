@@ -53,7 +53,7 @@ const PIXEL_DA_ARTE = 10 / 1101; // um "pixel" da arte, em frações da largura
 const SOBRA = { lados: 0.1, topo: 0.25, baixo: 0.15 };
 
 // Verdes das folhas que caem, tirados das copas da arte.
-const VERDES = ['#2f6b2a', '#3f8a32', '#57a83a', '#7cc44a'];
+const VERDES = ['#1f4a1c', '#2f6a22', '#4b8425', '#7faf38'];
 
 type Tipo = 'ouro' | 'brilho' | 'reflexo' | 'gota' | 'nevoa' | 'folha' | 'vagalume' | 'terra';
 

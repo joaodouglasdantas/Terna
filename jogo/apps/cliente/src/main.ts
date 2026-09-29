@@ -29,6 +29,7 @@ import {
 } from './entidades/poderes';
 import { desenharLuzAtras, desenharLuzNaFrente } from './entidades/luz-da-vitoria';
 import { esconderCena, prepararCena } from './inicio/cena';
+import { prepararRamos } from './inicio/ramos';
 import { abrirCortina, fecharCortina } from './inicio/dom';
 import { aparelhoMovel, telaSoNoComputador } from './inicio/aparelho';
 import { carregar, escolherModo, type Escolha } from './inicio/inicio';
@@ -517,6 +518,7 @@ async function principal(): Promise<void> {
   prepararAnimais(cenario, Y_CHAO);
   prepararMinhocas(Y_CHAO, ALTURA_CHAO);
   prepararCena();
+  prepararRamos();
   requestAnimationFrame(loop);
 
   // A sala da revanche caindo na escolha (o outro saiu, o tempo de escolher acabou), a tela
