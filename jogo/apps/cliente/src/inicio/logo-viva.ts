@@ -20,32 +20,33 @@ import {
   type Queda,
 } from './efeitos';
 
-// Pontos da arte (logo.webp, 1774×887) em frações da largura (u) e da altura (v).
-const CRISTAL = { u: 0.511, v: 0.118 }; // o meio do cristal
-const PONTA_DO_CRISTAL = { u: 0.51, v: 0.03 };
-const AREA_DO_CRISTAL = { u: [0.495, 0.527], v: [0.03, 0.215] } as const;
-// A cachoeira aparece em dois trechos: descendo do pico (atrás das letras ela some) e caindo
-// de baixo da ilha. Cada trecho é uma linha de pontos, de cima para baixo.
+// Pontos da arte (logo.webp, 1101×931) em frações da largura (u) e da altura (v).
+const CRISTAL = { u: 0.5, v: 0.135 }; // o meio do cristal
+const PONTA_DO_CRISTAL = { u: 0.5, v: 0.02 };
+const AREA_DO_CRISTAL = { u: [0.465, 0.535], v: [0.03, 0.235] } as const;
+// A cachoeira aparece em dois trechos: descendo do pico em degraus (atrás das letras ela some) e
+// caindo de baixo da ilha. Cada trecho é uma linha de pontos, de cima para baixo.
 const CACHOEIRA_DE_CIMA = [
-  { u: 0.511, v: 0.26 },
-  { u: 0.512, v: 0.31 },
-  { u: 0.525, v: 0.355 },
-  { u: 0.536, v: 0.4 },
+  { u: 0.5, v: 0.3 },
+  { u: 0.502, v: 0.34 },
+  { u: 0.53, v: 0.38 },
+  { u: 0.556, v: 0.45 },
+  { u: 0.558, v: 0.49 },
 ];
 const CACHOEIRA_DE_BAIXO = [
-  { u: 0.513, v: 0.665 },
-  { u: 0.509, v: 0.8 },
-  { u: 0.51, v: 0.9 },
-  { u: 0.507, v: 0.975 },
+  { u: 0.518, v: 0.72 },
+  { u: 0.522, v: 0.8 },
+  { u: 0.521, v: 0.9 },
+  { u: 0.522, v: 0.975 },
 ];
-const PE_DA_CACHOEIRA = { u: 0.507, v: 0.975 };
+const PE_DA_CACHOEIRA = { u: 0.522, v: 0.975 };
 // As copas das duas árvores e a parte de baixo da ilha.
 const COPAS = [
-  { u: [0.16, 0.33], v: [0.2, 0.44] },
-  { u: [0.68, 0.87], v: [0.2, 0.42] },
+  { u: [0.05, 0.26], v: [0.27, 0.45] },
+  { u: [0.76, 0.96], v: [0.27, 0.44] },
 ] as const;
-const FUNDO_DA_ILHA = { u: [0.3, 0.7], v: [0.8, 0.9] } as const;
-const PIXEL_DA_ARTE = 7 / 1774; // um "pixel" da arte, em frações da largura
+const FUNDO_DA_ILHA = { u: [0.2, 0.85], v: [0.8, 0.9] } as const;
+const PIXEL_DA_ARTE = 10 / 1101; // um "pixel" da arte, em frações da largura
 
 // Quanto o canvas passa da logo (as partículas saem dela), em frações da logo. Igual ao CSS de
 // .inicio-logo-particulas.
@@ -290,8 +291,8 @@ export function logoViva(): { palco: HTMLElement; ligar: () => void } {
     // O calor do cristal: um halo dourado que pulsa por cima dele.
     ctx.globalCompositeOperation = 'lighter';
     const pulso = 0.5 + 0.5 * Math.sin(tempo * 2.1);
-    desenharHalo(ctx, '#ffc93c', x(CRISTAL.u), y(CRISTAL.v), largura * (0.075 + 0.012 * pulso), 0.28 + 0.2 * pulso);
-    desenharHalo(ctx, '#fff3c4', x(CRISTAL.u), y(CRISTAL.v), largura * 0.03, 0.25 + 0.2 * pulso);
+    desenharHalo(ctx, '#ffc93c', x(CRISTAL.u), y(CRISTAL.v), largura * (0.13 + 0.02 * pulso), 0.28 + 0.2 * pulso);
+    desenharHalo(ctx, '#fff3c4', x(CRISTAL.u), y(CRISTAL.v), largura * 0.05, 0.25 + 0.2 * pulso);
 
     for (const p of particulas) {
       const a = alfa(p);

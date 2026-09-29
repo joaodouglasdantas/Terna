@@ -339,14 +339,15 @@
   gap: 1rem;
 }
 
-/* A logo com os efeitos (logo-viva.ts). O palco tem a proporção exata da imagem (2:1), para
+/* A logo com os efeitos (logo-viva.ts). O palco tem a proporção exata da imagem (1101×931), para
    as partículas e o reflexo caírem nos pontos certos da arte. */
 .inicio-logo-palco {
   position: relative;
   flex-shrink: 0;
-  /* Cabe com o nome e os dois botões embaixo (uns 290 px) na altura do quadro. */
-  width: min(760px, 88cqw, max(200px, (100cqh - 290px) * 2));
-  aspect-ratio: 1774 / 887;
+  /* Cabe com o nome e os dois botões embaixo (uns 290 px) na altura do quadro, com uma folga em
+     cima para o brilho do cristal. */
+  width: min(540px, 88cqw, max(200px, (100cqh - 320px) * 1101 / 931));
+  aspect-ratio: 1101 / 931;
   animation: inicio-flutua 4s ease-in-out infinite;
 }
 
@@ -359,12 +360,13 @@
   filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.6));
 }
 
-/* Luz dourada do sol do verão atrás do cristal do pico (em 51,1% × 11,8% da arte), respirando. */
+/* Luz dourada do sol do verão atrás do cristal do pico (em 50% × 13,5% da arte), respirando. O
+   `top` em % é da altura do palco; a metade do tamanho, da largura (daí o 1101 / 931). */
 .inicio-logo-aura {
   position: absolute;
-  left: calc(51.1% - 22%);
-  top: calc(11.8% - 44%);
-  width: 44%;
+  left: calc(50% - 30%);
+  top: calc(13.5% - 30% * 1101 / 931);
+  width: 60%;
   aspect-ratio: 1;
   background: radial-gradient(closest-side, rgba(255, 206, 90, 0.55), rgba(255, 170, 60, 0.18) 55%, rgba(255, 170, 60, 0));
   animation: inicio-aura 4s ease-in-out infinite;
@@ -375,9 +377,9 @@
    arte fica por cima. A máscara apaga as pontas. */
 .inicio-logo-raios {
   position: absolute;
-  left: calc(51.1% - 32%);
-  top: calc(11.8% - 64%);
-  width: 64%;
+  left: calc(50% - 44%);
+  top: calc(13.5% - 44% * 1101 / 931);
+  width: 88%;
   aspect-ratio: 1;
   background: repeating-conic-gradient(
     from 0deg,
