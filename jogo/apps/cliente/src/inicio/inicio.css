@@ -108,15 +108,35 @@
   background: #93e57d;
 }
 
-/* Ligar e desligar a música, pequeno, no canto de baixo à esquerda da tela inicial. */
-.inicio-musica {
+/* Os atalhos do canto de baixo à esquerda da tela inicial, pequenos, um em cima do outro: os
+   personagens, o mapa e ligar e desligar a música. */
+.inicio-atalhos {
   position: absolute;
   left: 14px;
   bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.inicio-atalho.inicio-botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   min-width: 0;
   min-height: 0;
   padding: 0.3rem 0.7rem;
   font-size: 0.95rem;
+}
+
+/* O ícone em pixels (inicio.ts), na cor do texto do botão. */
+.inicio-atalho-icone {
+  width: auto;
+  height: 0.95rem;
+  fill: currentColor;
+  shape-rendering: crispEdges;
+  filter: drop-shadow(0 2px 0 var(--b-tinta-sombra));
 }
 
 /* A versão do jogo, no canto de baixo da tela inicial: pequena, mas legível. */
@@ -775,8 +795,10 @@
 }
 
 /* A sala caiu (o outro saiu, o tempo de escolher acabou, a rede caiu): o aviso na tela inicial,
-   flutuando logo acima do nome (sobre o pé da logo), sem empurrar os botões para baixo. */
+   flutuando logo acima do nome (sobre o pé da logo), sem empurrar os botões para baixo. Depois de
+   uns segundos, esmaece (inicio.ts: AVISO_MS e AVISO_ESMAECE_MS). */
 .inicio-sala-caiu {
+  transition: opacity 1.2s ease;
   position: absolute;
   bottom: calc(100% + 0.6rem);
   left: 50%;
@@ -797,6 +819,10 @@
 
 .inicio-sala-caiu:empty {
   display: none;
+}
+
+.inicio-sala-caiu-saindo {
+  opacity: 0;
 }
 
 /* ---- caixas (multiplayer, menu da partida, fim) ---- */
@@ -1182,6 +1208,10 @@
     animation: none;
   }
 
+  .inicio-sala-caiu,
+  .inicio-retrato {
+    transition: none;
+  }
 }
 
 @container (max-height: 480px) {
@@ -1684,4 +1714,313 @@
 .inicio-ajuda-dicas li::before {
   content: '▸ ';
   color: var(--verde);
+}
+
+/* ---- os personagens (personagens.ts) ---- */
+
+/* O fundo da tela inicial continua à vista, mais escuro, como na escolha de personagem. */
+.inicio-personagens-tela {
+  background: radial-gradient(ellipse at 50% 50%, rgba(20, 14, 8, 0.5) 0%, rgba(20, 14, 8, 0.86) 100%);
+}
+
+.inicio-personagens {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+}
+
+/* Os cartões com o retrato: altos, lado a lado, com o nome e o codinome por cima da arte, embaixo. */
+.inicio-retratos {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.4rem;
+}
+
+.inicio-retrato {
+  position: relative;
+  display: block;
+  height: clamp(15rem, calc(100cqh - 13rem), 30rem);
+  aspect-ratio: 1 / 2;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  font: inherit;
+  color: var(--tinta);
+  background: var(--contorno);
+  border: 3px solid var(--marrom);
+  box-shadow: 0 0 0 3px var(--contorno), 0 12px 30px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.inicio-retrato:hover {
+  transform: translateY(-3px);
+  border-color: var(--verde);
+  box-shadow: 0 0 0 3px var(--contorno), 0 0 24px rgba(127, 214, 107, 0.4), 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.inicio-retrato:focus-visible {
+  outline: 3px solid var(--marrom-claro);
+  outline-offset: 4px;
+}
+
+/* A arte é alta (1:3): o cartão mostra do céu ao peito, com o rosto no meio. */
+.inicio-retrato-arte {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 27%;
+}
+
+.inicio-retrato-rotulo {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 2.4rem 0.5rem 0.7rem;
+  text-align: center;
+  background: linear-gradient(to bottom, rgba(18, 12, 6, 0), rgba(18, 12, 6, 0.92) 55%);
+}
+
+.inicio-retrato-nome {
+  font-size: 1.6rem;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-shadow: 0 3px 0 var(--marrom-escuro);
+}
+
+.inicio-retrato-codinome {
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: var(--suave);
+}
+
+/* A ficha: o sprite, o nome e o codinome à esquerda; a descrição e os poderes à direita. */
+.inicio-ficha {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 1.2rem 1.6rem;
+  width: min(66rem, 100%);
+  padding: 1.1rem 1.3rem;
+  box-sizing: border-box;
+  background: linear-gradient(to bottom, rgba(90, 58, 26, 0.35), rgba(0, 0, 0, 0) 4rem), rgba(26, 16, 10, 0.92);
+  border: 3px solid var(--marrom);
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px rgba(239, 220, 162, 0.28), 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+@container (max-width: 700px) {
+  .inicio-ficha {
+    grid-template-columns: 1fr;
+  }
+}
+
+.inicio-ficha-lado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  text-align: center;
+}
+
+.inicio-ficha-palco {
+  display: grid;
+  place-items: end center;
+  padding: 0.7rem 1.2rem 0.3rem;
+  background: radial-gradient(ellipse at 50% 90%, rgba(127, 214, 107, 0.2), rgba(0, 0, 0, 0) 70%), rgba(0, 0, 0, 0.25);
+  border: 2px solid rgba(230, 201, 160, 0.18);
+}
+
+/* O sprite em pixels inteiros: 4× (3× em quadro baixo). `--px`: a largura do canvas. */
+.inicio-ficha-sprite {
+  display: block;
+  width: calc(var(--px) * 4px);
+  height: auto;
+  image-rendering: pixelated;
+}
+
+@container (max-height: 600px) {
+  .inicio-ficha-sprite {
+    width: calc(var(--px) * 3px);
+  }
+}
+
+.inicio-ficha-nome {
+  margin: 0.3rem 0 0;
+  font-size: 2.2rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: 0 3px 0 var(--marrom-escuro);
+}
+
+.inicio-ficha-codinome {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--suave);
+}
+
+.inicio-ficha-etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.45rem;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inicio-ficha-etiquetas li {
+  padding: 0.1rem 0.5rem;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #2a1a06;
+  background: var(--marrom-claro);
+  box-shadow: 0 0 0 2px var(--contorno);
+}
+
+.inicio-ficha-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  min-width: 0;
+  text-align: left;
+}
+
+.inicio-ficha-frase {
+  max-width: 62ch;
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.35;
+}
+
+/* ---- o mapa (mapa.ts) ---- */
+
+/* O mapa cobre o quadro todo; o título e os botões ficam por cima, numa faixa escura em cima. */
+.inicio-mapa-tela {
+  padding: 0;
+  overflow: hidden;
+  background: #ccd8ea;
+}
+
+.inicio-mapa-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.inicio-mapa-arrastando {
+  cursor: grabbing;
+}
+
+.inicio-mapa-topo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 14px 16px 2rem;
+  background: linear-gradient(to bottom, rgba(18, 12, 6, 0.62), rgba(18, 12, 6, 0));
+  pointer-events: none;
+}
+
+.inicio-mapa-topo > * {
+  pointer-events: auto;
+}
+
+.inicio-mapa-titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  text-align: left;
+}
+
+.inicio-mapa-titulo .inicio-sub {
+  margin: 0;
+  text-align: left;
+  color: var(--tinta);
+  text-shadow: 0 2px 0 var(--contorno);
+}
+
+.inicio-mapa-botoes {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.inicio-mapa-botoes .inicio-botao {
+  min-width: 0;
+  min-height: 0;
+  padding: 0.35rem 0.8rem;
+  font-size: 1rem;
+}
+
+/* A placa do bioma: uma tábua presa na beira de baixo da arte, com o nome e os personagens dele.
+   Anda com o mapa (mapa.ts põe a posição). */
+.inicio-mapa-placa {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.9rem 0.65rem;
+  white-space: nowrap;
+  background: linear-gradient(to bottom, rgba(90, 58, 26, 0.35), rgba(0, 0, 0, 0) 3rem), rgba(26, 16, 10, 0.92);
+  border: 3px solid var(--marrom);
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px rgba(239, 220, 162, 0.28), 0 8px 20px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  will-change: transform;
+}
+
+.inicio-mapa-placa-nome {
+  font-size: 1.35rem;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffd966;
+  text-shadow: 0 2px 0 var(--contorno);
+}
+
+.inicio-mapa-herois {
+  display: flex;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inicio-mapa-herois li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 1.05rem;
+}
+
+/* O rosto, do retrato do personagem, numa moldura quadrada. */
+.inicio-mapa-rosto {
+  width: 2.5rem;
+  height: 2.5rem;
+  background-color: var(--contorno);
+  background-position: 50% 36%;
+  background-size: 180% auto;
+  box-shadow: 0 0 0 2px var(--marrom-claro), 0 0 0 4px var(--contorno);
 }

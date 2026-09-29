@@ -126,9 +126,9 @@ function dicasDo(heroi: Heroi): { dicas: string[]; outra?: { titulo: string; pod
   };
 }
 
-function seuPersonagem(heroi: Heroi): HTMLElement {
-  const bloco = elemento('section', 'inicio-ajuda-secao inicio-ajuda-heroi');
-  bloco.append(elemento('h2', '', `Seu personagem: ${SOBRE_HEROI[heroi].nome}`));
+// Os poderes de um personagem, com o ícone do painel e o que cada um faz (os da outra forma numa
+// coluna ao lado), e as dicas dele. Aqui no Tab e na tela dos personagens (personagens.ts).
+export function poderesDoHeroi(heroi: Heroi): HTMLElement[] {
   const { dicas, outra } = dicasDo(heroi);
   const listas = elemento('div', 'inicio-ajuda-poderes');
   const lista = (titulo: string | null, ids: readonly IdPoder[]): void => {
@@ -141,10 +141,14 @@ function seuPersonagem(heroi: Heroi): HTMLElement {
   };
   lista(outra ? 'De gente' : null, PODERES_DO_HEROI[heroi]);
   if (outra) lista(outra.titulo, outra.poderes);
-  bloco.append(listas);
   const ul = elemento('ul', 'inicio-ajuda-dicas');
   for (const d of dicas) ul.append(elemento('li', '', d));
-  bloco.append(ul);
+  return [listas, ul];
+}
+
+function seuPersonagem(heroi: Heroi): HTMLElement {
+  const bloco = elemento('section', 'inicio-ajuda-secao inicio-ajuda-heroi');
+  bloco.append(elemento('h2', '', `Seu personagem: ${SOBRE_HEROI[heroi].nome}`), ...poderesDoHeroi(heroi));
   return bloco;
 }
 

@@ -13,8 +13,10 @@ import { VERSAO } from '../versao';
 import { anexarCena } from './cena';
 import { botao, digitandoEm, elemento, mostrarTela, sairComEsmaecer } from './dom';
 import { logoViva } from './logo-viva';
+import { telaMapa } from './mapa';
 import { botaoDaMusica } from './musica';
 import { telaMultiplayer, type EscolhaOnline } from './multiplayer';
+import { telaPersonagens } from './personagens';
 import { telaSelecao } from './selecao';
 import { carregarArteDaTemporada } from './temporada';
 
@@ -191,18 +193,66 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
   });
 }
 
+// O aviso de sala que caiu: quanto fica na tela e quanto leva esmaecendo (o CSS usa o mesmo).
+const AVISO_MS = 7000;
+const AVISO_ESMAECE_MS = 1200;
+
+// Os ícones dos atalhos, em pixels ('#' aceso): um busto e um marcador de mapa.
+const ICONE_PERSONAGENS = ['...###...', '..#####..', '..#####..', '...###...', '....#....', '.#######.', '#########', '#########'];
+const ICONE_MAPA = ['..####..', '.######.', '###..###', '###..###', '.######.', '..####..', '...##...', '...##...'];
+
+function iconeDePixels(linhas: string[]): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', `0 0 ${linhas[0].length} ${linhas.length}`);
+  svg.setAttribute('class', 'inicio-atalho-icone');
+  svg.setAttribute('aria-hidden', 'true');
+  linhas.forEach((linha, y) => {
+    // Um retângulo por trecho aceso da linha.
+    for (const trecho of linha.matchAll(/#+/g)) {
+      const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      r.setAttribute('x', String(trecho.index));
+      r.setAttribute('y', String(y));
+      r.setAttribute('width', String(trecho[0].length));
+      r.setAttribute('height', '1');
+      svg.append(r);
+    }
+  });
+  return svg;
+}
+
+function atalho(texto: string, icone: string[]): HTMLButtonElement {
+  const b = elemento('button', 'inicio-botao inicio-botao-claro inicio-atalho');
+  b.type = 'button';
+  b.append(iconeDePixels(icone), elemento('span', '', texto));
+  return b;
+}
+
 // A tela inicial: a logo (viva, com partículas), o nome e os modos de jogo, com as árvores da
 // frente subindo nas beiradas. Termina quando a pessoa escolhe um modo e o personagem —
 // Singleplayer, depois da seleção de personagem; Multiplayer, depois de criar ou entrar numa sala
 // e dos dois escolherem (as telas deles voltam para cá se ela desistir). Sem conexão com o
 // servidor, o Multiplayer fica apagado.
 // `aviso`: a sala da partida online caiu (o outro saiu, o tempo de escolher acabou, a rede caiu):
-// aparece em cima do nome até a pessoa escolher um modo.
+// aparece em cima do nome e some sozinho, esmaecendo (antes, se a pessoa abrir outra tela).
 export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-titulo-tela');
-    const avisoDaSala = elemento('p', 'inicio-sala-caiu', aviso);
+    const avisoDaSala = elemento('p', 'inicio-sala-caiu');
     avisoDaSala.setAttribute('role', 'status');
+    let esmaecer = 0;
+    let apagar = 0;
+    const mostrarAviso = (texto: string): void => {
+      clearTimeout(esmaecer);
+      clearTimeout(apagar);
+      avisoDaSala.classList.remove('inicio-sala-caiu-saindo');
+      avisoDaSala.textContent = texto;
+      if (!texto) return;
+      esmaecer = window.setTimeout(() => {
+        avisoDaSala.classList.add('inicio-sala-caiu-saindo');
+        apagar = window.setTimeout(() => mostrarAviso(''), AVISO_ESMAECE_MS);
+      }, AVISO_MS);
+    };
+    mostrarAviso(aviso);
 
     const campo = elemento('label', 'inicio-campo');
     const rotulo = elemento('span', 'inicio-rotulo', 'Seu nome');
@@ -241,7 +291,7 @@ export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
 
     // Desistiu numa das telas seguintes (ou a sala caiu: `aviso`): a tela inicial volta como estava.
     const voltarParaCa = (foco: HTMLElement, aviso = ''): void => {
-      avisoDaSala.textContent = aviso;
+      mostrarAviso(aviso);
       anexarCena(tela);
       mostrarTela(tela);
       logo.ligar();
@@ -252,7 +302,7 @@ export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
     const solo = botao('Singleplayer', 'inicio-botao inicio-jogar', () => {
       const nome = nomeValido();
       if (!nome) return;
-      avisoDaSala.textContent = '';
+      mostrarAviso('');
       window.removeEventListener('keydown', aoTeclar);
       void telaSelecao().then((r) => {
         if (r.tipo === 'escolheu') resolver({ modo: 'solo', nome, heroi: r.heroi });
@@ -264,7 +314,7 @@ export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
       const nome = nomeValido();
       if (!nome) return;
       window.removeEventListener('keydown', aoTeclar);
-      avisoDaSala.textContent = '';
+      mostrarAviso('');
       void telaMultiplayer(nome).then((fim) => {
         if (fim.tipo === 'jogar') return resolver(fim.escolha);
         voltarParaCa(multiplayer, fim.aviso);
@@ -275,6 +325,20 @@ export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
       multiplayer.setAttribute('aria-label', 'Multiplayer, sem conexão com o servidor');
       multiplayer.append(elemento('span', 'inicio-etiqueta', 'Offline'));
     }
+
+    // Os atalhos do canto de baixo: os personagens, o mapa e a música.
+    const abrirAoClicar = (b: HTMLButtonElement, abrirTela: () => Promise<void>): HTMLButtonElement => {
+      b.addEventListener('click', () => {
+        window.removeEventListener('keydown', aoTeclar);
+        mostrarAviso('');
+        void abrirTela().then(() => voltarParaCa(b));
+      });
+      return b;
+    };
+    const personagens = abrirAoClicar(atalho('Personagens', ICONE_PERSONAGENS), telaPersonagens);
+    const mapa = abrirAoClicar(atalho('Mapa', ICONE_MAPA), telaMapa);
+    const atalhos = elemento('div', 'inicio-atalhos');
+    atalhos.append(personagens, mapa, botaoDaMusica('inicio-botao inicio-botao-claro inicio-atalho'));
 
     // Enter joga sozinho (também de dentro do campo de nome); Espaço só fora do campo.
     const aoTeclar = (evento: KeyboardEvent): void => {
@@ -289,7 +353,7 @@ export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
     const modos = elemento('div', 'inicio-modos');
     modos.append(avisoDaSala, campo, erroNome, solo, multiplayer);
     const logo = logoViva();
-    tela.append(logo.palco, modos, elemento('p', 'inicio-versao', VERSAO), botaoDaMusica('inicio-botao inicio-botao-claro inicio-musica'));
+    tela.append(logo.palco, modos, elemento('p', 'inicio-versao', VERSAO), atalhos);
     anexarCena(tela, true);
     mostrarTela(tela);
     logo.ligar();

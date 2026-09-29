@@ -83,6 +83,21 @@ Na partida, a tecla **Tab** abre (e fecha) a tela de controles: andar, pular, pu
 pegar e largar arma, poderes, energia pixy, transformações e os poderes do seu personagem
 (`apps/cliente/src/inicio/ajuda.ts`). Sozinho, o jogo pausa enquanto ela está aberta.
 
+No canto de baixo da tela inicial ficam três atalhos: **Personagens**, **Mapa** e a música.
+- **Personagens** (`inicio/personagens.ts`): um cartão alto com o retrato de cada personagem
+  liberado, o nome e o codinome. Clicando, a ficha dele: o sprite correndo, a descrição, a
+  temporada, o mapa de onde ele é e os poderes com as dicas (as mesmas do Tab). As setas passam
+  para o outro personagem e o Esc volta.
+- **Mapa** (`inicio/mapa.ts`): as Terras de Terna vistas de cima. Só aparece a **Floresta da
+  Divisa**, com uma placa com o nome e os personagens que são dela; o resto está coberto por
+  nuvens em pixel art, feitas no próprio jogo, que andam devagar. Arrastando, o mapa desliza (e
+  segue um pouco depois de soltar); a roda do mouse aproxima e afasta; C centraliza. Os biomas,
+  onde cada um fica no mapa grande e os personagens de cada um estão em `inicio/terras.ts`.
+
+Os retratos saem de `fontes/retratos-leslie-grow.png` (um painel para cada, recortado sem a
+moldura) e a arte do mapa de `fontes/mapa-floresta-da-divisa.png`; as versões do jogo, em webp,
+ficam em `apps/cliente/src/assets/retratos/` e `apps/cliente/src/assets/mapa/`.
+
 O jogo é feito para notebook ou computador (teclado e mouse): no celular e no tablet ele não
 carrega e aparece só um aviso para abrir no computador (`apps/cliente/src/inicio/aparelho.ts`).
 No computador, com a janela menor que **960 × 540** (o zoom do navegador conta), um aviso cobre
@@ -99,7 +114,8 @@ jogo/
 │   │       ├── main.ts       laço do jogo e ciclo das telas: menu → partida → fim → menu
 │   │       ├── partida.ts    uma partida: tempo, a CPU ou o outro jogador (pela rede)
 │   │       ├── inicio/       telas em HTML: carregamento, tela inicial (nome e modos),
-│   │       │                 multiplayer (criar/entrar em sala), menu da engrenagem e fim
+│   │       │                 personagens, mapa, multiplayer (criar/entrar em sala), menu da
+│   │       │                 engrenagem e fim
 │   │       ├── motor/        peças genéricas: carregar imagem, criar/reduzir sprite, sorteio
 │   │       ├── mundo/        céu, sol, nuvens, árvores, luz, chão e minhocas
 │   │       ├── entidades/    personagem (corpo comum), animais, armas e poderes;
