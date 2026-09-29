@@ -719,14 +719,19 @@
   text-shadow: 2px 0 0 #2a1608, -2px 0 0 #2a1608, 0 2px 0 #2a1608, 0 -2px 0 #2a1608, 0 3px 0 #1a0c04;
 }
 
-/* Apagado: sem conexão com o servidor não dá para jogar com outras pessoas. */
+/* Apagado: sem conexão com o servidor não dá para jogar com outras pessoas; na escolha de
+   personagem, o Jogar antes de escolher um. (Já escolhido online, o "Pronto!" continua verde.) */
 .inicio-multiplayer:disabled::before,
-.inicio-multiplayer:disabled::after {
+.inicio-multiplayer:disabled::after,
+.inicio-jogar:disabled:not(.inicio-jogar-pronto)::before,
+.inicio-jogar:disabled:not(.inicio-jogar-pronto)::after {
   filter: grayscale(1) brightness(0.6);
 }
 
 .inicio-multiplayer:disabled,
-.inicio-multiplayer:disabled:hover {
+.inicio-multiplayer:disabled:hover,
+.inicio-jogar:disabled:not(.inicio-jogar-pronto),
+.inicio-jogar:disabled:not(.inicio-jogar-pronto):hover {
   --b-fundo: #2e261d;
   --b-borda: #54483a;
   --b-degrau: #1a140d;
@@ -736,6 +741,12 @@
   background: var(--b-fundo);
   cursor: not-allowed;
   transform: none;
+  animation: none;
+}
+
+/* Online, já escolhido: o "Pronto!" fica verde, parado (o clique não faz mais nada). */
+.inicio-jogar-pronto {
+  cursor: default;
   animation: none;
 }
 

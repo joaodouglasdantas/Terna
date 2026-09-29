@@ -541,10 +541,10 @@ async function principal(): Promise<void> {
       // Jogar de novo: a escolha de personagem outra vez — sozinho, contra outra CPU sorteada;
       // online, na mesma sala, e os dois escolhendo começa outra rodada. Voltando, o menu.
       if (revanche === 'sozinho' && atual.modo === 'solo') {
-        const r = await telaSelecao(undefined, atual.heroi);
+        const r = await telaSelecao();
         if (r.tipo === 'escolheu') escolha = { modo: 'solo', nome: atual.nome, heroi: r.heroi };
       } else if (revanche && revanche !== 'sozinho' && atual.modo === 'online') {
-        const r = await telaSelecao(revanche, atual.heroi);
+        const r = await telaSelecao(revanche);
         if (r.tipo === 'comecou') escolha = { modo: 'online', nome: atual.nome, ...r.partida, conexao: atual.conexao };
         else if (r.tipo === 'caiu') aviso = r.aviso;
       }

@@ -75,7 +75,7 @@ cada um faz não aparece na escolha, só no Tab da partida, e só o seu.
 Antes de cada partida vem o carregamento da temporada atual (**Temporada 1 — A Primeira
 Semente**), com a arte num outdoor, os nomes dos personagens e o do mapa (**Floresta da Divisa**);
 depois, a contagem 3, 2, 1. No fim (por tempo ou morte) dá para clicar em **Jogar novamente**:
-contra a CPU, volta direto à escolha de personagem (com o da rodada anterior já marcado); online a
+contra a CPU, volta direto à escolha de personagem (nenhum começa escolhido); online a
 sala continua e, os dois clicando, voltam à escolha e jogam outra rodada, sem sair da sala. A arte
 da temporada fica em `apps/cliente/src/assets/temporada-a-primeira-semente.webp` (original em
 `fontes/`), e o nome, os personagens e o mapa em `apps/cliente/src/inicio/temporada.ts`.
