@@ -16,6 +16,7 @@ import { logoViva } from './logo-viva';
 import { telaMapa } from './mapa';
 import { botaoDaMusica } from './musica';
 import { telaMultiplayer, type EscolhaOnline } from './multiplayer';
+import { botaoDaOpiniao } from './opiniao';
 import { telaPersonagens } from './personagens';
 import { telaSelecao } from './selecao';
 import { carregarArteDaTemporada } from './temporada';
@@ -353,7 +354,8 @@ export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
     // Enter joga sozinho (também de dentro do campo de nome); Espaço só fora do campo.
     const aoTeclar = (evento: KeyboardEvent): void => {
       if (evento.code === 'Enter' || (evento.code === 'Space' && !digitandoEm(evento))) {
-        if (evento.target instanceof HTMLButtonElement) return; // o próprio botão já responde
+        // O próprio botão (ou o link da opinião) já responde.
+        if (evento.target instanceof HTMLButtonElement || evento.target instanceof HTMLAnchorElement) return;
         evento.preventDefault();
         solo.click();
       }
@@ -363,7 +365,9 @@ export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
     const modos = elemento('div', 'inicio-modos');
     modos.append(avisoDaSala, campo, erroNome, solo, multiplayer);
     const logo = logoViva();
-    tela.append(logo.palco, modos, elemento('p', 'inicio-versao', VERSAO), atalhos);
+    // O formulário de opinião, no canto de baixo à direita, em cima da versão.
+    const opiniao = botaoDaOpiniao('inicio-botao inicio-atalho inicio-opiniao-canto');
+    tela.append(logo.palco, modos, elemento('p', 'inicio-versao', VERSAO), atalhos, opiniao);
     anexarCena(tela, true);
     mostrarTela(tela);
     logo.ligar();

@@ -636,6 +636,29 @@
   --b-tinta-sombra: #2a1f13;
 }
 
+/* O botão da opinião (opiniao.ts) é um link com cara de botão: o texto e o ícone do balão no meio,
+   sem o sublinhado de link. */
+a.inicio-botao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
+/* Nas caixas (o menu da partida e a tela de fim), um pouco menor que os outros botões. */
+.inicio-caixa .inicio-opiniao {
+  font-size: 1rem;
+}
+
+/* Na tela inicial: verde, no canto de baixo à direita, em cima da versão. */
+.inicio-opiniao-canto {
+  position: absolute;
+  right: 14px;
+  bottom: 3.4rem;
+}
+
 /* Os modos de jogo, um embaixo do outro, com a mesma largura. */
 .inicio-modos {
   position: relative; /* o aviso de sala que caiu flutua em cima */

@@ -8,6 +8,7 @@ import type { Heroi } from '@terna/compartilhado';
 import { montarAjuda } from './ajuda';
 import { botao, elemento, mostrarTela, sairComEsmaecer } from './dom';
 import { botaoDaMusica } from './musica';
+import { botaoDaOpiniao } from './opiniao';
 import type { Revanche } from './revanche';
 
 export interface OpcoesMenus {
@@ -119,7 +120,7 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
     caixa.append(titulo);
     if (online) caixa.append(elemento('p', 'inicio-sub', 'A partida continua enquanto o menu está aberto.'));
     const controles = botao('Controles (Tab)', 'inicio-botao inicio-botao-claro', abrirAjuda);
-    caixa.append(continuar, controles, botaoDaMusica(), sair);
+    caixa.append(continuar, controles, botaoDaMusica(), botaoDaOpiniao(), sair);
     tela.append(caixa);
     // Clicar fora da caixa fecha, como o Esc.
     tela.addEventListener('click', (evento) => {
@@ -190,7 +191,7 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
         if (revanche === 'sozinho') {
           // Contra a CPU: jogar de novo volta direto à escolha de personagem.
           const jogar = botao('Jogar novamente', 'inicio-botao', () => sair('revanche'));
-          caixa.append(jogar, voltar);
+          caixa.append(jogar, voltar, botaoDaOpiniao());
           tela.append(caixa);
           mostrarTela(tela);
           jogar.focus();
@@ -219,13 +220,13 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
           revanche.aoMudar = atualizar;
           atualizar();
           void revanche.pronta.then(() => sair('revanche'));
-          caixa.append(estado, jogar, voltar);
+          caixa.append(estado, jogar, voltar, botaoDaOpiniao());
           tela.append(caixa);
           mostrarTela(tela);
           jogar.focus();
           return;
         }
-        caixa.append(voltar);
+        caixa.append(voltar, botaoDaOpiniao());
         tela.append(caixa);
         mostrarTela(tela);
         voltar.focus();
