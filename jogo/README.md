@@ -89,14 +89,19 @@ No canto de baixo da tela inicial ficam três atalhos: **Personagens**, **Mapa**
   temporada, o mapa de onde ele é e os poderes com as dicas (as mesmas do Tab). As setas passam
   para o outro personagem e o Esc volta.
 - **Mapa** (`inicio/mapa.ts`): as Terras de Terna vistas de cima. Só aparece a **Floresta da
-  Divisa**, com uma placa com o nome e os personagens que são dela; o resto está coberto por
-  nuvens em pixel art, feitas no próprio jogo, que andam devagar. Arrastando, o mapa desliza (e
-  segue um pouco depois de soltar); a roda do mouse aproxima e afasta; C centraliza. Os biomas,
-  onde cada um fica no mapa grande e os personagens de cada um estão em `inicio/terras.ts`.
+  Divisa**, com o nome escrito em cima dela; com o mouse por cima do bioma, aparecem os
+  personagens que são dele, em quadrinhos. O resto está coberto por nuvens, que andam devagar. A
+  tela abre clara, como a luz do sol, e as nuvens de cima da floresta se abrem para os lados.
+  Arrastando, o mapa desliza (e segue um pouco depois de soltar); a roda do mouse aproxima e
+  afasta, sem passar da borda do mapa grande; C centraliza. Os biomas, onde cada um fica no mapa
+  grande e os personagens de cada um estão em `inicio/terras.ts`.
 
 Os retratos saem de `fontes/retratos-leslie-grow.png` (um painel para cada, recortado sem a
-moldura) e a arte do mapa de `fontes/mapa-floresta-da-divisa.png`; as versões do jogo, em webp,
-ficam em `apps/cliente/src/assets/retratos/` e `apps/cliente/src/assets/mapa/`.
+moldura), a arte do mapa de `fontes/mapa-floresta-da-divisa.png` e a nuvem de `fontes/nuvem.png`
+(já com o fundo transparente); as versões do jogo, em webp, ficam em
+`apps/cliente/src/assets/retratos/` e `apps/cliente/src/assets/mapa/`. Os cartões e os
+quadrinhos enquadram os retratos pelo rosto (`ROSTO`, em `inicio/terras.ts`): trocando um
+retrato, é ali que se acerta o meio do rosto e a linha dos olhos.
 
 O jogo é feito para notebook ou computador (teclado e mouse): no celular e no tablet ele não
 carrega e aparece só um aviso para abrir no computador (`apps/cliente/src/inicio/aparelho.ts`).

@@ -1,31 +1,45 @@
 // A tela do mapa (o botão Mapa da tela inicial): o mapa grande das terras de Terna, visto de cima.
-// Só aparece o que já existe — por enquanto a Floresta da Divisa, com o nome dela e os personagens
-// que são dela (terras.ts) —; o resto está coberto por um mar de nuvens que anda devagar, com
-// tufos passando e os da beira da floresta subindo e descendo.
+// Só aparece o que já existe — por enquanto a Floresta da Divisa (terras.ts) —; o resto está
+// coberto por um mar de nuvens que anda devagar, com nuvens passando e as da beira da floresta
+// subindo e descendo. Todas são a nuvem de fontes/nuvem.png (assets/mapa/nuvem.webp), em vários
+// tamanhos, viradas para um lado ou para o outro.
+//
+// A chegada é clara, como a luz do sol: a tela abre branca, a luz baixa e as nuvens que cobrem a
+// floresta se abrem para os lados, mostrando o bioma. O nome fica escrito em cima dele; com o
+// mouse por cima do bioma, aparecem os personagens que são dele, em quadrinhos com o nome.
 //
 // Arrastando, o mapa desliza (e segue um pouco depois de soltar); a roda do mouse aproxima e
-// afasta, em volta do ponteiro. No teclado: setas andam, + e - aproximam, C centraliza e Esc volta.
-// As nuvens são pixel art feita aqui, com as cores das nuvens da borda da arte da floresta.
+// afasta, em volta do ponteiro, sem nunca mostrar além da borda do mapa grande. No teclado: setas
+// andam, + e - aproximam, C centraliza e Esc volta.
 
 import { SOBRE_HEROI } from '@terna/compartilhado';
+import urlNuvem from '../assets/mapa/nuvem.webp';
 import { carregarImagem, contexto2d, novoCanvas } from '../motor/imagens';
 import { esconderCena } from './cena';
 import { botao, elemento, ESMAECER_MS, mostrarTela } from './dom';
-import { BIOMAS, MAPA_GRANDE, RETRATO, type Bioma } from './terras';
+import { BIOMAS, MAPA_GRANDE, enquadrarRetrato, type Bioma } from './terras';
 
-// As cores das nuvens, do brilho em cima à sombra azulada embaixo (as da borda da arte).
-const NUVEM = ['#f4f8fc', '#e4ecf4', '#d4dcec', '#c4d4e4', '#b4c4e4', '#a4b4d4'];
-const FUNDO = '#ccd8ea'; // o mar de nuvens por baixo dos tufos
-const PIXEL = 4; // cada pixel das nuvens vale 4 pixels da arte (o tamanho dos pixels dela)
+const FUNDO = '#a8c4f0'; // entre as nuvens do mar: o azul da sombra da nuvem da arte
 
-// Quanto a floresta ocupa da altura da tela quando está centralizada, e até onde aproxima e afasta
-// (em relação a isso).
-const OCUPA = 0.84;
+// Quanto a floresta ocupa da altura da tela quando está centralizada (um pouco abaixo do meio, em
+// fração do tamanho dela: sobra lugar para o título em cima e o nome), e até onde aproxima (em
+// relação a isso). Afastando, para antes de a borda do mapa grande entrar na tela.
+const OCUPA = 0.78;
+const ABAIXO = 0.06;
 const ZOOM_MIN = 0.55;
 const ZOOM_MAX = 2.6;
-const ENTRADA_MS = 1100; // a chegada: o mapa abre um pouco afastado e aproxima
 const ATRITO = 4.5; // o quanto o deslize depois de soltar perde por segundo
-const MAR_POR_SEGUNDO = 5; // pixels da arte que o mar de nuvens anda, para a esquerda
+const MAR_POR_SEGUNDO = 6; // pixels do mapa que o mar de nuvens anda, para a esquerda
+
+// A chegada: a câmera, um pouco perto, afasta até a floresta caber, enquanto as nuvens de cima
+// dela se abrem (a luz do sol é do CSS: .inicio-mapa-luz).
+const ABRE_MS = 2300;
+const ABRE_ATRASO_MS = 250;
+const ABRE_DISTANCIA = 1500; // pixels do mapa que cada nuvem anda para fora
+
+// O mar de nuvens: um ladrilho que emenda nos quatro lados, em pixels do mapa, e a resolução dele.
+const LADO_MAR = 2400;
+const RESOLUCAO_MAR = 0.5;
 
 const semMovimento = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -40,138 +54,136 @@ function sorteador(semente: number): () => number {
   };
 }
 
-// Um tufo de nuvem, em pixels (1 pixel = PIXEL da arte): bolhas juntas numa fileira e outras
-// menores em cima. Cada pixel pega a bolha em que está mais por dentro e a cor vem da altura nela
-// (luz em cima, sombra embaixo), em faixas, como na arte.
-function tufo(sortear: () => number, raio: number): HTMLCanvasElement {
-  const bolhas: { x: number; y: number; r: number }[] = [];
-  const n = 3 + Math.floor(sortear() * 3);
-  for (let i = 0; i < n; i++) {
-    bolhas.push({
-      x: (i - (n - 1) / 2) * raio * 0.85 + (sortear() - 0.5) * raio * 0.3,
-      y: (sortear() - 0.5) * raio * 0.25,
-      r: raio * (0.6 + sortear() * 0.4),
-    });
-  }
-  const cima = 1 + Math.floor(sortear() * 3);
-  for (let i = 0; i < cima; i++) {
-    bolhas.push({ x: (sortear() - 0.5) * raio * n * 0.55, y: -raio * (0.4 + sortear() * 0.3), r: raio * (0.5 + sortear() * 0.35) });
-  }
-  const x0 = Math.floor(Math.min(...bolhas.map((b) => b.x - b.r))) - 1;
-  const y0 = Math.floor(Math.min(...bolhas.map((b) => b.y - b.r))) - 1;
-  const w = Math.ceil(Math.max(...bolhas.map((b) => b.x + b.r))) + 1 - x0;
-  const h = Math.ceil(Math.max(...bolhas.map((b) => b.y + b.r))) + 1 - y0;
-  const canvas = novoCanvas(w, h);
-  const ctx = contexto2d(canvas);
-  const pixels = ctx.createImageData(w, h);
-  const cores = NUVEM.map((c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)));
-  const dentro = (px: number, py: number): { b: (typeof bolhas)[number]; fundo: number } | null => {
-    let melhor: { b: (typeof bolhas)[number]; fundo: number } | null = null;
-    for (const b of bolhas) {
-      const fundo = b.r - Math.hypot(px - b.x, py - b.y);
-      if (fundo > 0 && (!melhor || fundo > melhor.fundo)) melhor = { b, fundo };
-    }
-    return melhor;
-  };
-  for (let py = 0; py < h; py++) {
-    for (let px = 0; px < w; px++) {
-      const x = px + x0 + 0.5;
-      const y = py + y0 + 0.5;
-      const aqui = dentro(x, y);
-      if (!aqui) continue;
-      const { b } = aqui;
-      const v = ((y - b.y) / b.r) * 0.85 - ((x - b.x) / b.r) * 0.25;
-      // Embaixo da nuvem inteira (o pixel de baixo já é fora): a sombra mais funda.
-      let cor = v < -0.5 ? 0 : v < -0.05 ? 1 : v < 0.3 ? 2 : v < 0.55 ? 3 : v < 0.78 ? 4 : 5;
-      if (!dentro(x, y + 1)) cor = 5;
-      else if (!dentro(x, y + 2)) cor = Math.max(cor, 4);
-      const i = (py * w + px) * 4;
-      [pixels.data[i], pixels.data[i + 1], pixels.data[i + 2]] = cores[cor];
-      pixels.data[i + 3] = 255;
-    }
-  }
-  ctx.putImageData(pixels, 0, 0);
-  return canvas;
+// A nuvem da arte e ela virada para o outro lado.
+interface Nuvens {
+  normal: HTMLImageElement;
+  virada: HTMLCanvasElement;
 }
 
-// O mar de nuvens: um ladrilho que emenda nos quatro lados (o tufo que passa da borda volta do
-// outro lado), coberto de tufos, repetido pelo mapa todo.
-function marDeNuvens(sortear: () => number): HTMLCanvasElement {
-  const lado = 200;
+// Uma nuvem no mapa: o centro, a largura (a altura segue a arte), para que lado e como anda.
+interface NuvemNoMapa {
+  x: number;
+  y: number;
+  largura: number;
+  virada: boolean;
+  velocidade: number; // para a esquerda, em pixels do mapa por segundo (0: fica, só sobe e desce)
+  fase: number; // o sobe e desce
+  sai?: { x: number; y: number }; // a das que se abrem na chegada: para onde anda (unitário)
+}
+
+// O ladrilho do mar: nuvens numa grade com sorteio (cobrem tudo, sem buracos grandes), cada uma
+// também do outro lado das bordas que ela passa, e todas desenhadas de cima para baixo (a de baixo
+// na frente).
+function marDeNuvens(nuvens: Nuvens, sortear: () => number): HTMLCanvasElement {
+  const lado = LADO_MAR * RESOLUCAO_MAR;
   const canvas = novoCanvas(lado, lado);
   const ctx = contexto2d(canvas);
   ctx.fillStyle = FUNDO;
   ctx.fillRect(0, 0, lado, lado);
-  const tufos = Array.from({ length: 46 }, () => ({ t: tufo(sortear, 7 + sortear() * 12), x: sortear() * lado, y: sortear() * lado }));
-  tufos.sort((a, b) => a.y - b.y); // os de baixo por cima, como vistos de cima e de lado
-  for (const { t, x, y } of tufos) {
-    for (const dx of [-lado, 0, lado]) {
-      for (const dy of [-lado, 0, lado]) ctx.drawImage(t, Math.round(x - t.width / 2 + dx), Math.round(y - t.height / 2 + dy));
+  const proporcao = nuvens.normal.height / nuvens.normal.width;
+  const colunas = 6;
+  const linhas = 11;
+  const copias: { x: number; y: number; w: number; virada: boolean }[] = [];
+  for (let l = 0; l < linhas; l++) {
+    for (let c = 0; c < colunas; c++) {
+      const w = (420 + sortear() * 360) * RESOLUCAO_MAR;
+      const x = ((c + (l % 2) * 0.5 + (sortear() - 0.5) * 0.6) * lado) / colunas;
+      const y = ((l + (sortear() - 0.5) * 0.5) * lado) / linhas;
+      const virada = sortear() < 0.5;
+      for (const dx of [-lado, 0, lado]) {
+        for (const dy of [-lado, 0, lado]) {
+          const cx = x + dx;
+          const cy = y + dy;
+          if (cx + w / 2 < 0 || cx - w / 2 > lado || cy + (w * proporcao) / 2 < 0 || cy - (w * proporcao) / 2 > lado) continue;
+          copias.push({ x: cx, y: cy, w, virada });
+        }
+      }
     }
+  }
+  copias.sort((a, b) => a.y - b.y);
+  ctx.imageSmoothingQuality = 'high';
+  for (const { x, y, w, virada } of copias) {
+    const h = w * proporcao;
+    ctx.drawImage(virada ? nuvens.virada : nuvens.normal, Math.round(x - w / 2), Math.round(y - h / 2), Math.round(w), Math.round(h));
   }
   return canvas;
 }
 
-interface TufoNoMapa {
-  t: HTMLCanvasElement;
-  x: number; // o centro, em pixels da arte
-  y: number;
-  velocidade: number; // pixels da arte por segundo, para a esquerda (0: parado, na beira)
-  fase: number; // o sobe e desce
-}
-
-// Os tufos da beira de cada bioma (escondem a divisa quadrada da arte, subindo e descendo) e os que
-// passam longe dele, em fileiras acima e abaixo, andando para a esquerda.
-function tufosDoMapa(sortear: () => number): TufoNoMapa[] {
-  const tufos: TufoNoMapa[] = [];
+// As nuvens do mapa: as da beira de cada bioma (escondem a divisa quadrada da arte), as que
+// passam em fileiras acima e abaixo da floresta e as que a cobrem na chegada e se abrem.
+function nuvensDoMapa(sortear: () => number): { beira: NuvemNoMapa[]; passando: NuvemNoMapa[]; cortina: NuvemNoMapa[] } {
+  const beira: NuvemNoMapa[] = [];
+  const cortina: NuvemNoMapa[] = [];
   for (const b of BIOMAS) {
     const x0 = b.centro.x - b.lado / 2;
     const y0 = b.centro.y - b.lado / 2;
-    const passo = 105;
-    for (let d = 0; d <= b.lado; d += passo) {
+    const passo = 230;
+    for (let d = 0; d <= b.lado + 1; d += passo) {
       for (const [x, y] of [[x0 + d, y0], [x0 + d, y0 + b.lado], [x0, y0 + d], [x0 + b.lado, y0 + d]]) {
-        tufos.push({ t: tufo(sortear, 13 + sortear() * 10), x: x + (sortear() - 0.5) * 50, y: y + (sortear() - 0.5) * 50, velocidade: 0, fase: sortear() * Math.PI * 2 });
+        beira.push({ x: x + (sortear() - 0.5) * 60, y: y + (sortear() - 0.5) * 60, largura: 520 + sortear() * 200, virada: sortear() < 0.5, velocidade: 0, fase: sortear() * Math.PI * 2 });
+      }
+    }
+    // A cortina: uma grade de nuvens grandes por cima de todo o bioma.
+    for (let i = 0; i < 4; i++) {
+      for (let j = 0; j < 5; j++) {
+        const x = x0 + ((i + 0.5) / 4) * b.lado + (sortear() - 0.5) * 120;
+        const y = y0 + ((j + 0.5) / 5) * b.lado + (sortear() - 0.5) * 100;
+        const dx = x - b.centro.x + (sortear() - 0.5) * 80;
+        const dy = y - b.centro.y + (sortear() - 0.5) * 80;
+        const d = Math.hypot(dx, dy) || 1;
+        cortina.push({ x, y, largura: 760 + sortear() * 260, virada: sortear() < 0.5, velocidade: 0, fase: 0, sai: { x: dx / d, y: dy / d } });
       }
     }
   }
+  cortina.sort((a, b) => a.y - b.y);
   const floresta = BIOMAS[0];
-  const alto = floresta.centro.y - floresta.lado / 2 - 160;
-  const baixo = floresta.centro.y + floresta.lado / 2 + 160;
-  for (let i = 0; i < 34; i++) {
+  const alto = floresta.centro.y - floresta.lado / 2 - 220;
+  const baixo = floresta.centro.y + floresta.lado / 2 + 220;
+  const passando: NuvemNoMapa[] = [];
+  for (let i = 0; i < 30; i++) {
     const emCima = i % 2 === 0;
-    const y = emCima ? sortear() * alto : baixo + sortear() * (MAPA_GRANDE.altura - baixo);
-    tufos.push({ t: tufo(sortear, 14 + sortear() * 14), x: sortear() * MAPA_GRANDE.largura, y, velocidade: 8 + sortear() * 10, fase: sortear() * Math.PI * 2 });
+    const y = emCima ? 100 + sortear() * (alto - 100) : baixo + sortear() * (MAPA_GRANDE.altura - 100 - baixo);
+    passando.push({ x: sortear() * MAPA_GRANDE.largura, y, largura: 480 + sortear() * 340, virada: sortear() < 0.5, velocidade: 10 + sortear() * 12, fase: sortear() * Math.PI * 2 });
   }
-  return tufos;
+  passando.sort((a, b) => a.y - b.y);
+  return { beira, passando, cortina };
 }
 
-// As nuvens saem sempre iguais (a semente é fixa): feitas na primeira vez que o mapa abre, ficam.
-let nuvens: { mar: HTMLCanvasElement; tufos: TufoNoMapa[] } | null = null;
-function nuvensDoMapa(): { mar: HTMLCanvasElement; tufos: TufoNoMapa[] } {
-  if (!nuvens) {
+// A arte da nuvem, o mar e as nuvens saem sempre iguais (a semente é fixa): feitos na primeira
+// vez que o mapa abre, ficam.
+let feitas: Promise<{ nuvens: Nuvens; mar: HTMLCanvasElement } & ReturnType<typeof nuvensDoMapa>> | null = null;
+function prepararNuvens(): NonNullable<typeof feitas> {
+  feitas ??= carregarImagem(urlNuvem).then((normal) => {
+    const virada = novoCanvas(normal.width, normal.height);
+    const ctx = contexto2d(virada);
+    ctx.scale(-1, 1);
+    ctx.drawImage(normal, -normal.width, 0);
+    const nuvens = { normal, virada };
     const sortear = sorteador(1729);
-    nuvens = { mar: marDeNuvens(sortear), tufos: tufosDoMapa(sortear) };
-  }
-  return nuvens;
+    return { nuvens, mar: marDeNuvens(nuvens, sortear), ...nuvensDoMapa(sortear) };
+  });
+  return feitas;
 }
 
-// A placa de um bioma, presa na beira de baixo dele: o nome e os personagens que são dele.
-function placaDo(b: Bioma): HTMLElement {
-  const placa = elemento('div', 'inicio-mapa-placa');
-  placa.append(elemento('strong', 'inicio-mapa-placa-nome', b.nome));
+// O nome do bioma, escrito em cima dele, e os quadrinhos dos personagens dele (aparecem com o
+// mouse por cima do bioma).
+function rotuloDo(b: Bioma): { el: HTMLElement; herois: HTMLElement } {
+  const el = elemento('div', 'inicio-mapa-rotulo');
   const herois = elemento('ul', 'inicio-mapa-herois');
   herois.setAttribute('aria-label', `Personagens da ${b.nome}`);
   for (const heroi of b.herois) {
     const item = elemento('li', '');
-    const rosto = elemento('span', 'inicio-mapa-rosto');
-    const url = RETRATO[heroi];
-    if (url) rosto.style.backgroundImage = `url("${url}")`;
-    rosto.setAttribute('aria-hidden', 'true');
-    item.append(rosto, elemento('span', '', SOBRE_HEROI[heroi].nome));
+    const quadro = elemento('span', 'inicio-mapa-rosto');
+    const img = elemento('img', '');
+    img.alt = '';
+    img.draggable = false;
+    enquadrarRetrato(img, heroi, 180, 0.46, 1);
+    quadro.append(img);
+    item.append(quadro, elemento('span', 'inicio-mapa-heroi-nome', SOBRE_HEROI[heroi].nome));
     herois.append(item);
   }
-  placa.append(herois);
-  return placa;
+  el.append(elemento('strong', 'inicio-mapa-nome', b.nome), herois);
+  return { el, herois };
 }
 
 // Termina quando a pessoa volta para a tela inicial.
@@ -187,32 +199,40 @@ export function telaMapa(): Promise<void> {
     const titulo = elemento('div', 'inicio-mapa-titulo');
     titulo.append(elemento('h1', 'inicio-titulo', 'Terras de Terna'), elemento('p', 'inicio-sub', 'Arraste para explorar · a roda do mouse aproxima'));
     const botoes = elemento('div', 'inicio-mapa-botoes');
-    const centralizar = botao('Centralizar', 'inicio-botao inicio-botao-claro', () => irPara(BIOMAS[0]));
-    const voltar = botao('Voltar', 'inicio-botao inicio-botao-claro', () => sair());
-    botoes.append(centralizar, voltar);
+    botoes.append(
+      botao('Centralizar', 'inicio-botao inicio-botao-claro', () => irPara(BIOMAS[0])),
+      botao('Voltar', 'inicio-botao inicio-botao-claro', () => sair()),
+    );
     topo.append(titulo, botoes);
-    const placas = BIOMAS.map((b) => ({ b, el: placaDo(b) }));
-    tela.append(canvas, ...placas.map((p) => p.el), topo);
+    const rotulos = BIOMAS.map((b) => ({ b, ...rotuloDo(b) }));
+    // A luz do sol da chegada, por cima de tudo: clara até a arte carregar, depois baixa (CSS).
+    const luz = elemento('div', 'inicio-mapa-luz');
+    luz.setAttribute('aria-hidden', 'true');
+    luz.addEventListener('animationend', () => luz.remove());
+    tela.append(canvas, ...rotulos.map((r) => r.el), topo, luz);
 
-    const { mar, tufos } = nuvensDoMapa();
-    const padrao = ctx.createPattern(mar, 'repeat');
+    let pronto: Awaited<ReturnType<typeof prepararNuvens>> | null = null;
+    let padrao: CanvasPattern | null = null;
     const artes = new Map<Bioma, HTMLImageElement>();
     for (const b of BIOMAS) void carregarImagem(b.arte).then((img) => artes.set(b, img));
 
-    // A câmera: o ponto do mapa no meio da tela e o zoom (pixels da tela por pixel da arte).
+    // A câmera: o ponto do mapa no meio da tela e o zoom (pixels da tela por pixel do mapa).
     const cam = { x: BIOMAS[0].centro.x, y: BIOMAS[0].centro.y, z: 1 };
-    const vel = { x: 0, y: 0 }; // o deslize depois de soltar, em pixels da arte por segundo
+    const vel = { x: 0, y: 0 }; // o deslize depois de soltar, em pixels do mapa por segundo
     let largura = 0;
     let altura = 0;
     let ajuste = 1; // o zoom com a floresta ocupando OCUPA da altura
     let animacao: { de: typeof cam; para: typeof cam; inicio: number; ms: number } | null = null;
+    let abertura = -1; // performance.now() do começo das nuvens se abrindo (-1: ainda não, ou sem)
 
-    const limitarZoom = (z: number): number => Math.min(ajuste * ZOOM_MAX, Math.max(ajuste * ZOOM_MIN, z));
+    // Afastando, a tela nunca passa da borda do mapa grande.
+    const limitarZoom = (z: number): number =>
+      Math.min(ajuste * ZOOM_MAX, Math.max(ajuste * ZOOM_MIN, largura / MAPA_GRANDE.largura, altura / MAPA_GRANDE.altura, z));
     const limitarCamera = (): void => {
       const meiaL = largura / (2 * cam.z);
       const meiaA = altura / (2 * cam.z);
-      cam.x = meiaL * 2 >= MAPA_GRANDE.largura ? MAPA_GRANDE.largura / 2 : Math.min(MAPA_GRANDE.largura - meiaL, Math.max(meiaL, cam.x));
-      cam.y = meiaA * 2 >= MAPA_GRANDE.altura ? MAPA_GRANDE.altura / 2 : Math.min(MAPA_GRANDE.altura - meiaA, Math.max(meiaA, cam.y));
+      cam.x = Math.min(MAPA_GRANDE.largura - meiaL, Math.max(meiaL, cam.x));
+      cam.y = Math.min(MAPA_GRANDE.altura - meiaA, Math.max(meiaA, cam.y));
     };
     const medir = (): void => {
       const antes = ajuste;
@@ -228,7 +248,7 @@ export function telaMapa(): Promise<void> {
     // Vai até o bioma, com o zoom de centralizado, deslizando.
     const irPara = (b: Bioma, ms = 650): void => {
       vel.x = vel.y = 0;
-      const para = { x: b.centro.x, y: b.centro.y, z: ajuste };
+      const para = { x: b.centro.x, y: b.centro.y - b.lado * ABAIXO, z: ajuste };
       if (semMovimento()) {
         Object.assign(cam, para);
         limitarCamera();
@@ -246,6 +266,16 @@ export function telaMapa(): Promise<void> {
       limitarCamera();
     };
 
+    // O mouse em cima de um bioma (um pouco para dentro da beira de nuvens): os personagens dele.
+    const sobre = (sx: number, sy: number): void => {
+      const x = cam.x + (sx - largura / 2) / cam.z;
+      const y = cam.y + (sy - altura / 2) / cam.z;
+      for (const { b, herois } of rotulos) {
+        const dentro = Math.abs(x - b.centro.x) < b.lado * 0.42 && Math.abs(y - b.centro.y) < b.lado * 0.42;
+        herois.classList.toggle('inicio-mapa-herois-visiveis', dentro);
+      }
+    };
+
     // Arrastar (o mouse ou o dedo): o mapa acompanha e, soltando, continua um pouco.
     let arrasto: { id: number; x: number; y: number; t: number } | null = null;
     canvas.addEventListener('pointerdown', (evento) => {
@@ -257,6 +287,8 @@ export function telaMapa(): Promise<void> {
       canvas.classList.add('inicio-mapa-arrastando');
     });
     canvas.addEventListener('pointermove', (evento) => {
+      const caixa = canvas.getBoundingClientRect();
+      sobre(evento.clientX - caixa.left, evento.clientY - caixa.top);
       if (!arrasto || evento.pointerId !== arrasto.id) return;
       const agora = performance.now();
       const dx = (evento.clientX - arrasto.x) / cam.z;
@@ -279,6 +311,9 @@ export function telaMapa(): Promise<void> {
     };
     canvas.addEventListener('pointerup', soltar);
     canvas.addEventListener('pointercancel', soltar);
+    canvas.addEventListener('pointerleave', () => {
+      for (const { herois } of rotulos) herois.classList.remove('inicio-mapa-herois-visiveis');
+    });
     canvas.addEventListener(
       'wheel',
       (evento) => {
@@ -324,15 +359,26 @@ export function telaMapa(): Promise<void> {
       resolver();
     };
 
-    // Um quadro: o mar, os tufos que passam, as artes dos biomas e os tufos da beira deles.
+    // Uma nuvem da arte, centrada em (x, y) do mapa. `escala`: a mais (as que se abrem crescem).
+    const nuvem = (n: NuvemNoMapa, x: number, y: number, escala = 1): void => {
+      if (!pronto) return;
+      const img = n.virada ? pronto.nuvens.virada : pronto.nuvens.normal;
+      const w = n.largura * escala;
+      const h = (w * img.height) / img.width;
+      // Diminuindo a arte, lisa; aumentando, em pixels.
+      ctx.imageSmoothingEnabled = (cam.z * (window.devicePixelRatio || 1) * w) / img.width < 1;
+      ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
+    };
+
+    // Um quadro: o mar, as nuvens que passam, as artes dos biomas, as nuvens da beira e, na
+    // chegada, as que se abrem.
     let anterior = performance.now();
     const desenhar = (agora: number): void => {
       if (acabou && !tela.isConnected) return;
       requestAnimationFrame(desenhar);
       const dt = Math.min(0.05, (agora - anterior) / 1000);
       anterior = agora;
-      const parado = semMovimento();
-      const tempo = parado ? 0 : agora / 1000;
+      const tempo = semMovimento() ? 0 : agora / 1000;
 
       if (animacao) {
         const p = Math.min(1, (agora - animacao.inicio) / animacao.ms);
@@ -357,41 +403,53 @@ export function telaMapa(): Promise<void> {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       const z = cam.z * dpr;
       ctx.setTransform(z, 0, 0, z, (largura / 2) * dpr - cam.x * z, (altura / 2) * dpr - cam.y * z);
-      ctx.imageSmoothingEnabled = false;
+      const vista = { x: cam.x - largura / (2 * cam.z), y: cam.y - altura / (2 * cam.z), w: largura / cam.z, h: altura / cam.z };
 
-      // O mar de nuvens, andando devagar para a esquerda.
-      if (padrao) {
-        padrao.setTransform(new DOMMatrix().translateSelf(-((tempo * MAR_POR_SEGUNDO) % (mar.width * PIXEL)), 0).scaleSelf(PIXEL, PIXEL));
-        ctx.fillStyle = padrao;
-        ctx.fillRect(0, 0, MAPA_GRANDE.largura, MAPA_GRANDE.altura);
-      }
-      const volta = MAPA_GRANDE.largura + 600;
-      const tufoEm = (t: TufoNoMapa, x: number, y: number): void =>
-        ctx.drawImage(t.t, Math.round(x - (t.t.width * PIXEL) / 2), Math.round(y - (t.t.height * PIXEL) / 2), t.t.width * PIXEL, t.t.height * PIXEL);
-      for (const t of tufos) {
-        if (!t.velocidade) continue;
-        const x = ((((t.x - tempo * t.velocidade + 300) % volta) + volta) % volta) - 300;
-        tufoEm(t, x, t.y + Math.sin(tempo * 0.4 + t.fase) * 6);
+      if (pronto) {
+        // O mar de nuvens, andando devagar para a esquerda, cobrindo tudo o que está na tela.
+        padrao ??= ctx.createPattern(pronto.mar, 'repeat');
+        if (padrao) {
+          const andou = (tempo * MAR_POR_SEGUNDO) % LADO_MAR;
+          padrao.setTransform(new DOMMatrix().translateSelf(-andou, 0).scaleSelf(1 / RESOLUCAO_MAR, 1 / RESOLUCAO_MAR));
+          ctx.imageSmoothingEnabled = true;
+          ctx.fillStyle = padrao;
+          ctx.fillRect(vista.x - 10, vista.y - 10, vista.w + 20, vista.h + 20);
+        }
+        const volta = MAPA_GRANDE.largura + 900;
+        for (const n of pronto.passando) {
+          const x = ((((n.x - tempo * n.velocidade + 450) % volta) + volta) % volta) - 450;
+          nuvem(n, x, n.y + Math.sin(tempo * 0.4 + n.fase) * 6);
+        }
       }
       for (const b of BIOMAS) {
         const img = artes.get(b);
         if (!img) continue;
-        // Afastado, a arte (que não é de pixels inteiros) fica lisa em vez de serrilhada.
-        ctx.imageSmoothingEnabled = cam.z < 1;
+        // Afastado, a arte fica lisa em vez de serrilhada; perto, em pixels.
+        ctx.imageSmoothingEnabled = z < 1;
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, b.centro.x - b.lado / 2, b.centro.y - b.lado / 2, b.lado, b.lado);
-        ctx.imageSmoothingEnabled = false;
       }
-      for (const t of tufos) {
-        if (t.velocidade) continue;
-        tufoEm(t, t.x, t.y + Math.sin(tempo * 0.7 + t.fase) * 5);
+      if (pronto) {
+        for (const n of pronto.beira) nuvem(n, n.x, n.y + Math.sin(tempo * 0.7 + n.fase) * 5);
+        // A chegada: as nuvens em cima da floresta se abrem para fora e crescem um pouco, como se
+        // a câmera passasse por elas. Antes da arte carregar, ficam paradas cobrindo tudo.
+        const p = abertura < 0 ? (semMovimento() ? 1 : 0) : Math.min(1, Math.max(0, (agora - abertura - ABRE_ATRASO_MS) / ABRE_MS));
+        if (p < 1) {
+          const k = p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2;
+          for (const n of pronto.cortina) {
+            const sai = n.sai ?? { x: 0, y: 0 };
+            nuvem(n, n.x + sai.x * ABRE_DISTANCIA * k, n.y + sai.y * ABRE_DISTANCIA * k, 1 + 0.35 * k);
+          }
+        }
       }
 
-      // As placas acompanham o mapa, presas na beira de baixo de cada bioma.
-      for (const { b, el } of placas) {
+      // Os nomes acompanham o mapa, em cima de cada bioma, crescendo e diminuindo com o zoom (até
+      // um ponto, para continuarem legíveis).
+      const escala = Math.min(1.5, Math.max(0.6, cam.z / ajuste));
+      for (const { b, el } of rotulos) {
         const x = (b.centro.x - cam.x) * cam.z + largura / 2;
-        const y = (b.centro.y + b.lado * 0.4 - cam.y) * cam.z + altura / 2;
-        el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, -50%)`;
+        const y = (b.centro.y - b.lado / 2 + 40 - cam.y) * cam.z + altura / 2;
+        el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translateX(-50%) scale(${escala.toFixed(3)})`;
       }
     };
 
@@ -399,10 +457,30 @@ export function telaMapa(): Promise<void> {
     observador.observe(canvas);
     mostrarTela(tela);
     medir();
-    // A chegada: começa um pouco afastado e aproxima até a floresta.
-    cam.z = limitarZoom(ajuste * (semMovimento() ? 1 : 0.72));
+    // A chegada: a câmera começa um pouco perto e afasta até a floresta, junto com as nuvens se
+    // abrindo — as duas esperam a nuvem e a arte da floresta carregarem.
+    const comecar = (): void => {
+      if (semMovimento()) {
+        luz.remove();
+        cam.z = limitarZoom(ajuste);
+        limitarCamera();
+        return;
+      }
+      luz.classList.add('inicio-mapa-luz-baixando');
+      cam.z = limitarZoom(ajuste * 1.15);
+      limitarCamera();
+      abertura = performance.now();
+      irPara(BIOMAS[0], ABRE_MS + ABRE_ATRASO_MS);
+    };
+    cam.z = limitarZoom(ajuste * 1.15);
     limitarCamera();
-    irPara(BIOMAS[0], ENTRADA_MS);
+    void Promise.all([prepararNuvens(), carregarImagem(BIOMAS[0].arte)]).then(
+      ([nuvens]) => {
+        pronto = nuvens;
+        comecar();
+      },
+      () => luz.remove(), // sem a arte, o mapa fica só com o fundo, mas a luz não prende a tela
+    );
     requestAnimationFrame(desenhar);
     // A arte do menu fica atrás do mapa, que cobre tudo: depois da troca, para de desenhar.
     setTimeout(() => {

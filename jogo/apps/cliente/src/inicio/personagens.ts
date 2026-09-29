@@ -13,7 +13,7 @@ import { poderesDoHeroi } from './ajuda';
 import { anexarCena } from './cena';
 import { botao, elemento, mostrarTela } from './dom';
 import { TEMPORADA } from './temporada';
-import { RETRATO, biomaDo } from './terras';
+import { RETRATO, biomaDo, enquadrarRetrato } from './terras';
 
 const QUADRO_CORRENDO = 0.09; // segundos por quadro da corrida, como no cartão da escolha
 
@@ -22,12 +22,12 @@ function cartaoComRetrato(heroi: Heroi, aoAbrir: () => void): HTMLButtonElement 
   const { nome, codinome } = SOBRE_HEROI[heroi];
   const cartao = botao('', 'inicio-retrato', aoAbrir);
   cartao.setAttribute('aria-label', `${nome}, ${codinome}: ver os poderes`);
-  const url = RETRATO[heroi];
-  if (url) {
+  if (RETRATO[heroi]) {
+    // Todos com o mesmo zoom e os olhos na mesma altura (terras.ts: enquadrarRetrato).
     const img = elemento('img', 'inicio-retrato-arte');
-    img.src = url;
     img.alt = '';
     img.draggable = false;
+    enquadrarRetrato(img, heroi, 397, 0.36, 2);
     cartao.append(img);
   }
   const rotulo = elemento('span', 'inicio-retrato-rotulo');
