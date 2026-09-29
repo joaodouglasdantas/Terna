@@ -1,7 +1,7 @@
 // A tela do mapa (o botão Mapa da tela inicial): o mapa grande das terras de Terna, visto de cima.
 // Só aparece o que já existe — por enquanto a Floresta da Divisa (terras.ts) —; o resto está
-// coberto por um mar de nuvens que anda devagar, com nuvens passando e as da beira da floresta
-// subindo e descendo. Todas são a nuvem de fontes/nuvem.png (assets/mapa/nuvem.webp), em vários
+// coberto por um mar de nuvens — uma camada parada e, por cima dela, outra que anda devagar —,
+// com nuvens passando e as da beira da floresta subindo e descendo. Todas são a nuvem de fontes/nuvem.png (assets/mapa/nuvem.webp), em vários
 // tamanhos, viradas para um lado ou para o outro.
 //
 // A chegada é clara, como a luz do sol: a tela abre branca, a luz baixa e as nuvens que cobrem a
@@ -19,7 +19,7 @@ import { esconderCena } from './cena';
 import { botao, elemento, ESMAECER_MS, mostrarTela } from './dom';
 import { BIOMAS, MAPA_GRANDE, enquadrarRetrato, type Bioma } from './terras';
 
-const FUNDO = '#a8c4f0'; // entre as nuvens do mar: o azul da sombra da nuvem da arte
+const FUNDO = '#c9d9f2'; // o fundo da tela antes de as nuvens carregarem
 
 // Quanto a floresta ocupa da altura da tela quando está centralizada (um pouco abaixo do meio, em
 // fração do tamanho dela: sobra lugar para o título em cima e o nome), e até onde aproxima (em
@@ -40,6 +40,19 @@ const ABRE_DISTANCIA = 1500; // pixels do mapa que cada nuvem anda para fora
 // O mar de nuvens: um ladrilho que emenda nos quatro lados, em pixels do mapa, e a resolução dele.
 const LADO_MAR = 2400;
 const RESOLUCAO_MAR = 0.5;
+
+// O mar tem duas camadas: a de baixo, parada, mais cheia e na sombra (cobre tudo: o que aparece
+// entre as nuvens de cima é nuvem, não uma cor lisa), e a de cima, andando devagar, com fundo
+// transparente. `larguras`: das nuvens, em pixels do mapa; `sombra`: o quanto escurece a camada.
+interface CamadaDoMar {
+  colunas: number;
+  linhas: number;
+  larguras: readonly [number, number];
+  fundo: string | null;
+  sombra: number;
+}
+const MAR_DE_BAIXO: CamadaDoMar = { colunas: 8, linhas: 16, larguras: [460, 860], fundo: '#d6e3f6', sombra: 0.16 };
+const MAR_DE_CIMA: CamadaDoMar = { colunas: 6, linhas: 11, larguras: [420, 780], fundo: null, sombra: 0 };
 
 const semMovimento = (): boolean => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -71,22 +84,23 @@ interface NuvemNoMapa {
   sai?: { x: number; y: number }; // a das que se abrem na chegada: para onde anda (unitário)
 }
 
-// O ladrilho do mar: nuvens numa grade com sorteio (cobrem tudo, sem buracos grandes), cada uma
-// também do outro lado das bordas que ela passa, e todas desenhadas de cima para baixo (a de baixo
-// na frente).
-function marDeNuvens(nuvens: Nuvens, sortear: () => number): HTMLCanvasElement {
+// Um ladrilho de uma camada do mar: nuvens numa grade com sorteio (cobrem tudo, sem buracos
+// grandes), cada uma também do outro lado das bordas que ela passa, e todas desenhadas de cima
+// para baixo (a de baixo na frente).
+function marDeNuvens(nuvens: Nuvens, sortear: () => number, camada: CamadaDoMar): HTMLCanvasElement {
   const lado = LADO_MAR * RESOLUCAO_MAR;
   const canvas = novoCanvas(lado, lado);
   const ctx = contexto2d(canvas);
-  ctx.fillStyle = FUNDO;
-  ctx.fillRect(0, 0, lado, lado);
+  if (camada.fundo) {
+    ctx.fillStyle = camada.fundo;
+    ctx.fillRect(0, 0, lado, lado);
+  }
   const proporcao = nuvens.normal.height / nuvens.normal.width;
-  const colunas = 6;
-  const linhas = 11;
+  const { colunas, linhas, larguras } = camada;
   const copias: { x: number; y: number; w: number; virada: boolean }[] = [];
   for (let l = 0; l < linhas; l++) {
     for (let c = 0; c < colunas; c++) {
-      const w = (420 + sortear() * 360) * RESOLUCAO_MAR;
+      const w = (larguras[0] + sortear() * (larguras[1] - larguras[0])) * RESOLUCAO_MAR;
       const x = ((c + (l % 2) * 0.5 + (sortear() - 0.5) * 0.6) * lado) / colunas;
       const y = ((l + (sortear() - 0.5) * 0.5) * lado) / linhas;
       const virada = sortear() < 0.5;
@@ -105,6 +119,13 @@ function marDeNuvens(nuvens: Nuvens, sortear: () => number): HTMLCanvasElement {
   for (const { x, y, w, virada } of copias) {
     const h = w * proporcao;
     ctx.drawImage(virada ? nuvens.virada : nuvens.normal, Math.round(x - w / 2), Math.round(y - h / 2), Math.round(w), Math.round(h));
+  }
+  if (camada.sombra) {
+    // Mais funda: um azul por cima de tudo o que já está pintado.
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = `rgba(60, 90, 160, ${camada.sombra})`;
+    ctx.fillRect(0, 0, lado, lado);
+    ctx.globalCompositeOperation = 'source-over';
   }
   return canvas;
 }
@@ -151,7 +172,7 @@ function nuvensDoMapa(sortear: () => number): { beira: NuvemNoMapa[]; passando: 
 
 // A arte da nuvem, o mar e as nuvens saem sempre iguais (a semente é fixa): feitos na primeira
 // vez que o mapa abre, ficam.
-let feitas: Promise<{ nuvens: Nuvens; mar: HTMLCanvasElement } & ReturnType<typeof nuvensDoMapa>> | null = null;
+let feitas: Promise<{ nuvens: Nuvens; marDeBaixo: HTMLCanvasElement; marDeCima: HTMLCanvasElement } & ReturnType<typeof nuvensDoMapa>> | null = null;
 function prepararNuvens(): NonNullable<typeof feitas> {
   feitas ??= carregarImagem(urlNuvem).then((normal) => {
     const virada = novoCanvas(normal.width, normal.height);
@@ -160,7 +181,12 @@ function prepararNuvens(): NonNullable<typeof feitas> {
     ctx.drawImage(normal, -normal.width, 0);
     const nuvens = { normal, virada };
     const sortear = sorteador(1729);
-    return { nuvens, mar: marDeNuvens(nuvens, sortear), ...nuvensDoMapa(sortear) };
+    return {
+      nuvens,
+      marDeBaixo: marDeNuvens(nuvens, sortear, MAR_DE_BAIXO),
+      marDeCima: marDeNuvens(nuvens, sortear, MAR_DE_CIMA),
+      ...nuvensDoMapa(sortear),
+    };
   });
   return feitas;
 }
@@ -212,7 +238,7 @@ export function telaMapa(): Promise<void> {
     tela.append(canvas, ...rotulos.map((r) => r.el), topo, luz);
 
     let pronto: Awaited<ReturnType<typeof prepararNuvens>> | null = null;
-    let padrao: CanvasPattern | null = null;
+    let padroes: { baixo: CanvasPattern | null; cima: CanvasPattern | null } | null = null;
     const artes = new Map<Bioma, HTMLImageElement>();
     for (const b of BIOMAS) void carregarImagem(b.arte).then((img) => artes.set(b, img));
 
@@ -359,15 +385,18 @@ export function telaMapa(): Promise<void> {
       resolver();
     };
 
-    // Uma nuvem da arte, centrada em (x, y) do mapa. `escala`: a mais (as que se abrem crescem).
-    const nuvem = (n: NuvemNoMapa, x: number, y: number, escala = 1): void => {
-      if (!pronto) return;
+    // Uma nuvem da arte, centrada em (x, y) do mapa. `escala`: a mais (as que se abrem crescem);
+    // `opacidade`: as que se abrem vão sumindo.
+    const nuvem = (n: NuvemNoMapa, x: number, y: number, escala = 1, opacidade = 1): void => {
+      if (!pronto || opacidade <= 0) return;
       const img = n.virada ? pronto.nuvens.virada : pronto.nuvens.normal;
       const w = n.largura * escala;
       const h = (w * img.height) / img.width;
       // Diminuindo a arte, lisa; aumentando, em pixels.
       ctx.imageSmoothingEnabled = (cam.z * (window.devicePixelRatio || 1) * w) / img.width < 1;
+      ctx.globalAlpha = opacidade;
       ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
+      ctx.globalAlpha = 1;
     };
 
     // Um quadro: o mar, as nuvens que passam, as artes dos biomas, as nuvens da beira e, na
@@ -406,12 +435,18 @@ export function telaMapa(): Promise<void> {
       const vista = { x: cam.x - largura / (2 * cam.z), y: cam.y - altura / (2 * cam.z), w: largura / cam.z, h: altura / cam.z };
 
       if (pronto) {
-        // O mar de nuvens, andando devagar para a esquerda, cobrindo tudo o que está na tela.
-        padrao ??= ctx.createPattern(pronto.mar, 'repeat');
-        if (padrao) {
-          const andou = (tempo * MAR_POR_SEGUNDO) % LADO_MAR;
-          padrao.setTransform(new DOMMatrix().translateSelf(-andou, 0).scaleSelf(1 / RESOLUCAO_MAR, 1 / RESOLUCAO_MAR));
-          ctx.imageSmoothingEnabled = true;
+        // O mar de nuvens, cobrindo tudo o que está na tela: a camada de baixo parada e a de cima
+        // andando devagar para a esquerda.
+        padroes ??= { baixo: ctx.createPattern(pronto.marDeBaixo, 'repeat'), cima: ctx.createPattern(pronto.marDeCima, 'repeat') };
+        const escalaDoMar = new DOMMatrix().scaleSelf(1 / RESOLUCAO_MAR, 1 / RESOLUCAO_MAR);
+        const andou = (tempo * MAR_POR_SEGUNDO) % LADO_MAR;
+        ctx.imageSmoothingEnabled = true;
+        for (const [padrao, matriz] of [
+          [padroes.baixo, escalaDoMar],
+          [padroes.cima, new DOMMatrix().translateSelf(-andou, 0).multiplySelf(escalaDoMar)],
+        ] as const) {
+          if (!padrao) continue;
+          padrao.setTransform(matriz);
           ctx.fillStyle = padrao;
           ctx.fillRect(vista.x - 10, vista.y - 10, vista.w + 20, vista.h + 20);
         }
@@ -432,13 +467,17 @@ export function telaMapa(): Promise<void> {
       if (pronto) {
         for (const n of pronto.beira) nuvem(n, n.x, n.y + Math.sin(tempo * 0.7 + n.fase) * 5);
         // A chegada: as nuvens em cima da floresta se abrem para fora e crescem um pouco, como se
-        // a câmera passasse por elas. Antes da arte carregar, ficam paradas cobrindo tudo.
+        // a câmera passasse por elas, e vão esmaecendo até sumir (nada some de uma vez). Antes da
+        // arte carregar, ficam paradas cobrindo tudo.
         const p = abertura < 0 ? (semMovimento() ? 1 : 0) : Math.min(1, Math.max(0, (agora - abertura - ABRE_ATRASO_MS) / ABRE_MS));
         if (p < 1) {
           const k = p < 0.5 ? 4 * p ** 3 : 1 - (-2 * p + 2) ** 3 / 2;
+          // Inteiras no começo; do terço do caminho até quase o fim, esmaecem devagar até zero.
+          const f = Math.min(1, Math.max(0, (p - 0.3) / 0.62));
+          const opacidade = 1 - f * f * (3 - 2 * f);
           for (const n of pronto.cortina) {
             const sai = n.sai ?? { x: 0, y: 0 };
-            nuvem(n, n.x + sai.x * ABRE_DISTANCIA * k, n.y + sai.y * ABRE_DISTANCIA * k, 1 + 0.35 * k);
+            nuvem(n, n.x + sai.x * ABRE_DISTANCIA * k, n.y + sai.y * ABRE_DISTANCIA * k, 1 + 0.25 * k, opacidade);
           }
         }
       }

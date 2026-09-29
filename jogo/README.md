@@ -90,8 +90,9 @@ No canto de baixo da tela inicial ficam três atalhos: **Personagens**, **Mapa**
   para o outro personagem e o Esc volta.
 - **Mapa** (`inicio/mapa.ts`): as Terras de Terna vistas de cima. Só aparece a **Floresta da
   Divisa**, com o nome escrito em cima dela; com o mouse por cima do bioma, aparecem os
-  personagens que são dele, em quadrinhos. O resto está coberto por nuvens, que andam devagar. A
-  tela abre clara, como a luz do sol, e as nuvens de cima da floresta se abrem para os lados.
+  personagens que são dele, em quadrinhos. O resto está coberto por nuvens: uma camada parada e,
+  por cima, outra que anda devagar. A tela abre clara, como a luz do sol, e as nuvens de cima da
+  floresta se abrem para os lados, esmaecendo.
   Arrastando, o mapa desliza (e segue um pouco depois de soltar); a roda do mouse aproxima e
   afasta, sem passar da borda do mapa grande; C centraliza. Os biomas, onde cada um fica no mapa
   grande e os personagens de cada um estão em `inicio/terras.ts`.
