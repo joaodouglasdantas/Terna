@@ -10,8 +10,8 @@
 // dois escolherem, ninguém entra no jogo e a sala cai. Caindo a sala — o prazo, o outro saindo, a
 // rede —, a tela termina com o aviso para a tela inicial.
 //
-// Cada personagem é um cartão pequeno com o sprite — parado de frente e, escolhido, correndo —, o
-// nome e o codinome. O que cada um faz não aparece aqui (os poderes do seu estão no Tab, na
+// Cada personagem é um cartão pequeno com o retrato (o mesmo da tela dos personagens) — e, o
+// escolhido, o sprite correndo no lugar dele —, o nome e o codinome. O que cada um faz não aparece aqui (os poderes do seu estão no Tab, na
 // partida). Só aparecem os liberados: o Anjo, pronto mas guardado, não é mostrado.
 //
 // Setas (ou A/D) passam de um cartão para o outro (pulando o do outro), Enter joga e Esc volta.
@@ -22,8 +22,13 @@ import { contexto2d } from '../motor/imagens';
 import type { ConexaoPartida } from '../rede/partida';
 import { anexarCena } from './cena';
 import { botao, elemento, mostrarTela, sairComEsmaecer } from './dom';
+import { RETRATO, enquadrarRetrato } from './terras';
 
 const QUADRO_CORRENDO = 0.09; // segundos por quadro da corrida no cartão
+// O retrato no cartão: quantos pixels da arte cabem de largura e a altura dos olhos (fração do
+// palco): a cabeça inteira, do cabelo ao ombro.
+const JANELA_DO_RETRATO = 380;
+const OLHOS_DO_RETRATO = 0.56;
 // O outro pegou o seu: por quanto tempo o Jogar fica travado depois de você ir para um livre.
 const TRAVA_DO_JOGAR_MS = 700;
 
@@ -94,6 +99,22 @@ function montarCartao(heroi: Heroi, aoEscolher: () => void): Cartao {
   sprite.height = imagem.height + 2; // o tamanho na tela vem do CSS (×3 ou ×4, em pixels inteiros)
   const dono = elemento('span', 'inicio-cartao-dono');
   dono.hidden = true;
+  // Antes de escolher, o retrato (enquadrado pelo rosto, como na tela dos personagens); o
+  // escolhido troca para o sprite correndo (o CSS troca um pelo outro).
+  if (RETRATO[heroi]) {
+    const retrato = elemento('span', 'inicio-cartao-retrato');
+    const img = elemento('img', '');
+    img.alt = '';
+    img.draggable = false;
+    retrato.append(img);
+    palcoSprite.append(retrato);
+    cartao.classList.add('inicio-cartao-com-retrato');
+    // O palco muda de tamanho com o quadro: o enquadramento acompanha.
+    new ResizeObserver(() => {
+      const { clientWidth: w, clientHeight: h } = palcoSprite;
+      if (w && h) enquadrarRetrato(img, heroi, JANELA_DO_RETRATO, OLHOS_DO_RETRATO, h / w);
+    }).observe(palcoSprite);
+  }
   palcoSprite.append(sprite, dono);
   if (!liberado) palcoSprite.append(elemento('span', 'inicio-cartao-selo', 'Em breve'));
 

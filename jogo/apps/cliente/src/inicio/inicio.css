@@ -1021,6 +1021,38 @@
   border: 2px solid rgba(230, 201, 160, 0.18);
 }
 
+/* Antes de escolher, o retrato ocupa o palco; o escolhido troca para o sprite correndo
+   (selecao.ts põe a largura, a esquerda e o topo da imagem: terras.ts, enquadrarRetrato). */
+.inicio-cartao-retrato {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transition: opacity 0.2s ease;
+}
+
+.inicio-cartao-retrato img {
+  position: absolute;
+  max-width: none;
+  height: auto;
+}
+
+.inicio-cartao-escolhido .inicio-cartao-retrato {
+  opacity: 0;
+}
+
+.inicio-cartao-do-outro .inicio-cartao-retrato {
+  opacity: 0.75;
+}
+
+.inicio-cartao-com-retrato .inicio-cartao-sprite {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.inicio-cartao-com-retrato.inicio-cartao-escolhido .inicio-cartao-sprite {
+  opacity: 1;
+}
+
 .inicio-cartao-sprite {
   display: block;
   width: 120px; /* 40 px do sprite × 3 */

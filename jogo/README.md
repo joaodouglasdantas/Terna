@@ -68,8 +68,9 @@ tiver mais vida. A tabela anotada e o porquê de cada número estão em **[BALAN
 A escolha é feita na tela de seleção, depois do Singleplayer (a CPU espera a sua escolha e fica com
 outro personagem) ou, no Multiplayer, com os dois já na sala: a partida só começa quando os dois
 escolhem. Cada personagem é de um jogador só na partida (não há dois iguais em campo). O cartão de
-cada um mostra só o sprite, o nome e o codinome (**Leslie, a Primeira Semente**; **Grow, a Rocha
-Profunda**): o que cada um faz não aparece na escolha, só no Tab da partida, e só o seu.
+cada um mostra só o retrato (o mesmo da tela dos personagens; o escolhido troca para o sprite
+correndo), o nome e o codinome (**Leslie, a Primeira Semente**; **Grow, a Rocha Profunda**): o que
+cada um faz não aparece na escolha, só no Tab da partida, e só o seu.
 
 Antes de cada partida vem o carregamento da temporada atual (**Temporada 1 — A Primeira
 Semente**), com a arte num outdoor, os nomes dos personagens e o do mapa (**Floresta da Divisa**);
