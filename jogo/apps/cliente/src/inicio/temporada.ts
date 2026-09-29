@@ -1,5 +1,5 @@
 // A tela de carregamento antes do combate: confere as imagens, espera uns segundos e divulga a
-// temporada atual, "Chamado da Floresta". No meio, um outdoor de madeira com lâmpadas em cima
+// temporada atual, "A Primeira Semente". No meio, um outdoor de madeira com lâmpadas em cima
 // mostra a arte da temporada — a imagem se aproxima devagar, um reflexo passa pelo vidro, faíscas
 // douradas e vaga-lumes sobem na frente —; embaixo, os nomes dos personagens e do mapa da
 // temporada, uma dica e a barra, como a do começo do jogo.
@@ -8,14 +8,14 @@
 // servidor, então termina no mesmo instante para os dois). Se o outro sair da sala enquanto isso,
 // avisa e volta ao menu.
 
-import urlTemporada from '../assets/temporada-chamado-da-floresta.webp';
+import urlTemporada from '../assets/temporada-a-primeira-semente.webp';
 import { carregarImagem, contexto2d } from '../motor/imagens';
 import type { ConexaoPartida } from '../rede/partida';
 import { botao, elemento, mostrarTela, sairComEsmaecer, TELA_OPACA } from './dom';
 
 export const TEMPORADA = {
   numero: 1,
-  nome: 'Chamado da Floresta',
+  nome: 'A Primeira Semente',
   personagens: ['Leslie', 'Grow'],
   mapa: 'Floresta da Divisa',
 };

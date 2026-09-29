@@ -68,12 +68,12 @@ tiver mais vida. A tabela anotada e o porquê de cada número estão em **[BALAN
 A escolha é feita na tela de seleção, depois do Singleplayer (a CPU fica com outro personagem, sorteado)
 ou, no Multiplayer, com os dois já na sala: a partida só começa quando os dois escolhem.
 
-Antes de cada partida vem o carregamento da temporada atual (**Temporada 1 — Chamado da
-Floresta**), com a arte num outdoor, os nomes dos personagens e o do mapa (**Floresta da Divisa**);
+Antes de cada partida vem o carregamento da temporada atual (**Temporada 1 — A Primeira
+Semente**), com a arte num outdoor, os nomes dos personagens e o do mapa (**Floresta da Divisa**);
 depois, a contagem 3, 2, 1. No fim (por tempo ou morte) dá para clicar em **Jogar novamente**:
 contra a CPU, volta direto à escolha de personagem (com o da rodada anterior já marcado); online a
 sala continua e, os dois clicando, voltam à escolha e jogam outra rodada, sem sair da sala. A arte
-da temporada fica em `apps/cliente/src/assets/temporada-chamado-da-floresta.webp` (original em
+da temporada fica em `apps/cliente/src/assets/temporada-a-primeira-semente.webp` (original em
 `fontes/`), e o nome, os personagens e o mapa em `apps/cliente/src/inicio/temporada.ts`.
 
 Na partida, a tecla **Tab** abre (e fecha) a tela de controles: andar, pular, pulo duplo, dash,
