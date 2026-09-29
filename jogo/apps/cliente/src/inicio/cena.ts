@@ -19,7 +19,7 @@
 
 import urlArvores from '../assets/tela-inicial-arvores.png';
 import urlArte from '../assets/tela-inicial.webp';
-import { carregarImagem, contexto2d, novoCanvas } from '../motor/imagens';
+import { carregarDecodificada, contexto2d, novoCanvas, umaVez } from '../motor/imagens';
 import { elemento, palco } from './dom';
 import {
   cair,
@@ -243,6 +243,11 @@ function mexer(c: CanvasRenderingContext2D, tempo: number, frente = false): void
   }
 }
 
+// A arte do fundo e a máscara das árvores da frente, baixadas e decodificadas uma vez. O
+// carregamento do começo do jogo espera por elas: a tela inicial abre com a floresta inteira, em vez
+// de a chegada passar sobre o roxo liso e a arte surgir de repente no meio dela.
+export const carregarArteDaCena = umaVez(() => Promise.all([carregarDecodificada(urlArte), carregarDecodificada(urlArvores)]));
+
 // Monta a cena uma vez.
 export function prepararCena(): void {
   camada = elemento('div', 'inicio-cena');
@@ -250,7 +255,10 @@ export function prepararCena(): void {
   camada.style.setProperty('--arte', `url("${urlArte}")`);
   arte = elemento('div', 'inicio-cena-arte');
   const fundo = elemento('div', 'inicio-cena-fundo');
-  void Promise.all([carregarImagem(urlArte), carregarImagem(urlArvores)]).then(([img, mascara]) => recortar(img, mascara));
+  carregarArteDaCena().then(
+    ([img, mascara]) => recortar(img, mascara),
+    () => undefined, // sem os recortes, a arte só não balança
+  );
   const luzesDaArte = LUZES_DA_ARTE.map(({ x, y, r, tipo }, i) => {
     const luz = elemento('div', `inicio-cena-luz inicio-cena-luz-${tipo}`);
     luz.style.setProperty('--x', `${x}%`);

@@ -6,11 +6,11 @@
 import { Apelido, type Heroi } from '@terna/compartilhado';
 import logoSimplesUrl from '../assets/logo-simples.webp';
 import logoUrl from '../assets/logo.webp';
-import { carregarImagem } from '../motor/imagens';
+import { carregarDecodificada } from '../motor/imagens';
 import { checarBanco, checarServidor } from '../rede/saude';
 import { guardarNome, lerNome } from '../save/nome';
 import { VERSAO } from '../versao';
-import { anexarCena } from './cena';
+import { anexarCena, carregarArteDaCena } from './cena';
 import { botao, digitandoEm, elemento, mostrarTela, sairComEsmaecer } from './dom';
 import { logoViva } from './logo-viva';
 import { telaMapa } from './mapa';
@@ -19,6 +19,7 @@ import { telaMultiplayer, type EscolhaOnline } from './multiplayer';
 import { telaPersonagens } from './personagens';
 import { telaSelecao } from './selecao';
 import { carregarArteDaTemporada } from './temporada';
+import { carregarRetratos } from './terras';
 
 // Cada etapa da barra é uma checagem de verdade, com um nome do mundo do jogo no lugar do nome
 // técnico. A barra anda por elas em ordem, mas as checagens correm todas ao mesmo tempo.
@@ -57,16 +58,19 @@ export function logoSimples(): HTMLElement {
 const esperar = (ms: number): Promise<void> => new Promise((resolver) => setTimeout(resolver, ms));
 
 // A logo grande e a letra da tela inicial, baixadas e já decodificadas antes de a tela abrir:
-// sem isso ela aparecia com as árvores subindo e a logo chegava segundos depois. A imagem fica
-// guardada aqui para o navegador não descartar a versão decodificada.
+// sem isso ela aparecia com as árvores subindo e a logo chegava segundos depois. Junto, o que as
+// telas seguintes mostram de cara: a floresta do fundo dos menus, os retratos dos cartões e a arte
+// do carregamento antes de cada partida. A imagem da logo fica guardada aqui para o navegador não
+// descartar a versão decodificada (as outras ficam guardadas por quem carrega).
 let logoPronta: HTMLImageElement | undefined;
 async function prepararTelaInicial(): Promise<void> {
   const [logo] = await Promise.all([
-    carregarImagem(logoUrl),
+    carregarDecodificada(logoUrl),
     document.fonts.load('1rem "Tiny5"'),
-    carregarArteDaTemporada(), // a do carregamento antes de cada partida
+    carregarArteDaCena(),
+    carregarRetratos(),
+    carregarArteDaTemporada(),
   ]);
-  await logo.decode().catch(() => undefined); // já carregou: se o decode falhar, o navegador decodifica ao mostrar
   logoPronta = logo;
 }
 
@@ -108,8 +112,14 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
 
     let cenario: C | undefined;
     let herois: H | undefined;
+    // Cada rodada (a primeira e cada "Tentar de novo") anima a barra sozinha: a animação da rodada
+    // que falhou para quando a nova começa (antes, as duas puxavam a largura ao mesmo tempo). A
+    // largura mostrada passa de uma para a outra, e a barra volta deslizando.
+    let rodada = 0;
+    let mostrado = 0;
 
     const rodar = async (): Promise<void> => {
+      const esta = ++rodada;
       acoes.replaceChildren();
       aviso.textContent = '';
       delete tela.dataset.estado;
@@ -134,8 +144,8 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
       let feitas = 0;
       let inicioEtapa = performance.now();
       let parada = false;
-      let mostrado = 0;
       const animar = (agora: number): void => {
+        if (esta !== rodada) return;
         const correndo = parada ? 0 : 0.85 * (1 - Math.exp(-(agora - inicioEtapa) / 1500));
         const alvo = Math.min(1, (feitas + correndo) / etapas.length);
         mostrado += (alvo - mostrado) * 0.15;

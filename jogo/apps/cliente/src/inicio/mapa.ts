@@ -14,7 +14,7 @@
 
 import { SOBRE_HEROI } from '@terna/compartilhado';
 import urlNuvem from '../assets/mapa/nuvem.webp';
-import { carregarImagem, contexto2d, novoCanvas } from '../motor/imagens';
+import { carregarImagem, contexto2d, novoCanvas, umaVez } from '../motor/imagens';
 import { esconderCena } from './cena';
 import { botao, elemento, ESMAECER_MS, mostrarTela } from './dom';
 import { BIOMAS, MAPA_GRANDE, enquadrarRetrato, type Bioma } from './terras';
@@ -171,15 +171,14 @@ function nuvensDoMapa(sortear: () => number): { beira: NuvemNoMapa[]; passando: 
 }
 
 // A arte da nuvem, o mar e as nuvens saem sempre iguais (a semente é fixa): feitos na primeira
-// vez que o mapa abre, ficam.
-let feitas: Promise<{ nuvens: Nuvens; marDeBaixo: HTMLCanvasElement; marDeCima: HTMLCanvasElement } & ReturnType<typeof nuvensDoMapa>> | null = null;
-function prepararNuvens(): NonNullable<typeof feitas> {
-  feitas ??= carregarImagem(urlNuvem).then((normal) => {
+// vez que o mapa abre, ficam. (Se a nuvem não carregar, a próxima vez que o mapa abrir tenta de novo.)
+const prepararNuvens = umaVez(() =>
+  carregarImagem(urlNuvem).then((normal) => {
     const virada = novoCanvas(normal.width, normal.height);
     const ctx = contexto2d(virada);
     ctx.scale(-1, 1);
     ctx.drawImage(normal, -normal.width, 0);
-    const nuvens = { normal, virada };
+    const nuvens: Nuvens = { normal, virada };
     const sortear = sorteador(1729);
     return {
       nuvens,
@@ -187,9 +186,8 @@ function prepararNuvens(): NonNullable<typeof feitas> {
       marDeCima: marDeNuvens(nuvens, sortear, MAR_DE_CIMA),
       ...nuvensDoMapa(sortear),
     };
-  });
-  return feitas;
-}
+  }),
+);
 
 // O nome do bioma, escrito em cima dele, e os quadrinhos dos personagens dele (aparecem com o
 // mouse por cima do bioma).
@@ -240,7 +238,15 @@ export function telaMapa(): Promise<void> {
     let pronto: Awaited<ReturnType<typeof prepararNuvens>> | null = null;
     let padroes: { baixo: CanvasPattern | null; cima: CanvasPattern | null } | null = null;
     const artes = new Map<Bioma, HTMLImageElement>();
-    for (const b of BIOMAS) void carregarImagem(b.arte).then((img) => artes.set(b, img));
+    // A arte de cada bioma, guardada assim que carrega. A chegada espera a da floresta por esta
+    // mesma promessa: quando as nuvens começam a se abrir, a arte já está no mapa para desenhar.
+    const artesCarregando = BIOMAS.map((b) =>
+      carregarImagem(b.arte).then((img) => {
+        artes.set(b, img);
+        return img;
+      }),
+    );
+    for (const carregando of artesCarregando) carregando.catch(() => undefined);
 
     // A câmera: o ponto do mapa no meio da tela e o zoom (pixels da tela por pixel do mapa).
     const cam = { x: BIOMAS[0].centro.x, y: BIOMAS[0].centro.y, z: 1 };
@@ -513,7 +519,7 @@ export function telaMapa(): Promise<void> {
     };
     cam.z = limitarZoom(ajuste * 1.15);
     limitarCamera();
-    void Promise.all([prepararNuvens(), carregarImagem(BIOMAS[0].arte)]).then(
+    void Promise.all([prepararNuvens(), artesCarregando[0]]).then(
       ([nuvens]) => {
         pronto = nuvens;
         comecar();

@@ -9,7 +9,7 @@
 // avisa e volta ao menu.
 
 import urlTemporada from '../assets/temporada-a-primeira-semente.webp';
-import { carregarImagem, contexto2d } from '../motor/imagens';
+import { carregarDecodificada, contexto2d, umaVez } from '../motor/imagens';
 import type { ConexaoPartida } from '../rede/partida';
 import { botao, elemento, mostrarTela, sairComEsmaecer, TELA_OPACA } from './dom';
 
@@ -34,16 +34,9 @@ const DICAS = [
 // As frases da barra, na ordem, conforme ela enche.
 const ETAPAS = ['Conferindo as imagens', 'Enchendo o rio', 'Acordando os vaga-lumes', 'Chamando os lutadores'];
 
-let arte: Promise<HTMLImageElement> | null = null;
-
 // Carrega (e decodifica) a arte da temporada uma vez: o carregamento do começo do jogo já chama.
-export function carregarArteDaTemporada(): Promise<HTMLImageElement> {
-  arte ??= carregarImagem(urlTemporada).then(async (img) => {
-    await img.decode().catch(() => undefined);
-    return img;
-  });
-  return arte;
-}
+// (Falhando, a próxima chamada tenta de novo.)
+export const carregarArteDaTemporada = umaVez(() => carregarDecodificada(urlTemporada));
 
 export interface OpcoesTemporada {
   ate: number; // performance.now() em que a tela termina
@@ -150,6 +143,9 @@ export function telaTemporada(opcoes: OpcoesTemporada): Promise<{ saiu: boolean 
       if (acabou) return;
       acabou = true;
       pararBrilhos();
+      // A partida vai abrir: até ela ouvir a sala, o que chegar fica guardado (o outro saindo
+      // enquanto esta tela esmaece chega para o jogo, que termina a partida).
+      opcoes.online?.conexao.segurar();
       void sairComEsmaecer(tela).then(() => resolver({ saiu }));
     };
 

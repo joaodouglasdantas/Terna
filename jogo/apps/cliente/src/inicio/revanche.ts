@@ -3,7 +3,6 @@
 // clicando também, aceita — aí o servidor manda os dois de volta à escolha de personagem, na
 // mesma sala. Se o outro sair (ou a sala fechar), o pedido não vale mais.
 
-import type { MensagemPartidaDoServidor } from '@terna/compartilhado';
 import type { ConexaoPartida } from '../rede/partida';
 
 export interface Revanche {
@@ -14,10 +13,10 @@ export interface Revanche {
   pedir(): void;
   aoMudar: (() => void) | null;
   // Os dois pediram: chega a escolha de personagem, com prazo (`prazoAte`, em performance.now()).
-  // `pendentes` guarda o que a sala mandar até a tela de seleção abrir (o outro pode escolher antes).
+  // Daí até a tela de seleção abrir, a conexão segura o que a sala mandar (o outro pode escolher
+  // antes, ou sair) e entrega para ela.
   pronta: Promise<void>;
   prazoAte: number;
-  pendentes: MensagemPartidaDoServidor[];
 }
 
 export function ouvirRevanche(conexao: ConexaoPartida, oponente: string): Revanche {
@@ -31,7 +30,6 @@ export function ouvirRevanche(conexao: ConexaoPartida, oponente: string): Revanc
     aoMudar: null,
     pronta: new Promise((resolver) => (liberar = resolver)),
     prazoAte: 0,
-    pendentes: [],
     pedir() {
       if (r.pedi || r.saiu) return;
       r.pedi = true;
@@ -45,16 +43,14 @@ export function ouvirRevanche(conexao: ConexaoPartida, oponente: string): Revanc
     r.aoMudar?.();
   };
   conexao.ouvir((m) => {
-    if (escolhendo) {
-      r.pendentes.push(m);
-      return;
-    }
+    if (escolhendo) return;
     if (m.tipo === 'revanche') {
       r.outroQuer = true;
       r.aoMudar?.();
     } else if (m.tipo === 'escolher') {
       escolhendo = true;
       r.prazoAte = performance.now() + m.prazoMs;
+      conexao.segurar();
       liberar();
     } else if (m.tipo === 'fim' || m.tipo === 'erro') {
       acabou();

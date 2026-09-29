@@ -446,9 +446,14 @@ const ESPERA_FIM_MORTE = 2800; // ms
 function jogar(escolha: Escolha): Promise<SalaNaSelecao | 'sozinho' | null> {
   return new Promise((resolver) => {
     // Sai escurecendo: a próxima tela aparece do escuro. Com `proxima` (a revanche online), a
-    // conexão continua aberta.
+    // conexão continua aberta. Uma vez só: saindo pelo menu enquanto a tela de fim esperava (a
+    // pausa depois da morte), ela não aparece mais.
+    let saindo = false;
+    let esperaDoFim = 0;
     const sair = (proxima?: SalaNaSelecao | 'sozinho'): void => {
-      if (!partida) return;
+      if (!partida || saindo) return;
+      saindo = true;
+      clearTimeout(esperaDoFim);
       encerrarPartida(partida, typeof proxima !== 'object');
       void fecharCortina().then(() => {
         partida = null;
@@ -477,13 +482,15 @@ function jogar(escolha: Escolha): Promise<SalaNaSelecao | 'sozinho' | null> {
       const deNovo = motivo === 'morte' || motivo === 'tempo';
       const revanche =
         escolha.modo !== 'online' ? (deNovo ? 'sozinho' : undefined) : deNovo ? ouvirRevanche(escolha.conexao, escolha.oponente) : undefined;
-      const mostrar = (): void =>
+      const mostrar = (): void => {
+        if (saindo) return;
         void menus.mostrarFim(titulo, texto, revanche).then((como) => {
           if (como !== 'revanche' || !revanche) return sair();
           if (revanche === 'sozinho' || escolha.modo !== 'online') return sair('sozinho');
-          sair({ conexao: escolha.conexao, oponente: escolha.oponente, prazoAte: revanche.prazoAte, pendentes: revanche.pendentes });
+          sair({ conexao: escolha.conexao, oponente: escolha.oponente, prazoAte: revanche.prazoAte });
         });
-      if (motivo === 'morte') setTimeout(mostrar, ESPERA_FIM_MORTE);
+      };
+      if (motivo === 'morte') esperaDoFim = window.setTimeout(mostrar, ESPERA_FIM_MORTE);
       else mostrar();
     });
     // Começa com a câmera já entre os dois (sem deslizar do meio do mapa).

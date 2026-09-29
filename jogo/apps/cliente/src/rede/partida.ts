@@ -60,8 +60,13 @@ const FILA_MAXIMA = 8 * 1024;
 
 export interface ConexaoPartida {
   // Troca quem recebe as mensagens (a tela de espera, depois o jogo). `aoFechar` recebe o
-  // último erro que o servidor mandou, se mandou algum.
+  // último erro que o servidor mandou, se mandou algum. O que ficou guardado por `segurar` chega
+  // agora para ele (logo depois de quem chamou terminar de se montar).
   ouvir(aoReceber: (mensagem: MensagemPartidaDoServidor) => void, aoFechar?: (erro: string | null) => void): void;
+  // Uma tela terminou e a próxima ainda não abriu (as duas esmaecem no meio): até a próxima
+  // chamar `ouvir`, o que chegar — e a conexão caindo — fica guardado, em vez de ir para a tela
+  // que já saiu e se perder. Sem isso, o outro saindo bem na troca deixava o jogo esperando por ele.
+  segurar(): void;
   // Com os dois na sala: o personagem escolhido (mandar de novo troca, até o outro escolher).
   escolherHeroi(heroi: Heroi): void;
   // Ligados direto pela rede local (o estado, os poderes e os golpes não passam pelo servidor).
@@ -98,6 +103,14 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
   let ultimoErro: string | null = null;
   let fechadaPorMim = false;
   let ligacao: LigacaoDireta | null = null;
+  // Segurando (segurar): as mensagens que chegaram e se a conexão caiu, para o próximo `ouvir`.
+  let guardado: { mensagens: MensagemPartidaDoServidor[]; caiu: boolean } | null = null;
+
+  // Para quem está ouvindo, ou para a fila, segurando.
+  const entregar = (mensagem: MensagemPartidaDoServidor): void => {
+    if (guardado) guardado.mensagens.push(mensagem);
+    else receber(mensagem);
+  };
 
   const ler = (texto: string): MensagemPartidaDoServidor | null => {
     try {
@@ -125,7 +138,7 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
       (sinal) => mandar({ tipo: 'sinal', sinal }),
       (texto) => {
         const m = ler(texto);
-        if (m && PELA_LIGACAO.has(m.tipo)) receber(m);
+        if (m && PELA_LIGACAO.has(m.tipo)) entregar(m);
       },
     );
   };
@@ -140,17 +153,33 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
       ligacao?.receberSinal(mensagem.sinal);
       return;
     }
-    receber(mensagem);
+    entregar(mensagem);
   });
   socket.addEventListener('close', () => {
     ligacao?.fechar();
-    if (!fechadaPorMim) fechou?.(ultimoErro);
+    if (fechadaPorMim) return;
+    if (guardado) guardado.caiu = true;
+    else fechou?.(ultimoErro);
   });
 
   return {
     ouvir(aoReceber, aoFechar) {
       receber = aoReceber;
       fechou = aoFechar;
+      if (!guardado) return;
+      const { mensagens, caiu } = guardado;
+      guardado = null;
+      // Numa microtarefa: quem chamou `ouvir` (a tela, o jogo) termina de se montar antes.
+      queueMicrotask(() => {
+        for (const m of mensagens) entregar(m);
+        if (caiu && !fechadaPorMim) {
+          if (guardado) guardado.caiu = true;
+          else fechou?.(ultimoErro);
+        }
+      });
+    },
+    segurar() {
+      guardado ??= { mensagens: [], caiu: false };
     },
     escolherHeroi(heroi) {
       mandar({ tipo: 'heroi', heroi });

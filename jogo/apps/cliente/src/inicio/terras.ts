@@ -6,11 +6,16 @@ import type { Heroi } from '@terna/compartilhado';
 import urlFlorestaDaDivisa from '../assets/mapa/floresta-da-divisa.webp';
 import urlRetratoGrow from '../assets/retratos/grow.webp';
 import urlRetratoLeslie from '../assets/retratos/leslie.webp';
+import { carregarDecodificada, umaVez } from '../motor/imagens';
 import { TEMPORADA } from './temporada';
 
 // O retrato de cada personagem (de fontes/retratos-leslie-grow.png, um painel para cada). O Anjo,
 // guardado até a atualização dele, ainda não tem.
 export const RETRATO: Partial<Record<Heroi, string>> = { leslie: urlRetratoLeslie, grow: urlRetratoGrow };
+
+// Os retratos baixados e decodificados uma vez, no carregamento do começo do jogo: os cartões da
+// escolha de personagem e da tela dos personagens abrem com eles, sem o quadro vazio antes.
+export const carregarRetratos = umaVez(() => Promise.all(Object.values(RETRATO).map((url) => carregarDecodificada(url))));
 
 // Onde fica o rosto em cada retrato, em pixels da arte (os painéis têm 477 de largura): o meio dele
 // e a linha dos olhos. Os cartões da tela dos personagens e os quadrinhos do mapa enquadram por

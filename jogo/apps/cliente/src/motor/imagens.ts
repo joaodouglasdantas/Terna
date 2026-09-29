@@ -22,6 +22,28 @@ export function carregarImagem(url: string): Promise<HTMLImageElement> {
   });
 }
 
+// A imagem carregada e já decodificada: mostrada depois, aparece inteira no primeiro quadro. Se o
+// decode falhar (a imagem carregou), o navegador decodifica ao mostrar.
+export async function carregarDecodificada(url: string): Promise<HTMLImageElement> {
+  const imagem = await carregarImagem(url);
+  await imagem.decode().catch(() => undefined);
+  return imagem;
+}
+
+// `carregar` feito uma vez só: as chamadas seguintes recebem a mesma promessa. Falhando, ela não
+// fica guardada — o "Tentar de novo" do carregamento tenta de verdade, em vez de receber a falha
+// de antes para sempre.
+export function umaVez<T>(carregar: () => Promise<T>): () => Promise<T> {
+  let promessa: Promise<T> | null = null;
+  return () => {
+    promessa ??= carregar().catch((erro: unknown) => {
+      promessa = null;
+      throw erro;
+    });
+    return promessa;
+  };
+}
+
 export function desenharQuadro(ctx: CanvasRenderingContext2D, folha: CanvasImageSource, q: Recorte, x: number, y: number): void {
   ctx.drawImage(folha, q.x, q.y, q.w, q.h, x, y, q.w, q.h);
 }

@@ -33,13 +33,13 @@ const JANELA_DO_RETRATO = 380;
 const OLHOS_DO_RETRATO = 0.56;
 
 // O que chega da sala enquanto a tela está aberta.
-// `prazoAte`: performance.now() em que acaba o tempo de escolher (do `escolher` da sala).
-// `pendentes`: o que a sala mandou antes de a tela abrir (na revanche, o outro pode escolher antes).
+// `prazoAte`: performance.now() em que acaba o tempo de escolher (do `escolher` da sala). O que a
+// sala mandou antes de a tela abrir (na revanche, o outro pode escolher antes) a conexão guardou
+// (segurar) e entrega quando a tela passa a ouvir.
 export interface SalaNaSelecao {
   conexao: ConexaoPartida;
   oponente: string;
   prazoAte: number;
-  pendentes?: MensagemPartidaDoServidor[];
 }
 
 // `comecouEm`: performance.now() de quando chegou o aviso — dele contam o carregamento, a
@@ -205,6 +205,9 @@ export function telaSelecao(sala?: SalaNaSelecao): Promise<ResultadoSelecao> {
       if (acabou) return;
       acabou = true;
       window.removeEventListener('keydown', aoTeclar);
+      // A partida começou: até o carregamento dela ouvir a sala, o que chegar fica guardado (o
+      // outro pode sair enquanto esta tela esmaece).
+      if (resultado.tipo === 'comecou') sala?.conexao.segurar();
       if (resultado.tipo === 'voltou' || resultado.tipo === 'caiu') resolver(resultado);
       else void sairComEsmaecer(tela).then(() => resolver(resultado));
     };
@@ -254,7 +257,6 @@ export function telaSelecao(sala?: SalaNaSelecao): Promise<ResultadoSelecao> {
         if (m.tipo === 'fim') terminar({ tipo: 'caiu', aviso: `${sala.oponente} saiu da sala.` });
       };
       sala.conexao.ouvir(ouvir, (erro) => terminar({ tipo: 'caiu', aviso: avisoDaQueda(erro) }));
-      for (const m of sala.pendentes ?? []) ouvir(m);
     }
 
     // Setas (ou A/D) andam entre os livres; Enter joga; Esc volta.
