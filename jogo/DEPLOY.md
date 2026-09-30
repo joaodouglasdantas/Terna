@@ -122,6 +122,18 @@ Uma vez por mês, dê uma olhada em:
   servidor, cada um só se a sua parte mudou.
 - **Mudar o banco:** edite `schema.ts`, rode `npm run db:gerar`, faça commit. O servidor aplica
   a migração no Neon ao subir.
+- **Trocar o endereço do jogo (grátis):** o endereço é `<nome-do-projeto>.<subdomínio-da-conta>.workers.dev`.
+  O nome do projeto já é `terna` (`name` em `apps/cliente/wrangler.jsonc`); o subdomínio é da conta
+  do Cloudflare. Para trocá-lo:
+  1. No Cloudflare, abra **Workers & Pages** e clique em **Change** ao lado de **Your subdomain**
+     (ou, no projeto `terna`, na aba **Domains**). O nome tem que estar livre no Cloudflare inteiro,
+     com até 63 letras, números ou hífens, sem hífen na ponta. Ex.: `jogo` → `terna.jogo.workers.dev`.
+     Vale para todos os Workers da conta, e o endereço antigo deixa de funcionar.
+  2. Espere uns minutos e abra o endereço novo.
+  3. No Render, em **terna-servidor → Environment**, acrescente o endereço novo em
+     **ORIGENS_PERMITIDAS**, separado por vírgula do antigo (ex.:
+     `https://terna.antigo.workers.dev,https://terna.jogo.workers.dev`), e salve. Sem isso a parte
+     online não conecta. Quando o novo estiver funcionando, pode tirar o antigo.
 - **Domínio próprio** (ex.: `terna.com.br`): dá para apontar para o Cloudflare de graça (só paga
   o domínio). Aí troque `ORIGENS_PERMITIDAS` no Render.
 - **Sair do grátis:** quando precisar, um plano pago do Render tira o sono do servidor e amplia
