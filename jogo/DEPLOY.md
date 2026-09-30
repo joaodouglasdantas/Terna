@@ -74,10 +74,9 @@ Antes de tudo: faça commit e push deste projeto para o GitHub (`joaodouglasdant
    caminhos contam a partir da raiz do repositório, não da pasta `jogo`). Assim, commit que não
    mexe no jogo não gasta build.
 
-O jogo já ficou num Worker (`terna.<subdominio-da-conta>.workers.dev`, com a configuração em
-`apps/cliente/wrangler.jsonc`). O Pages ficou no lugar dele porque o endereço é só o nome do
-projeto, sem o subdomínio da conta (que é o mesmo de todos os Workers dela). Depois de apagar o
-Worker antigo no Cloudflare, o `wrangler.jsonc` pode ser apagado também.
+Por que Pages e não Workers: no Pages o endereço é só o nome do projeto (`terna.pages.dev`); no
+Workers ele leva o subdomínio da conta (`terna.<subdominio-da-conta>.workers.dev`), que é o mesmo
+de todos os Workers dela e não dá para trocar sem mudar o endereço dos outros.
 
 ### 4. Ligar um no outro
 
