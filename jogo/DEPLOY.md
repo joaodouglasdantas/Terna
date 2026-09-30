@@ -10,7 +10,7 @@ jogador ──► Cloudflare Pages  (o jogo: arquivos estáticos, em terna.pages
 |---|---|---|
 | Jogo (`apps/cliente`) | Cloudflare Pages, plano Free | `https://terna.pages.dev` |
 | Servidor (`apps/servidor`) | Render, plano Free | `https://terna-servidor.onrender.com` |
-| Banco | Neon, plano Free | string de conexão `postgresql://…neon.tech/neondb?sslmode=require` |
+| Banco | Neon, plano Free | string de conexão `postgresql://…neon.tech/neondb?sslmode=verify-full` |
 
 Os três aceitam login com a conta do GitHub. O Render não pede cartão no plano grátis.
 Os três fazem deploy sozinhos a cada `git push` na `main`.
@@ -33,6 +33,9 @@ Antes de tudo: faça commit e push deste projeto para o GitHub (`joaodouglasdant
 4. Em **Connect**, desligue **Connection pooling** e copie a string de conexão. Ela começa
    com `postgresql://` e termina com `?sslmode=require` (se vier `&channel_binding=require`
    junto, pode deixar).
+   Troque o `sslmode=require` por `sslmode=verify-full`: é a mesma segurança de hoje, e
+   sem isso o servidor mostra um *SECURITY WARNING* no log (numa versão futura da biblioteca do
+   Postgres, o `require` fica menos rígido).
 
 ### 2. Servidor — Render
 

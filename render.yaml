@@ -33,7 +33,7 @@ services:
       - key: LOG
         value: warn
       # Preenchidos à mão no painel do Render (não vão para o Git):
-      # string de conexão do Neon (postgresql://...neon.tech/neondb?sslmode=require)
+      # string de conexão do Neon (postgresql://...neon.tech/neondb?sslmode=verify-full)
       - key: DATABASE_URL
         sync: false
       # endereço do jogo publicado no Cloudflare Pages: https://terna.pages.dev (mais de um, separados por vírgula)
