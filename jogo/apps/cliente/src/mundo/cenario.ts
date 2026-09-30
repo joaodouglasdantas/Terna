@@ -9,7 +9,7 @@ import { sortear, suavizar } from '../motor/matematica';
 import { paisagemViva } from './agua';
 import { criarCeu, desenharCirros, desenharSerraDeLonge } from './ceu';
 import { graduarImagem, type Graduacao } from './cor';
-import { acompanharNuvens, avisarCobertura, desenharRaios, solLivre, sombraDaNuvem } from './raios';
+import { acompanharNuvens, avisarCobertura, desenharRaios, luzDoRaio, solLivre, sombraDaNuvem } from './raios';
 import type { Luz, Paleta, Recorte } from '../motor/tipos';
 
 // Quanto cada camada anda quando a câmera anda 1px: as distantes andam menos (paralaxe).
@@ -230,7 +230,7 @@ const LUZ = {
   lateral: 0.28, // lado das plantas virado para o sol clareia, o outro escurece
   topo: 0.14, // copa clareia por cima quando o sol está alto
   base: 0.3, // pé das plantas mais escuro (luz que não chega embaixo)
-  contorno: 0.55, // filete de luz quente na borda das plantas virada para o sol
+  contorno: 0.6, // filete de luz quente na borda das plantas virada para o sol, onde um raio bate
   contornoSombra: 0.22, // e a borda do outro lado, um pouco mais escura
   nevoa: 'rgba(92, 140, 188, 0.34)', // véu azul da distância nas árvores de trás
   sombra: 0.44, // sombra no chão, embaixo de plantas e do personagem
@@ -508,13 +508,19 @@ export function desenharFundo(
   const camFundo = Math.round(camX * PARALAXE.arvoresFundo);
   descer('arvoresFundo');
   ctx.translate(-camFundo, 0);
-  desenharFileira(ctx, folha, tempo, luz, 'arvores', ARVORES_FUNDO, yBase + 3, camFundo, largura, true);
+  desenharFileira(ctx, folha, tempo, luz, 'arvores', ARVORES_FUNDO, yBase + 3, camFundo, largura, olharY, true);
   ctx.restore();
 }
 
-// Cópias das plantas já com luz e sombra do sol. O sol anda devagar, então cada cópia só é
-// refeita quando a direção ou a altura da luz mudam um degrau.
-const plantasIluminadas = new Map<string, { canvas: HTMLCanvasElement; degrau: string }>();
+// Cópias das plantas já com luz e sombra do sol, e o filete de luz da borda à parte (`borda`), que
+// só aparece onde um raio bate. O sol anda devagar, então cada cópia só é refeita quando a direção
+// ou a altura da luz mudam um degrau.
+interface PlantaIluminada {
+  canvas: HTMLCanvasElement;
+  borda: HTMLCanvasElement | null;
+  degrau: string;
+}
+const plantasIluminadas = new Map<string, PlantaIluminada>();
 
 function plantaIluminada(
   folha: CanvasImageSource,
@@ -523,19 +529,19 @@ function plantaIluminada(
   quadro: number,
   luz: Luz,
   nevoa: boolean,
-): HTMLCanvasElement {
+): PlantaIluminada {
   const q = QUADROS_CENARIO[grupo][indice][quadro];
   const chave = `${grupo}:${indice}:${quadro}:${nevoa}`;
-  const degrau = `${Math.round(luz.lado * 16)}:${Math.round(luz.forca * 8)}`;
+  const degrau = `${Math.round(luz.lado * 16)}:${Math.round(luz.elevacao * 8)}:${Math.round(luz.forca * 8)}`;
   const guardada = plantasIluminadas.get(chave);
-  if (guardada && guardada.degrau === degrau) return guardada.canvas;
+  if (guardada && guardada.degrau === degrau) return guardada;
 
   const canvas = guardada ? guardada.canvas : novoCanvas(q.w, q.h);
   canvas.width = q.w;
   canvas.height = q.h;
   const c = contexto2d(canvas, { willReadFrequently: true });
   c.drawImage(folha, q.x, q.y, q.w, q.h, 0, 0, q.w, q.h);
-  contornoDeLuz(c, q.w, q.h, luz, nevoa);
+  const borda = contornoDeLuz(c, q.w, q.h, luz, nevoa, guardada?.borda ?? null);
   // 'source-atop' pinta só por cima dos pixels da planta, sem sair do contorno.
   c.globalCompositeOperation = 'source-atop';
 
@@ -560,28 +566,41 @@ function plantaIluminada(
     c.fillStyle = LUZ.nevoa;
     c.fillRect(0, 0, q.w, q.h);
   }
-  plantasIluminadas.set(chave, { canvas, degrau });
-  return canvas;
+  const pronta = { canvas, borda, degrau };
+  plantasIluminadas.set(chave, pronta);
+  return pronta;
 }
 
-// Pixel art de luz: a borda da planta virada para o sol (do lado dele e em cima, com o sol alto)
-// ganha um filete quente; a borda do lado de lá, um pouco de sombra. Na fileira de trás, mais fraco.
-const LUZ_CONTORNO = [255, 232, 160];
+// Pixel art de luz: a borda da planta do lado de lá do sol ganha um pouco de sombra, sempre. O
+// filete quente na borda virada para ele (do lado dele e em cima, com o sol alto) fica numa cópia à
+// parte, só com esses pixels, que desenharFileira pinta por cima quando um raio pega a planta — e
+// só o quanto o raio bate, acendendo e apagando com ele. Sem raio, a planta fica sem o contorno
+// claro. Na fileira de trás, mais fraco. Devolve a cópia do filete (null com a folha protegida).
+const LUZ_CONTORNO = [255, 222, 140];
 
-function contornoDeLuz(c: CanvasRenderingContext2D, w: number, h: number, luz: Luz, nevoa: boolean): void {
+function contornoDeLuz(
+  c: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  luz: Luz,
+  nevoa: boolean,
+  reaproveitar: HTMLCanvasElement | null,
+): HTMLCanvasElement | null {
   let dados: ImageData;
   try {
     dados = c.getImageData(0, 0, w, h);
   } catch {
-    return; // folha protegida: sem o filete
+    return null; // folha protegida: sem o filete
   }
   const d = dados.data;
   const original = Uint8ClampedArray.from(d);
+  const borda = new ImageData(w, h);
+  const b = borda.data;
   const opaco = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < w && y < h && original[(y * w + x) * 4 + 3] > 0;
   const lado = luz.lado >= 0 ? 1 : -1;
   const fraco = nevoa ? 0.5 : 1;
-  const deLado = LUZ.contorno * luz.forca * (0.35 + 0.65 * Math.abs(luz.lado)) * fraco;
-  const deCima = LUZ.contorno * 0.7 * luz.forca * luz.elevacao * fraco;
+  const deLado = LUZ.contorno * (0.35 + 0.65 * Math.abs(luz.lado));
+  const deCima = LUZ.contorno * 0.75 * luz.elevacao;
   const sombra = LUZ.contornoSombra * (0.4 + 0.6 * luz.forca) * fraco;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -592,9 +611,10 @@ function contornoDeLuz(c: CanvasRenderingContext2D, w: number, h: number, luz: L
       if (!opaco(x, y - 1)) k = Math.max(k, deCima);
       if (!opaco(x + lado, y - 1) && !opaco(x + 2 * lado, y)) k = Math.max(k, deLado * 0.5);
       if (k > 0) {
-        d[i] += (LUZ_CONTORNO[0] - d[i]) * k;
-        d[i + 1] += (LUZ_CONTORNO[1] - d[i + 1]) * k;
-        d[i + 2] += (LUZ_CONTORNO[2] - d[i + 2]) * k;
+        b[i] = d[i] + (LUZ_CONTORNO[0] - d[i]) * k;
+        b[i + 1] = d[i + 1] + (LUZ_CONTORNO[1] - d[i + 1]) * k;
+        b[i + 2] = d[i + 2] + (LUZ_CONTORNO[2] - d[i + 2]) * k;
+        b[i + 3] = Math.round(255 * fraco);
       } else if (!opaco(x - lado, y)) {
         d[i] *= 1 - sombra;
         d[i + 1] *= 1 - sombra;
@@ -603,6 +623,23 @@ function contornoDeLuz(c: CanvasRenderingContext2D, w: number, h: number, luz: L
     }
   }
   c.putImageData(dados, 0, 0);
+  const canvas = reaproveitar ?? novoCanvas(w, h);
+  canvas.width = w;
+  canvas.height = h;
+  contexto2d(canvas).putImageData(borda, 0, 0);
+  return canvas;
+}
+
+// Quanto os raios pegam a planta (0–1), pela copa: o topo, o meio e o lado virado para o sol. Em
+// px da tela: `centro` e `apoio` já com a câmera.
+function raioNaPlanta(centro: number, apoio: number, w: number, h: number, luz: Luz): number {
+  const lado = luz.lado >= 0 ? 1 : -1;
+  return Math.max(
+    luzDoRaio(centro, apoio - h * 0.85),
+    luzDoRaio(centro, apoio - h * 0.55),
+    luzDoRaio(centro + lado * w * 0.35, apoio - h * 0.6),
+    luzDoRaio(centro - lado * w * 0.3, apoio - h * 0.7),
+  );
 }
 
 // A copa só verga para o lado do vento (esquerda, como as nuvens) e volta ao repouso, sem
@@ -620,6 +657,7 @@ function desenharFileira(
   apoio: number,
   vistaX: number,
   largura: number,
+  olharY: number,
   nevoa = false,
 ): void {
   plantas.forEach(({ indice, x }) => {
@@ -628,7 +666,15 @@ function desenharFileira(
     const esquerda = esquerdaDaPlanta(quadros[0], x);
     if (esquerda + w + 2 < vistaX || esquerda - 2 > vistaX + largura) return;
     const quadro = quadroDoVento(tempo, x, quadros.length, nevoa);
-    ctx.drawImage(plantaIluminada(folha, grupo, indice, quadro, luz, nevoa), esquerda, apoio - h);
+    const planta = plantaIluminada(folha, grupo, indice, quadro, luz, nevoa);
+    ctx.drawImage(planta.canvas, esquerda, apoio - h);
+    if (!planta.borda) return;
+    // O filete de luz na borda, só o quanto um raio bate nela agora.
+    const raio = raioNaPlanta(x - vistaX, apoio + Math.round(olharY), w, h, luz);
+    if (raio < 0.03) return;
+    ctx.globalAlpha = raio;
+    ctx.drawImage(planta.borda, esquerda, apoio - h);
+    ctx.globalAlpha = 1;
   });
 }
 
@@ -683,6 +729,7 @@ export function desenharVegetacao(
   yBase: number,
   camX: number,
   largura: number,
+  olharY = 0,
 ): void {
   // +1 para a base encostar dentro da grama, sem vão.
   const apoio = yBase + 1;
@@ -694,8 +741,8 @@ export function desenharVegetacao(
     const { w, m = 0 }: Recorte = QUADROS_CENARIO.arbustos[indice][0];
     desenharSombra(ctx, luz, x, yBase, w - m, 0.6);
   });
-  desenharFileira(ctx, folha, tempo, luz, 'arvores', ARVORES_CHAO, apoio, camX, largura);
-  desenharFileira(ctx, folha, tempo, luz, 'arbustos', ARBUSTOS_CHAO, apoio, camX, largura);
+  desenharFileira(ctx, folha, tempo, luz, 'arvores', ARVORES_CHAO, apoio, camX, largura, olharY);
+  desenharFileira(ctx, folha, tempo, luz, 'arbustos', ARBUSTOS_CHAO, apoio, camX, largura, olharY);
 }
 
 // Última camada, em coordenadas de tela: calor em volta do sol, o lado longe dele um pouco
@@ -703,7 +750,15 @@ export function desenharVegetacao(
 // (raios.ts), que também clareiam o que está embaixo deles. Uma nuvem na frente do sol apaga o
 // calor e os raios aos poucos e escurece a cena um tanto. Tudo bem de leve. `chao`: a linha da
 // grama na tela.
-export function desenharLuz(ctx: CanvasRenderingContext2D, luz: Luz, largura: number, altura: number, tempo = 0, chao = altura): void {
+export function desenharLuz(
+  ctx: CanvasRenderingContext2D,
+  luz: Luz,
+  largura: number,
+  altura: number,
+  tempo = 0,
+  chao = altura,
+  camX = 0,
+): void {
   acompanharNuvens(tempo);
   ctx.save();
   ctx.globalCompositeOperation = 'soft-light';
@@ -742,5 +797,5 @@ export function desenharLuz(ctx: CanvasRenderingContext2D, luz: Luz, largura: nu
   ctx.fillRect(0, 0, largura, altura);
   ctx.restore();
 
-  desenharRaios(ctx, luz, tempo, largura, altura, chao);
+  desenharRaios(ctx, luz, tempo, largura, altura, chao, camX);
 }

@@ -6,7 +6,10 @@
 //   sol alto eles são curtos e brancos; baixo, mais compridos, dourados e mais fortes (a hora
 //   dourada). Perto do horizonte somem, junto com a luz;
 // - a cena reage: por onde o feixe passa, as copas, a grama e quem estiver ali ficam mais claros e
-//   quentes (soft-light), e onde ele bate no chão abre uma poça de luz na grama;
+//   quentes (soft-light); as plantas que ele pega ganham um filete de luz na borda virada para o sol
+//   (cenario.ts pergunta aqui: luzDoRaio); e onde ele bate no chão a grama brilha, com gotinhas de
+//   orvalho cintilando — umas brancas, umas douradas e, de vez em quando, uma que refrata em azul ou
+//   rosa;
 // - a poeira no ar: grãozinhos dourados que flutuam pela cena e só aparecem dentro dos feixes,
 //   piscando — a poeira que a gente só vê no facho de sol;
 // - as nuvens: quando uma passa na frente do sol, os fachos, as poças e o calor da luz somem aos
@@ -47,6 +50,21 @@ const RAIOS = {
 // Cor do facho: branca-quente com o sol alto, dourada com ele baixo.
 const COR_ALTO = [255, 246, 214];
 const COR_BAIXO = [255, 200, 118];
+
+// O orvalho na grama onde o feixe bate: uma gotinha em cada `raras` colunas do mapa (sempre as
+// mesmas, presas na grama), cada uma piscando no seu ritmo.
+const ORVALHO = {
+  densidade: 0.32, // fração das colunas com uma gotinha
+  acima: 4, // px acima da linha da grama onde elas podem estar (a ponta dos tufos)
+  abaixo: 2,
+  // As cores do brilho: quase todas brancas-quentes e douradas; umas poucas refratam.
+  cores: [
+    { ate: 0.55, cor: '255, 252, 228' },
+    { ate: 0.83, cor: '255, 224, 136' },
+    { ate: 0.92, cor: '190, 238, 255' },
+    { ate: 1, cor: '255, 204, 238' },
+  ],
+};
 
 const POEIRA = {
   quantos: 150,
@@ -200,20 +218,14 @@ function pintarFeixes(
 
 // Onde cada feixe bate no chão, uma poça de luz achatada na grama, da largura do feixe ali.
 function pintarPocas(ctx: CanvasRenderingContext2D, feixes: Feixe[], luz: Luz, cor: number[], alfa: number, chao: number): void {
-  const altura = chao - luz.y;
-  if (altura <= 0) return;
   const [r, g, b] = cor;
   for (const f of feixes) {
-    const s = Math.sin(f.angulo);
-    if (s < 0.2) continue;
-    const distancia = altura / s;
-    const x = luz.x + Math.cos(f.angulo) * distancia;
-    const meiaLargura = Math.max(6, (distancia * Math.tan(f.meia)) / s);
+    const alvo = noChao(f, luz, chao);
     const forca = alfa * f.forca;
-    if (forca < 0.004) continue;
+    if (!alvo || forca < 0.004) continue;
     ctx.save();
-    ctx.translate(x, chao + 1);
-    ctx.scale(meiaLargura, 5);
+    ctx.translate(alvo.x, chao + 1);
+    ctx.scale(alvo.meia, 5);
     const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
     grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${forca})`);
     grad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, ${forca * 0.45})`);
@@ -253,13 +265,109 @@ function pintarPoeira(ctx: CanvasRenderingContext2D, feixes: Feixe[], luz: Luz, 
   }
 }
 
-// Os raios, a luz que eles jogam na cena, as poças no chão e a poeira. `chao`: a linha da grama na
-// tela.
-export function desenharRaios(ctx: CanvasRenderingContext2D, luz: Luz, tempo: number, largura: number, altura: number, chao: number): void {
+// Um sorteio fixo por coluna do mapa (o orvalho fica sempre no mesmo lugar da grama).
+function acaso(x: number, sal: number): number {
+  const s = Math.sin(x * 12.9898 + sal * 78.233) * 43758.5453;
+  return s - Math.floor(s);
+}
+
+// Onde o feixe bate no chão: o centro e a meia largura dele ali, em px da tela.
+function noChao(f: Feixe, luz: Luz, chao: number): { x: number; meia: number } | null {
+  const s = Math.sin(f.angulo);
+  if (s < 0.2 || chao <= luz.y) return null;
+  const distancia = (chao - luz.y) / s;
+  return { x: luz.x + Math.cos(f.angulo) * distancia, meia: Math.max(6, (distancia * Math.tan(f.meia)) / s) };
+}
+
+// A grama que o feixe pega: uma faixa fina de luz na ponta dos tufos e o orvalho cintilando.
+// `camX`: a câmera, para as gotinhas ficarem presas no mapa quando ela anda.
+function pintarBrilhoNaGrama(ctx: CanvasRenderingContext2D, feixes: Feixe[], luz: Luz, cor: number[], tempo: number, alfa: number, chao: number, camX: number): void {
+  const [r, g, b] = cor;
+  for (const f of feixes) {
+    const alvo = noChao(f, luz, chao);
+    const forca = alfa * f.forca;
+    if (!alvo || forca < 0.02) continue;
+    // A faixa: bem achatada, na altura das pontas da grama.
+    ctx.globalCompositeOperation = 'screen';
+    ctx.save();
+    ctx.translate(alvo.x, chao - 2);
+    ctx.scale(alvo.meia * 0.9, 3);
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${0.85 * forca})`);
+    grad.addColorStop(0.55, `rgba(${r}, ${g}, ${b}, ${0.4 * forca})`);
+    grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // O orvalho: gotinhas de 1px, as mais acesas com uma cruz (e as mais ainda, com as pontas longas).
+    ctx.globalCompositeOperation = 'source-over';
+    const de = Math.floor(alvo.x - alvo.meia);
+    const ate = Math.ceil(alvo.x + alvo.meia);
+    for (let x = de; x <= ate; x++) {
+      const coluna = x + Math.round(camX);
+      if (acaso(coluna, 1) > ORVALHO.densidade) continue;
+      const borda = (x - alvo.x) / alvo.meia;
+      const miolo = 1 - borda * borda;
+      if (miolo <= 0) continue;
+      const pisca = Math.sin(tempo * (1.2 + 3 * acaso(coluna, 2)) + acaso(coluna, 3) * 40);
+      if (pisca < 0.25) continue;
+      const a = Math.min(1, forca * 2.3 * miolo * ((pisca - 0.25) / 0.75));
+      if (a < 0.05) continue;
+      const y = Math.round(chao - ORVALHO.acima + acaso(coluna, 4) * (ORVALHO.acima + ORVALHO.abaixo));
+      const tom = acaso(coluna, 5);
+      const brilho = ORVALHO.cores.find((c) => tom <= c.ate)!.cor;
+      ctx.fillStyle = `rgba(${brilho}, ${a.toFixed(3)})`;
+      ctx.fillRect(x, y, 1, 1);
+      if (a > 0.35) {
+        ctx.fillStyle = `rgba(${brilho}, ${(a * 0.5).toFixed(3)})`;
+        ctx.fillRect(x - 1, y, 1, 1);
+        ctx.fillRect(x + 1, y, 1, 1);
+        ctx.fillRect(x, y - 1, 1, 1);
+        ctx.fillRect(x, y + 1, 1, 1);
+      }
+      if (a > 0.65) {
+        ctx.fillStyle = `rgba(${brilho}, ${(a * 0.2).toFixed(3)})`;
+        ctx.fillRect(x - 2, y, 1, 1);
+        ctx.fillRect(x + 2, y, 1, 1);
+      }
+    }
+  }
+}
+
+// Os feixes do quadro, calculados uma vez (prepararRaios) antes de desenhar a cena: as plantas
+// perguntam por eles (luzDoRaio) e desenharRaios os pinta no fim.
+let quadro: { tempo: number; luz: Luz; feixes: Feixe[]; forca: number } | null = null;
+
+// Chamado uma vez por quadro, antes de desenhar a cena. `luz`: o sol na tela; `chao`: a linha da
+// grama na tela.
+export function prepararRaios(luz: Luz, tempo: number, largura: number, chao: number): void {
   const horaDourada = 1 + RAIOS.horaDourada * (1 - suavizar(0.3, 0.8, luz.elevacao));
-  const forca = luz.forca * solLivre() * horaDourada;
+  quadro = { tempo, luz, feixes: feixesDoQuadro(luz, tempo, largura, chao), forca: luz.forca * solLivre() * horaDourada };
+}
+
+// Quanto os raios deste quadro batem no ponto (x, y) da tela, 0–1.
+export function luzDoRaio(x: number, y: number): number {
+  if (!quadro || quadro.forca < 0.02) return 0;
+  return Math.min(1, dentroDosFeixes(quadro.feixes, quadro.luz, x, y) * quadro.forca);
+}
+
+// Os raios, a luz que eles jogam na cena, as poças e o brilho na grama e a poeira. `chao`: a linha
+// da grama na tela; `camX`: a câmera (o orvalho fica preso no mapa).
+export function desenharRaios(
+  ctx: CanvasRenderingContext2D,
+  luz: Luz,
+  tempo: number,
+  largura: number,
+  altura: number,
+  chao: number,
+  camX = 0,
+): void {
+  if (!quadro || quadro.tempo !== tempo) prepararRaios(luz, tempo, largura, chao);
+  const { feixes, forca } = quadro!;
   if (forca < 0.02) return;
-  const feixes = feixesDoQuadro(luz, tempo, largura, chao);
   const cor = corDoFacho(luz);
   const alcance = Math.hypot(largura, altura) * 1.05;
   ctx.save();
@@ -274,6 +382,7 @@ export function desenharRaios(ctx: CanvasRenderingContext2D, luz: Luz, tempo: nu
   pintarFeixes(ctx, feixes, luz, cor, RAIOS.forca * forca, alcance, 'screen');
   ctx.globalCompositeOperation = 'screen';
   pintarPocas(ctx, feixes, luz, cor, RAIOS.poca * forca, chao);
+  pintarBrilhoNaGrama(ctx, feixes, luz, cor, tempo, Math.min(1, forca), chao, camX);
   pintarPoeira(ctx, feixes, luz, tempo, Math.min(1, 1.6 * forca), largura, chao);
   ctx.restore();
 }

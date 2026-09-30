@@ -56,6 +56,7 @@ import {
   luzDoSol,
   luzNaTela,
 } from './mundo/cenario';
+import { prepararRaios } from './mundo/raios';
 import { TILE, criarChao } from './mundo/chao';
 import { desenharRaizes } from './mundo/raizes';
 import { atualizarMinhocas, desenharMinhocas, prepararMinhocas } from './mundo/minhocas';
@@ -305,7 +306,7 @@ function desenharVista(tempo: number, luz: Luz, camX: number, olharY: number, x0
   ctx.translate(-camX, olharY);
   ctx.drawImage(chao, 0, Y_CHAO - FOLGA_TUFOS);
   desenharMinhocas(ctx, camX, LARGURA);
-  desenharVegetacao(ctx, folhaCenario, tempo, luz, Y_CHAO, camX, LARGURA);
+  desenharVegetacao(ctx, folhaCenario, tempo, luz, Y_CHAO, camX, LARGURA, olharY);
   desenharAnimais(ctx, luz, tempo, camX, LARGURA);
 
   if (partida) {
@@ -371,13 +372,16 @@ function desenhar(tempo: number): void {
   const luz = luzDoSol(tempo, LARGURA);
   const { esquerda, direita, dividida } = camerasNaTela();
   const altos = olharNaTela();
+  // Os raios de sol do quadro: as plantas perguntam se estão dentro de um antes de a luz ser pintada.
+  const sol = luzNaTela(luz, altos.esquerda);
+  prepararRaios(sol, tempo, LARGURA, Y_CHAO + altos.esquerda);
   if (dividida) {
     desenharVista(tempo, luz, esquerda, altos.esquerda, 0, METADE);
     desenharVista(tempo, luz, direita, altos.direita, METADE, METADE);
   } else {
     desenharVista(tempo, luz, esquerda, altos.esquerda, 0, LARGURA);
   }
-  desenharLuz(ctx, luzNaTela(luz, altos.esquerda), LARGURA, ALTURA, tempo, Y_CHAO + altos.esquerda);
+  desenharLuz(ctx, sol, LARGURA, ALTURA, tempo, Y_CHAO + altos.esquerda, esquerda);
   const p = partida;
   if (!p) return;
   // Os nomes vêm depois da luz, para o sol não tingir o azul e o vermelho.
