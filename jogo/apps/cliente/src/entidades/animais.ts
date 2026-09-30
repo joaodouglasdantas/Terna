@@ -34,6 +34,7 @@ import {
   esquerdaDaPlanta,
   quadroDoVento,
 } from '../mundo/cenario';
+import { soltarFolhas } from '../mundo/folhas';
 import {
   CORES_BORBOLETA,
   CORPO_CERVO,
@@ -534,7 +535,10 @@ function atualizarEsquilo(e: Esquilo, dt: number, jogador: Jogador): void {
     if (Math.abs(e.arvore.tronco - e.x) < 0.5) e.estado = 'subindo';
   } else if (e.estado === 'subindo' && e.arvore) {
     e.y -= ESQUILO.subida * dt;
-    if (e.y <= e.arvore.copa) e.sumiu = true; // entrou na copa: saiu do mapa
+    if (e.y <= e.arvore.copa) {
+      e.sumiu = true; // entrou na copa: saiu do mapa (e a copa balança, soltando folhas)
+      soltarFolhas(e.arvore.x, e.x, e.arvore.copa + 4, 5, true);
+    }
   }
 }
 
@@ -920,6 +924,8 @@ function chegarAve(pessoas: readonly Jogador[], vistas: readonly Vista[]): void 
 }
 
 function levantarVoo(ave: Ave, fuga: number): void {
+  // Saindo de um galho, sacode umas folhas.
+  if (ave.arvore) soltarFolhas(ave.arvore.x, ave.x, ave.y + 2, 3 + Math.floor(Math.random() * 3), true);
   ave.estado = 'voando';
   ave.direcao = fuga;
   ave.vx = fuga * sortear(AVES.fuga.vx);
@@ -945,6 +951,8 @@ function atualizarAve(ave: Ave, dt: number, jogador: Jogador): void {
     if (dist - passo < 0.5) {
       ave.estado = 'pousado';
       ave.espera = sortear(AVES.parado);
+      // Pousando num galho, cai uma folha ou duas.
+      if (ave.arvore) soltarFolhas(ave.arvore.x, ave.x, ave.y + 2, 1 + Math.floor(Math.random() * 2));
     }
     return;
   }

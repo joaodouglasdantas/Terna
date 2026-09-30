@@ -37,11 +37,11 @@ const CAMADAS = [
 ];
 
 const RAIOS = {
-  forca: 0.34, // alfa do facho visível (screen), com o sol forte
-  aquece: 0.6, // alfa do que o facho clareia e esquenta embaixo dele (soft-light)
-  horaDourada: 0.7, // quanto mais fortes os raios ficam com o sol baixo
+  forca: 0.23, // alfa do facho visível (screen), com o sol forte
+  aquece: 0.42, // alfa do que o facho clareia e esquenta embaixo dele (soft-light)
+  horaDourada: 0.5, // quanto mais fortes os raios ficam com o sol baixo
   inicio: 9, // px a partir do centro do sol onde o facho começa (dentro do brilho)
-  poca: 0.36, // a poça de luz no chão
+  poca: 0.28, // a poça de luz no chão
   nuvem: 0.8, // quanto uma nuvem na frente do sol apaga os raios
   sombraDaNuvem: 0.1, // e quanto a cena escurece com ela
   seguir: 1.6, // por segundo: a cobertura muda aos poucos (a nuvem entrando e saindo do sol)

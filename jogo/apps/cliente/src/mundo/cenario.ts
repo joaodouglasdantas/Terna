@@ -541,6 +541,7 @@ function plantaIluminada(
   canvas.height = q.h;
   const c = contexto2d(canvas, { willReadFrequently: true });
   c.drawImage(folha, q.x, q.y, q.w, q.h, 0, 0, q.w, q.h);
+  if (grupo === 'arbustos' && indice in AMORAS) pintarAmoras(c, q.w, q.h, q.m ?? 0, indice);
   const borda = contornoDeLuz(c, q.w, q.h, luz, nevoa, guardada?.borda ?? null);
   // 'source-atop' pinta só por cima dos pixels da planta, sem sair do contorno.
   c.globalCompositeOperation = 'source-atop';
@@ -569,6 +570,48 @@ function plantaIluminada(
   const pronta = { canvas, borda, degrau };
   plantasIluminadas.set(chave, pronta);
   return pronta;
+}
+
+// Amoras em algumas moitas (índice da moita → quantas): cachinhos de 2×2 no meio da folhagem, a
+// maioria madura (roxo quase preto, com um brilho) e umas ainda vermelhas. Sempre nos mesmos
+// lugares da moita (sorteio fixo por índice), pintadas antes da luz, para a sombra pegar nelas.
+const AMORAS: Record<number, number> = { 0: 6, 1: 7, 3: 5, 5: 5 };
+const MADURA = { brilho: '#b58ac4', meio: '#4a1a52', fundo: '#24091f' };
+const VERDE = { brilho: '#ff9a8a', meio: '#c8323a', fundo: '#861a26' };
+
+function pintarAmoras(c: CanvasRenderingContext2D, w: number, h: number, m: number, indice: number): void {
+  let dados: ImageData;
+  try {
+    dados = c.getImageData(0, 0, w, h);
+  } catch {
+    return;
+  }
+  const opaco = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < w && y < h && dados.data[(y * w + x) * 4 + 3] > 0;
+  // Dentro da folhagem: o 2×2 e a volta dele opacos.
+  const cabe = (x: number, y: number): boolean => {
+    for (let dy = -1; dy <= 2; dy++) for (let dx = -1; dx <= 2; dx++) if (!opaco(x + dx, y + dy)) return false;
+    return true;
+  };
+  let semente = indice * 7919 + 17;
+  const acaso = (): number => {
+    semente = (semente * 16807) % 2147483647;
+    return semente / 2147483647;
+  };
+  const postas: [number, number][] = [];
+  for (let tentativa = 0; tentativa < 60 && postas.length < AMORAS[indice]; tentativa++) {
+    const x = m + 2 + Math.floor(acaso() * (w - m - 5));
+    const y = 2 + Math.floor(acaso() * (h * 0.65));
+    const madura = acaso() < 0.72;
+    if (!cabe(x, y) || postas.some(([px, py]) => Math.abs(px - x) < 4 && Math.abs(py - y) < 3)) continue;
+    postas.push([x, y]);
+    const cor = madura ? MADURA : VERDE;
+    c.fillStyle = cor.meio;
+    c.fillRect(x, y, 2, 2);
+    c.fillStyle = cor.fundo;
+    c.fillRect(x + 1, y + 1, 1, 1);
+    c.fillStyle = cor.brilho;
+    c.fillRect(x, y, 1, 1);
+  }
 }
 
 // Pixel art de luz: a borda da planta do lado de lá do sol ganha um pouco de sombra, sempre. O

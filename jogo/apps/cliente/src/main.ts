@@ -57,6 +57,8 @@ import {
   luzNaTela,
 } from './mundo/cenario';
 import { prepararRaios } from './mundo/raios';
+import { atualizarFolhas, desenharFolhas, prepararFolhas } from './mundo/folhas';
+import { desenharCogumelos } from './mundo/cogumelos';
 import { TILE, criarChao } from './mundo/chao';
 import { desenharRaizes } from './mundo/raizes';
 import { atualizarMinhocas, desenharMinhocas, prepararMinhocas } from './mundo/minhocas';
@@ -290,6 +292,7 @@ function atualizar(dt: number, tempo: number): void {
   atualizarPassaros(dt, LARGURA, esquerda, direita);
   atualizarAnimais(dt, partida ? [partida.jogador, partida.outro] : [], vistas());
   atualizarMinhocas(dt);
+  atualizarFolhas(dt, tempo, vistas());
 }
 
 // Uma tela inteira vista pela câmera `camX`, recortada na faixa de `x0` a `x0 + largura` da
@@ -307,7 +310,9 @@ function desenharVista(tempo: number, luz: Luz, camX: number, olharY: number, x0
   ctx.drawImage(chao, 0, Y_CHAO - FOLGA_TUFOS);
   desenharMinhocas(ctx, camX, LARGURA);
   desenharVegetacao(ctx, folhaCenario, tempo, luz, Y_CHAO, camX, LARGURA, olharY);
+  desenharCogumelos(ctx, luz, Y_CHAO, camX, LARGURA);
   desenharAnimais(ctx, luz, tempo, camX, LARGURA);
+  desenharFolhas(ctx, tempo, camX, LARGURA);
 
   if (partida) {
     // As marcas dos poderes no chão, embaixo de todos; o outro atrás e você na frente, quando um
@@ -530,6 +535,7 @@ async function principal(): Promise<void> {
   folhaCenario = cenario;
   desenharRaizes(chao, cenario, FOLGA_TUFOS); // as raízes das plantas, no chão (mundo/raizes.ts)
   prepararAnimais(cenario, Y_CHAO);
+  prepararFolhas(Y_CHAO);
   prepararMinhocas(Y_CHAO, ALTURA_CHAO);
   prepararCena();
   prepararRamos();
