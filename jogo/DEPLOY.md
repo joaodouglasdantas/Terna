@@ -69,9 +69,10 @@ Antes de tudo: faça commit e push deste projeto para o GitHub (`joaodouglasdant
    - **Root directory (advanced):** `jogo`
    - **Environment variables (advanced):** `NODE_VERSION` = `22`
 4. **Save and Deploy**. Em uns 3 minutos o jogo está em `https://terna.pages.dev`.
-5. Em **Settings → Build → Build watch paths**, deixe só `apps/cliente/*`, `packages/*` e
-   `package*.json` (caminhos a partir da pasta `jogo`). Assim, commit que não mexe no jogo não
-   gasta build.
+5. Em **Settings → Build → Build watch paths → Edit**, troque o `*` de **Include paths** por
+   `jogo/apps/cliente/*`, `jogo/packages/*`, `jogo/package.json` e `jogo/package-lock.json` (os
+   caminhos contam a partir da raiz do repositório, não da pasta `jogo`). Assim, commit que não
+   mexe no jogo não gasta build.
 
 O jogo já ficou num Worker (`terna.<subdominio-da-conta>.workers.dev`, com a configuração em
 `apps/cliente/wrangler.jsonc`). O Pages ficou no lugar dele porque o endereço é só o nome do
