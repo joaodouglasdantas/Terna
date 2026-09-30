@@ -40,7 +40,7 @@ export const SAPO = {
   volta: 40,
 };
 
-export const CERVO = {
+export const VEADO = {
   maximo: 2,
   lugares: [250, 1200],
   susto: 130,
@@ -85,7 +85,7 @@ export const AVES = {
   saltinho: { vx: 30, vy: 55 },
 };
 
-export const CONFIG_ANIMAL = { esquilo: ESQUILO, coelho: COELHO, sapo: SAPO, cervo: CERVO, borboleta: BORBOLETA };
+export const CONFIG_ANIMAL = { esquilo: ESQUILO, coelho: COELHO, sapo: SAPO, veado: VEADO, borboleta: BORBOLETA };
 export type TipoAnimal = keyof typeof CONFIG_ANIMAL;
 
 export const REPOSICAO_ANIMAIS: Intervalo = [8, 20]; // espera até nascer um animal no lugar de um que sumiu

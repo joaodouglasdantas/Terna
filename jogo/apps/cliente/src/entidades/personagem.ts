@@ -485,49 +485,6 @@ export const ALTURA_RETRATO = 28; // por dentro da moldura (o painel: da barra d
 const FOLGA_NO_ALTO = 2; // entre o alto da moldura e a cabeça
 const retratos = new Map<string, HTMLCanvasElement>();
 
-// A largura do golem na foto, em px (o sprite tem 25).
-const GOLEM_NA_FOTO = 21;
-
-// A imagem reduzida para `largura` px (a altura na mesma proporção), com a média das cores de cada
-// área e o contorno nítido (cada pixel fica opaco ou vazio, como no resto da pixel art).
-function reduzirParaFoto(imagem: HTMLCanvasElement, largura: number): HTMLCanvasElement {
-  const escala = largura / imagem.width;
-  const w = largura;
-  const h = Math.round(imagem.height * escala);
-  const origem = contexto2d(imagem).getImageData(0, 0, imagem.width, imagem.height).data;
-  const saida = novoCanvas(w, h);
-  const c = contexto2d(saida);
-  const dados = c.createImageData(w, h);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      // A área da imagem original que cai neste pixel.
-      const [x0, x1] = [x / escala, (x + 1) / escala];
-      const [y0, y1] = [y / escala, (y + 1) / escala];
-      let [r, g, b, a, peso] = [0, 0, 0, 0, 0];
-      for (let oy = Math.floor(y0); oy < Math.ceil(y1); oy++) {
-        for (let ox = Math.floor(x0); ox < Math.ceil(x1); ox++) {
-          const cobre = (Math.min(x1, ox + 1) - Math.max(x0, ox)) * (Math.min(y1, oy + 1) - Math.max(y0, oy));
-          const i = (oy * imagem.width + ox) * 4;
-          const al = origem[i + 3] / 255;
-          r += origem[i] * al * cobre;
-          g += origem[i + 1] * al * cobre;
-          b += origem[i + 2] * al * cobre;
-          a += al * cobre;
-          peso += cobre;
-        }
-      }
-      if (a / peso < 0.5) continue;
-      const i = (y * w + x) * 4;
-      dados.data[i] = r / a;
-      dados.data[i + 1] = g / a;
-      dados.data[i + 2] = b / a;
-      dados.data[i + 3] = 255;
-    }
-  }
-  c.putImageData(dados, 0, 0);
-  return saida;
-}
-
 // Onde pôr a imagem para as colunas com pixel (nas `linhas` de cima, as que aparecem na foto)
 // ficarem no meio da largura da foto.
 function centrarNaFoto(imagem: HTMLCanvasElement, linhas: number): number {
@@ -555,18 +512,15 @@ export function retrato(heroi: Heroi, forma: Forma = 'base'): HTMLCanvasElement 
   if (pronto) return pronto;
 
   const sprites = spritesDo(heroi, forma);
-  const { eixo } = (sprites.retrato ?? sprites.parado)[0];
-  // O golem é quase da largura da moldura e torto (o braço grande de um lado): na foto ele vai um
-  // pouco menor, inteiro e com folga dos dois lados, como os outros.
-  const imagem = forma === 'golem' ? reduzirParaFoto((sprites.retrato ?? sprites.parado)[0].imagem, GOLEM_NA_FOTO) : (sprites.retrato ?? sprites.parado)[0].imagem;
-  // O golem (reduzido) assenta os pés na borda de baixo, como o corpo dos outros.
-  const y = heroi === 'anjo' ? ALTURA_AUREOLA : forma === 'golem' ? Math.max(FOLGA_NO_ALTO, ALTURA_RETRATO - imagem.height) : FOLGA_NO_ALTO;
+  const { imagem, eixo } = (sprites.retrato ?? sprites.parado)[0];
+  const y = heroi === 'anjo' ? ALTURA_AUREOLA : FOLGA_NO_ALTO;
   const linhas = Math.min(imagem.height, ALTURA_RETRATO - y);
   const foto = novoCanvas(LARGURA_RETRATO, ALTURA_RETRATO);
   const ctx = contexto2d(foto);
   // No meio da moldura: o eixo do corpo (o cajado do Grow sobra para o lado); o golem, largo e
-  // quase do tamanho da foto, pelo que aparece dele — sobra o mesmo dos dois lados.
-  const x = forma === 'golem' ? centrarNaFoto(imagem, linhas) : Math.round(LARGURA_RETRATO / 2 - eixo);
+  // quase do tamanho da foto, pelo que aparece dele, e mais 1px para a direita: ele tem 25px numa
+  // foto de 26, e o braço grande do lado esquerdo pesa mais (encostado na borda, parecia torto).
+  const x = forma === 'golem' ? centrarNaFoto(imagem, linhas) + 1 : Math.round(LARGURA_RETRATO / 2 - eixo);
   const quadro = quadroPersonagem(heroi, 'parado', 0);
   if (forma === 'anjo') desenharAsasDoRetrato(ctx, quadro, x, y);
   ctx.drawImage(imagem, 0, 0, imagem.width, linhas, x, y, imagem.width, linhas);

@@ -1,6 +1,6 @@
 // Animais do mapa, em coordenadas do mapa (como o chão e o personagem). Todos se assustam
 // com o personagem e vão embora de vez: o esquilo sobe na árvore mais próxima e some na copa
-// (sem árvore por perto, foge pelo chão), o cervo dispara em galope, coelho e sapo saem aos
+// (sem árvore por perto, foge pelo chão), o veado dispara em galope, coelho e sapo saem aos
 // pulos, borboletas e pássaros saem voando. Quem sai da tela some do mapa e, mais tarde,
 // outro nasce fora da tela no lugar dele: cada bicho tem um `maximo` no mapa, então o mapa
 // nunca fica cheio nem vazio. Os sprites estão em animais-quadros.ts e os números de
@@ -9,7 +9,7 @@
 import {
   AVES,
   BORBOLETA,
-  CERVO,
+  VEADO,
   COELHO,
   CONFIG_ANIMAL,
   ESQUILO,
@@ -37,8 +37,8 @@ import {
 import { soltarFolhas } from '../mundo/folhas';
 import {
   CORES_BORBOLETA,
-  CORPO_CERVO,
-  PALETA_CERVO,
+  CORPO_VEADO,
+  PALETA_VEADO,
   PALETA_COELHO,
   PALETA_ESQUILO,
   PALETA_SAPO,
@@ -116,8 +116,8 @@ interface Sapo extends AnimalBase, Saltador {
   depois: 'pulo' | 'parado';
 }
 
-interface Cervo extends AnimalBase {
-  tipo: 'cervo';
+interface Veado extends AnimalBase {
+  tipo: 'veado';
   estado: 'parado' | 'andando' | 'olhando' | 'alerta' | 'fugindo';
   fuga: number;
   olhandoPraTras: boolean;
@@ -130,7 +130,7 @@ interface Borboleta extends AnimalBase {
   alvo: (Ponto & { pousar: boolean }) | null;
 }
 
-type Animal = Esquilo | Coelho | Sapo | Cervo | Borboleta;
+type Animal = Esquilo | Coelho | Sapo | Veado | Borboleta;
 
 // Onde um pássaro pousa: no chão (arvore = null) ou num poleiro de uma árvore.
 interface LugarDePouso {
@@ -167,7 +167,7 @@ function girarSprite(sprite: HTMLCanvasElement, sentido: number): HTMLCanvasElem
   return canvas;
 }
 
-// Pernas do cervo: quadril, joelho e casco em (x, y) no quadro do corpo; o casco no chão fica
+// Pernas do veado: quadril, joelho e casco em (x, y) no quadro do corpo; o casco no chão fica
 // na linha 39. As de trás dobram o jarrete para trás. `tp`/`tl`: traseiras de perto e de
 // longe; `dp`/`dl`: dianteiras. As de longe ficam atrás do corpo e mais escuras.
 type Junta = [number, number];
@@ -175,7 +175,7 @@ type Perna = [Junta, Junta, Junta]; // quadril, joelho, casco
 type NomePerna = 'tp' | 'tl' | 'dp' | 'dl';
 type Pernas = Record<NomePerna, Perna>;
 
-const PERNAS_CERVO: { repouso: Pernas; galope: (Pernas & { dy: number })[] } = {
+const PERNAS_VEADO: { repouso: Pernas; galope: (Pernas & { dy: number })[] } = {
   repouso: {
     tp: [[6, 27], [4, 33], [6, 39]],
     tl: [[10, 27], [8, 33], [10, 39]],
@@ -189,14 +189,14 @@ const PERNAS_CERVO: { repouso: Pernas; galope: (Pernas & { dy: number })[] } = {
     { dy: -1, tp: [[6, 27], [3, 33], [5, 39]], tl: [[10, 27], [7, 33], [9, 38]], dp: [[20, 27], [23, 32], [25, 37]], dl: [[23, 27], [26, 31], [28, 35]] },
   ],
 };
-const CORES_PERNA_CERVO: Record<'perto' | 'longe', [string, string, string]> = { perto: ['c', 'g', 'i'], longe: ['i', 'c', 'l'] }; // escura, clara, casco
-const MARGEM_CERVO = 2; // o galope estica as pernas para fora do corpo
+const CORES_PERNA_VEADO: Record<'perto' | 'longe', [string, string, string]> = { perto: ['c', 'g', 'i'], longe: ['i', 'c', 'l'] }; // escura, clara, casco
+const MARGEM_VEADO = 2; // o galope estica as pernas para fora do corpo
 
-// Passo do cervo: pernas em diagonal andam juntas; a que vai para a frente sobe o casco.
+// Passo do veado: pernas em diagonal andam juntas; a que vai para a frente sobe o casco.
 function pernasAndando(fase: number): Pernas {
   const pernas = {} as Pernas;
   const defasagem: Record<NomePerna, number> = { tp: 0, dl: 0, tl: Math.PI, dp: Math.PI };
-  (Object.entries(PERNAS_CERVO.repouso) as [NomePerna, Perna][]).forEach(([nome, [quadril, joelho, casco]]) => {
+  (Object.entries(PERNAS_VEADO.repouso) as [NomePerna, Perna][]).forEach(([nome, [quadril, joelho, casco]]) => {
     const f = fase + defasagem[nome];
     const dx = Math.round(2.5 * Math.cos(f));
     const sobe = Math.max(0, Math.round(2 * Math.sin(f)));
@@ -206,12 +206,12 @@ function pernasAndando(fase: number): Pernas {
   return pernas;
 }
 
-// Monta o quadro do cervo: pernas de longe, corpo e pernas de perto, nessa ordem. Cada perna
+// Monta o quadro do veado: pernas de longe, corpo e pernas de perto, nessa ordem. Cada perna
 // tem 2px (escura atrás, clara na frente); as coxas de trás, 3px no alto.
-function comporCervo(corpo: 'frente' | 'tras', pernas: Pernas, dy = 0): QuadroAnimal {
-  const m = MARGEM_CERVO;
+function comporVeado(corpo: 'frente' | 'tras', pernas: Pernas, dy = 0): QuadroAnimal {
+  const m = MARGEM_VEADO;
   // O casco dianteiro de longe chega à coluna 32 no galope.
-  const largura = Math.max(CORPO_CERVO.frente[0].length, CORPO_CERVO.tras[0].length, 33) + 2 * m;
+  const largura = Math.max(CORPO_VEADO.frente[0].length, CORPO_VEADO.tras[0].length, 33) + 2 * m;
   const grade = Array.from({ length: 40 + m }, () => Array(largura).fill('.'));
   const pintar = (x: number, y: number, cor: string): void => {
     if (grade[y + m] && x + m >= 0 && x + m < largura) grade[y + m][x + m] = cor;
@@ -232,15 +232,15 @@ function comporCervo(corpo: 'frente' | 'tras', pernas: Pernas, dy = 0): QuadroAn
       }
     }
   };
-  perna('tl', CORES_PERNA_CERVO.longe);
-  perna('dl', CORES_PERNA_CERVO.longe);
-  CORPO_CERVO[corpo].forEach((linha, y) => {
+  perna('tl', CORES_PERNA_VEADO.longe);
+  perna('dl', CORES_PERNA_VEADO.longe);
+  CORPO_VEADO[corpo].forEach((linha, y) => {
     [...linha].forEach((cor, x) => {
       if (cor !== '.') pintar(x, y + dy, cor);
     });
   });
-  perna('tp', CORES_PERNA_CERVO.perto);
-  perna('dp', CORES_PERNA_CERVO.perto);
+  perna('tp', CORES_PERNA_VEADO.perto);
+  perna('dp', CORES_PERNA_VEADO.perto);
   return { linhas: grade.map((linha) => linha.join('')), eixo: 15 + m };
 }
 
@@ -265,11 +265,11 @@ const SPRITES_ANIMAIS = (() => {
       boca: spriteDe(QUADROS_SAPO.boca, PALETA_SAPO),
       agachado: spriteDe(QUADROS_SAPO.agachado, PALETA_SAPO),
     },
-    cervo: {
-      parado: spriteDe(comporCervo('frente', PERNAS_CERVO.repouso), PALETA_CERVO),
-      olhando: spriteDe(comporCervo('tras', PERNAS_CERVO.repouso), PALETA_CERVO),
-      andando: [0, 1, 2, 3].map((i) => spriteDe(comporCervo('frente', pernasAndando((i * Math.PI) / 2)), PALETA_CERVO)),
-      galope: PERNAS_CERVO.galope.map(({ dy, ...pernas }) => spriteDe(comporCervo('frente', pernas, dy), PALETA_CERVO)),
+    veado: {
+      parado: spriteDe(comporVeado('frente', PERNAS_VEADO.repouso), PALETA_VEADO),
+      olhando: spriteDe(comporVeado('tras', PERNAS_VEADO.repouso), PALETA_VEADO),
+      andando: [0, 1, 2, 3].map((i) => spriteDe(comporVeado('frente', pernasAndando((i * Math.PI) / 2)), PALETA_VEADO)),
+      galope: PERNAS_VEADO.galope.map(({ dy, ...pernas }) => spriteDe(comporVeado('frente', pernas, dy), PALETA_VEADO)),
     },
     // Uma versão por cor de CORES_PASSARO, com os pés (P).
     ave: CORES_PASSARO.map((cores) => {
@@ -427,8 +427,8 @@ function criarAnimal(tipo: TipoAnimal, x: number): Animal {
         cheio: false,
         depois: 'parado',
       };
-    case 'cervo':
-      return { ...base, tipo, estado: 'parado', espera: sortear(CERVO.parado), fuga: 1, olhandoPraTras: false };
+    case 'veado':
+      return { ...base, tipo, estado: 'parado', espera: sortear(VEADO.parado), fuga: 1, olhandoPraTras: false };
     case 'borboleta':
       return {
         ...base,
@@ -707,14 +707,14 @@ function desenharSapo(ctx: CanvasRenderingContext2D, s: Sapo, luz: Luz): void {
   desenharSprite(ctx, sprite, s.x, s.y, s.direcao);
 }
 
-// --- Cervo ---
+// --- Veado ---
 
-function atualizarCervo(c: Cervo, dt: number, jogador: Jogador): void {
+function atualizarVeado(c: Veado, dt: number, jogador: Jogador): void {
   const { longe, fuga } = distancia(c, jogador);
-  if (!c.medo && longe < CERVO.susto) {
+  if (!c.medo && longe < VEADO.susto) {
     c.medo = true;
     c.estado = 'alerta';
-    c.espera = CERVO.alerta;
+    c.espera = VEADO.alerta;
     c.fuga = fuga;
     // Encara o personagem: se ele está atrás, vira a cabeça.
     c.olhandoPraTras = Math.sign(jogador.x - c.x) !== c.direcao;
@@ -727,31 +727,31 @@ function atualizarCervo(c: Cervo, dt: number, jogador: Jogador): void {
       c.direcao = c.fuga;
     }
   } else if (c.estado === 'fugindo') {
-    c.x += c.direcao * CERVO.galope * dt; // até sair da tela
+    c.x += c.direcao * VEADO.galope * dt; // até sair da tela
   } else if (c.estado === 'andando') {
-    c.x = limitarNoMapa(c.x + c.direcao * CERVO.passo * dt, 20);
+    c.x = limitarNoMapa(c.x + c.direcao * VEADO.passo * dt, 20);
     if (c.espera <= 0) {
       c.estado = 'parado';
-      c.espera = sortear(CERVO.parado);
+      c.espera = sortear(VEADO.parado);
     }
   } else if (c.espera <= 0) {
     const sorteio = Math.random();
     if (sorteio < 0.5) {
       c.estado = 'andando';
-      c.direcao = direcaoPasseio(c, CERVO.volta);
-      c.espera = sortear(CERVO.andando);
+      c.direcao = direcaoPasseio(c, VEADO.volta);
+      c.espera = sortear(VEADO.andando);
     } else if (sorteio < 0.8 && c.estado !== 'olhando') {
       c.estado = 'olhando';
-      c.espera = sortear(CERVO.olhando);
+      c.espera = sortear(VEADO.olhando);
     } else {
       c.estado = 'parado';
-      c.espera = sortear(CERVO.parado);
+      c.espera = sortear(VEADO.parado);
     }
   }
 }
 
-function desenharCervo(ctx: CanvasRenderingContext2D, c: Cervo, luz: Luz): void {
-  const s = SPRITES_ANIMAIS.cervo;
+function desenharVeado(ctx: CanvasRenderingContext2D, c: Veado, luz: Luz): void {
+  const s = SPRITES_ANIMAIS.veado;
   desenharSombra(ctx, luz, c.x, yChaoAnimais, 24, 0.9);
   let sprite = s.parado;
   if (c.estado === 'olhando' || (c.estado === 'alerta' && c.olhandoPraTras)) sprite = s.olhando;
@@ -1041,8 +1041,8 @@ function atualizarAnimal(animal: Animal, dt: number, jogador: Jogador): void {
       return atualizarCoelho(animal, dt, jogador);
     case 'sapo':
       return atualizarSapo(animal, dt, jogador);
-    case 'cervo':
-      return atualizarCervo(animal, dt, jogador);
+    case 'veado':
+      return atualizarVeado(animal, dt, jogador);
     case 'borboleta':
       return atualizarBorboleta(animal, dt, jogador);
   }
@@ -1102,12 +1102,12 @@ const naVista = (x: number, camX: number, largura: number, margem = MARGEM_TELA)
 
 // Bichos no chão e nas árvores, com sombra: depois da vegetação e antes do personagem. Os
 // maiores primeiro, para os pequenos não sumirem atrás deles.
-const ORDEM_DESENHO = ['cervo', 'coelho', 'sapo', 'esquilo'] as const;
+const ORDEM_DESENHO = ['veado', 'coelho', 'sapo', 'esquilo'] as const;
 
 function desenharAnimalNoChao(ctx: CanvasRenderingContext2D, animal: Animal, luz: Luz): void {
   switch (animal.tipo) {
-    case 'cervo':
-      return desenharCervo(ctx, animal, luz);
+    case 'veado':
+      return desenharVeado(ctx, animal, luz);
     case 'coelho':
       return desenharCoelho(ctx, animal, luz);
     case 'sapo':

@@ -1,6 +1,6 @@
-// Sprites dos animais, desenhados a partir das referências: coelho, sapo e cervo copiados
-// pixel a pixel (o cervo com a cabeça virada para a frente e as pernas refeitas por quadro,
-// em animais.ts); o esquilo redesenhado em metade do tamanho, com as cores da referência.
+// Sprites dos animais, desenhados a partir das referências: coelho e sapo copiados
+// pixel a pixel; o veado redesenhado como o veado-mateiro (pernas refeitas por quadro, em
+// animais.ts); o esquilo redesenhado em metade do tamanho, com as cores da referência.
 // Todos virados para a direita. Cada caractere é 1 pixel e '.' é transparente; `eixo` é a
 // coluna do centro do corpo, que fica sobre o `x` do animal (os pés ficam na última linha).
 // Nenhum tem contorno preto em volta do corpo (o 'o' que sobrou é só olho, boca e detalhe).
@@ -175,85 +175,88 @@ export const QUADROS_SAPO: Record<'parado' | 'pulo' | 'papo' | 'boca' | 'agachad
   ] },
 };
 
-export const PALETA_CERVO = {
-  a: '#cd633d',
-  b: '#ab5233',
-  c: '#70422a',
-  d: '#5e2c1a',
-  e: '#b8896f',
-  f: '#e24e0f',
-  g: '#8b624c',
-  h: '#f49974',
-  i: '#432418',
-  j: '#f0c185',
-  k: '#d2a775',
-  l: '#260f07',
+// O veado (veado-mateiro, da mata brasileira): pelagem cor de ferrugem, sem pintas, a cabeça um
+// pouco mais escura, chifres curtos em espeto (sem galhos), orelha grande clara por dentro, uma
+// marquinha clara acima do olho, queixo e garganta claros e o rabo curto, branco por baixo.
+export const PALETA_VEADO = {
+  a: '#d9c9a3', // chifre
+  b: '#c2703f', // lombo, onde bate a luz
+  c: '#7a3a1c', // sombra
+  d: '#4d2210', // sombra funda, focinho
+  f: '#8f4524', // cabeça
+  g: '#a8582d', // corpo
+  h: '#ecd6b8', // dentro da orelha
+  i: '#26120a', // olho, nariz
+  j: '#ecdcc0', // garganta e peito
+  k: '#d2976a', // barriga
+  l: '#1e0c06', // casco
+  m: '#f6eee0', // branco: acima do olho, queixo, rabo
 };
 
-// Corpo do cervo até a barriga; as pernas são desenhadas por cima em cada quadro.
-export const CORPO_CERVO: Record<'frente' | 'tras', string[]> = {
+// Corpo do veado até a barriga; as pernas são desenhadas por cima em cada quadro.
+export const CORPO_VEADO: Record<'frente' | 'tras', string[]> = {
   frente: [
     '..............................',
-    '......................a.......',
-    '..............a.......a.a.....',
-    '...............a......bbb.....',
-    '...............bb......c......',
-    '..............a.c....cdd......',
-    '...............ccc.d..dee.....',
-    '.................cdd...ef.....',
-    '..................dd...gf.....',
-    '.................gggg.ccgg....',
-    '..................hfggcgggg...',
-    '...................hfggggigg..',
-    '....................ggggghgggi',
-    '....................ggggfhhggg',
-    '....................gcggfffgg.',
-    '....................ggggdgg...',
-    '......................ddcgj...',
-    '.....jc...............dcggj...',
-    '.....jgcjeejee........ccggj...',
-    '.....jjcejeejeje......cgggj...',
-    '.......ccggkjeejeje.eecgggj...',
-    '......dcggkegggkegjejggggkj...',
-    '.....dccggggkgkgeekggggggkj...',
-    '.....dcgggggggggkggggggggjj...',
-    '.....dcgggggggggggggggggkj....',
-    '......cgggggeegggggggggekj....',
-    '......cgggeeeckgggkdgggej.....',
-    '......cggeeecckjjjkdggegj.....',
-    '......cegeecc.....dcggekj.....',
+    '..............................',
+    '.....................a..a.....',
+    '.....................a..a.....',
+    '......................a.a.....',
+    '......................a.a.....',
+    '..................cc.fffff....',
+    '.................chhcffffff...',
+    '..................cccfffmiff..',
+    '.....................ffffffff.',
+    '.....................fffffffdi',
+    '.....................fffffmmm.',
+    '.....................ggffmm...',
+    '.....................gggggj...',
+    '.....................cggggj...',
+    '....................ccggggj...',
+    '......................ddcgb...',
+    '.....cc...............dcggb...',
+    '.....mgcbbbbbb........ccggb...',
+    '.....mmcggggggbb......cgggb...',
+    '.......ccgggggggbbb.bbcgggb...',
+    '......dcgggggggggggbgggggkb...',
+    '.....dccgggggggggggggggggkb...',
+    '.....dcggggggggggggggggggbb...',
+    '.....dcgggggggggggggggggkk....',
+    '......cgggggkkgggggggggekk....',
+    '......cgggkkkcgggggdgggek.....',
+    '......cggkkkccgggggdggegk.....',
+    '......ckgkkcc.....dcggekk.....',
   ],
-  // a pose da referência: cabeça virada para trás
+  // olhando para trás, por cima do lombo
   tras: [
     '.................................',
-    '........................a........',
-    '......................a.a.......a',
-    '......................bbb......a.',
-    '.......................c......bb.',
-    '.......................ddc....c.a',
-    '......................eed..d.ccc.',
-    '......................fe...ddc...',
-    '......................fg...dd....',
-    '.....................ggcc.gggg...',
-    '....................ggggcggfh....',
-    '...................ggiggggfh.....',
-    '.................iggghggggg......',
-    '.................ggghhfgggg......',
-    '..................ggfffggcg......',
-    '....................ggggdgg......',
-    '......................ddcgj......',
-    '.....jc...............dcggj......',
-    '.....jgcjeejee........ccggj......',
-    '.....jjcejeejeje......cgggj......',
-    '.......ccggkjeejeje.eecgggj......',
-    '......dcggkegggkegjejggggkj......',
-    '.....dccggggkgkgeekggggggkj......',
-    '.....dcgggggggggkggggggggjj......',
-    '.....dcgggggggggggggggggkj.......',
-    '......cgggggeegggggggggekj.......',
-    '......cgggeeeckgggkdgggej........',
-    '......cggeeecckjjjkdggegj........',
-    '......cegeecc.....dcggekj........',
+    '.................................',
+    '.......................a..a......',
+    '.......................a..a......',
+    '.......................a.a.......',
+    '.......................a.a.......',
+    '......................fffff.cc...',
+    '.....................ffffffchhc..',
+    '....................ffimfffccc...',
+    '...................ffffffff......',
+    '..................idfffffff......',
+    '...................mmmfffff......',
+    '.....................mmffgg......',
+    '.....................gggggj......',
+    '.....................gggggj......',
+    '.....................gggggjc.....',
+    '......................ddcgb......',
+    '.....cc...............dcggb......',
+    '.....mgcbbbbbb........ccggb......',
+    '.....mmcggggggbb......cgggb......',
+    '.......ccgggggggbbb.bbcgggb......',
+    '......dcgggggggggggbgggggkb......',
+    '.....dccgggggggggggggggggkb......',
+    '.....dcggggggggggggggggggbb......',
+    '.....dcgggggggggggggggggkk.......',
+    '......cgggggkkgggggggggekk.......',
+    '......cgggkkkcgggggdgggek........',
+    '......cggkkkccgggggdggegk........',
+    '......ckgkkcc.....dcggekk........',
   ],
 };
 
