@@ -25,6 +25,7 @@
     "arte:leslie": "node ferramentas/gerar-herois.cjs leslie flor",
     "arte:grow": "node ferramentas/gerar-herois.cjs grow golem aguia",
     "arte:logo": "node ferramentas/logo-por-do-sol.cjs",
+    "arte:icone": "node ferramentas/gerar-icone.cjs",
     "arte:tela-inicial-feixes": "node ferramentas/tela-inicial-sem-feixes.cjs"
   },
   "devDependencies": {

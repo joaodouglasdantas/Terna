@@ -1,0 +1,17 @@
+{
+  "name": "Terna",
+  "short_name": "Terna",
+  "description": "Jogo de plataforma e luta 2D em pixel art: Leslie e Grow na Floresta da Divisa.",
+  "lang": "pt-BR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1b1b24",
+  "theme_color": "#1b1b24",
+  "icons": [
+    { "src": "icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icone.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

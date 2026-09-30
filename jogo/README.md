@@ -37,6 +37,7 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 | `npm run arte:grow` | regera o Grow (com o musgo pintado no cajado, e a folha sem o cajado na mão), o golem e as águias a partir de `fontes/grow.png`, `golem.png` e `aguia.png` |
 | `python3 ferramentas/simular-duelo.py` | simula duelos entre os personagens (duração e quem vence) com os números do balanceamento; `antes` compara com os de antes, `furia` com a Fúria da Floresta no lugar da Flor (BALANCEAMENTO.md) |
 | `node ferramentas/tirar-fundo.cjs <folha.png> <nome>` | tira o fundo preto de uma folha nova de personagem e grava em `fontes/` (os pretos de dentro do desenho — olhos, contornos — ficam); com `--cor-do-canto`, o fundo é a cor do canto da folha (as águias vieram num azul-escuro); com `--xadrez`, o xadrez branco e cinza de "transparente" pintado na folha (a da flor) |
+| `npm run arte:icone` | regera o ícone do site (a aba do navegador, a tela inicial do celular e o app instalado) a partir da grade de pixels em `ferramentas/gerar-icone.cjs`; os arquivos vão para `apps/cliente/public/` |
 | `npm run arte:anjo` | regera o Anjo (desligado por enquanto) a partir de `fontes/SpriteBase.png` |
 
 ## Personagens

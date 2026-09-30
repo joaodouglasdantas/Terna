@@ -61,11 +61,11 @@ const FUNDO = { x: -4, y: -4, w: BARRA_X + BARRA + 2 + 8, h: FOTO.h + 8 };
 
 const PALETA_ICONES: Paleta = { r: '#e8445e', c: '#ffb3c0', e: '#a8283e', y: '#ffd966', w: '#fff4c2' };
 const CORACAO = criarSprite(['.rr.rr.', 'rcrrrrr', 'rrrrrrr', '.rrrrr.', '..rre..', '...e...'], PALETA_ICONES);
-const AUREOLA = criarSprite(['.wyyyy.', 'y.....y', '.yyyyy.'], PALETA_ICONES);
-// A folha da energia pixy da Leslie.
-const FOLHA = criarSprite(['...gg..', '.gcggg.', 'tggge..'], { g: '#8fd45a', c: '#d4f7a8', e: '#4f9a38', t: '#6b4424' });
-// A pedrinha com musgo da energia do Grow (e do tempo do golem).
-const PEDRINHA = criarSprite(['..vgv..', '.lkkkk.', 'skkkkks'], { v: '#9cbc45', g: '#6b8a2a', l: '#d2c3a2', k: '#a8977a', s: '#75654f' });
+// O caco de cristal da energia pixy, igual para todos: um estilhaço do cristal da lore, com a
+// luz na face da esquerda. L: o brilho, A: a face clara, b: a do meio, d: a da sombra. Ele tem as
+// cores da barra do lado: amarelo carregando, a cor do personagem cheia, a pedra do golem ou o
+// dourado do anjo durante a transformação.
+const CACO = ['...L.', '..LAb', '.LAbd', 'LAAbd', '.Abd.', '..d..'];
 
 interface CoresBarra {
   fundo: string;
@@ -153,6 +153,39 @@ function pintarTrecho(p: Pincel, y: number, altura: number, de: number, ate: num
   p.retangulo(BARRA_X + 1 + de, y + 1, w, altura, cores.cheio);
   p.retangulo(BARRA_X + 1 + de, y + 1, w, 1, cores.brilho);
   if (altura > 2) p.retangulo(BARRA_X + 1 + de, y + altura, w, 1, cores.sombra);
+}
+
+// A cor do meio entre duas (#rrggbb).
+function meio(a: string, b: string): string {
+  const [ra, ga, ba] = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
+  const [rb, gb, bb] = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  const h = (v: number): string => Math.round(v).toString(16).padStart(2, '0');
+  return `#${h((ra + rb) / 2)}${h((ga + gb) / 2)}${h((ba + bb) / 2)}`;
+}
+
+const cacos = new Map<CoresBarra, HTMLCanvasElement>();
+function cacoDe(cores: CoresBarra): HTMLCanvasElement {
+  let caco = cacos.get(cores);
+  if (!caco) {
+    caco = criarSprite(CACO, { L: cores.brilho, A: cores.cheio, b: meio(cores.cheio, cores.sombra), d: cores.sombra });
+    cacos.set(cores, caco);
+  }
+  return caco;
+}
+
+// O caco ao lado da barra de energia, nas cores dela. `brilhando`: a barra cheia e pronta — ele
+// pulsa e uma faísca pisca na ponta.
+function desenharCaco(p: Pincel, cores: CoresBarra, brilhando: boolean, tempo: number): void {
+  const x = ICONE_X + 1;
+  const y = ANJO_Y - 1;
+  const pulso = 0.5 + 0.5 * Math.sin(tempo * 5);
+  p.imagem(cacoDe(cores), x, y, brilhando ? 0.8 + 0.2 * pulso : 1);
+  if (brilhando && Math.sin(tempo * 3.1) > 0.4) {
+    // A faísca: uma cruzinha branca na ponta do caco.
+    const forca = (Math.sin(tempo * 3.1) - 0.4) / 0.6;
+    p.retangulo(x + 3, y - 1, 1, 3, `rgba(255, 255, 255, ${0.85 * forca})`);
+    p.retangulo(x + 2, y, 3, 1, `rgba(255, 255, 255, ${0.85 * forca})`);
+  }
 }
 
 // Desde quando a energia de cada personagem está cheia (em `tempo` do jogo); null carregando.
@@ -539,15 +572,15 @@ export function desenharPainel(
   p.imagem(CORACAO, ICONE_X, VIDA_Y);
   desenharBarra(p, VIDA_Y, 5, personagem.vida / VIDA_MAXIMA, VIDA);
 
-  const pulso = 0.5 + 0.5 * Math.sin(tempo * 5);
   const { poderes } = personagem;
   if (personagem.heroi === 'grow') {
     const golem = barraDoGolem(personagem.golem, personagem.energia);
     const piscando = golem.ativa && golem.resta <= ALERTA_ANJO && Math.floor(tempo * PISCADAS) % 2 === 0;
-    p.imagem(PEDRINHA, ICONE_X, ANJO_Y + 1, golem.ativa ? 1 : golem.disponivel ? 0.7 + 0.3 * pulso : 0.6);
+    const barraGolem = piscando ? GOLEM_PISCANDO : GOLEM;
+    desenharCaco(p, golem.ativa ? barraGolem : golem.cheia >= 1 ? ENERGIA_GROW : CRISTAL, golem.disponivel, tempo);
     if (golem.ativa) {
       cheiaDesde.delete(personagem);
-      desenharBarra(p, ANJO_Y, 3, golem.cheia, piscando ? GOLEM_PISCANDO : GOLEM);
+      desenharBarra(p, ANJO_Y, 3, golem.cheia, barraGolem);
     } else {
       const completa = desenharEnergia(p, personagem, golem.cheia, ENERGIA_GROW, tempo);
       // Marquinhas onde a Revoada e o Vendaval já saem.
@@ -569,7 +602,7 @@ export function desenharPainel(
   } else if (personagem.heroi === 'leslie') {
     // A energia pixy, que enche para a Flor; e a arma e os poderes lado a lado.
     const cheia = personagem.energia >= ENERGIA_PIXY.maxima;
-    p.imagem(FOLHA, ICONE_X, ANJO_Y + 1, cheia ? 0.7 + 0.3 * pulso : 0.6);
+    desenharCaco(p, cheia ? ENERGIA_LESLIE : CRISTAL, cheia, tempo);
     desenharEnergia(p, personagem, personagem.energia / ENERGIA_PIXY.maxima, ENERGIA_LESLIE, tempo);
     // Marquinhas na barra onde o 1 e o 2 já saem.
     for (const poder of ['chicote', 'raizes'] as const) {
@@ -584,10 +617,11 @@ export function desenharPainel(
   } else {
     const anjo = barraDoAnjo(personagem.anjo, personagem.energia);
     const piscando = anjo.ativa && anjo.resta <= ALERTA_ANJO && Math.floor(tempo * PISCADAS) % 2 === 0;
-    p.imagem(AUREOLA, ICONE_X, ANJO_Y + 1, anjo.ativa ? 1 : anjo.disponivel ? 0.7 + 0.3 * pulso : 0.5);
+    const barraAnjo = piscando ? ANJO_PISCANDO : ANJO;
+    desenharCaco(p, anjo.ativa ? barraAnjo : anjo.cheia >= 1 ? ENERGIA : CRISTAL, anjo.disponivel, tempo);
     if (anjo.ativa) {
       cheiaDesde.delete(personagem);
-      desenharBarra(p, ANJO_Y, 3, anjo.cheia, piscando ? ANJO_PISCANDO : ANJO);
+      desenharBarra(p, ANJO_Y, 3, anjo.cheia, barraAnjo);
     } else {
       desenharEnergia(p, personagem, anjo.cheia, ENERGIA, tempo);
     }
