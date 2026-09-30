@@ -1,5 +1,6 @@
 // A água da paisagem de fundo, viva: o rio e os córregos brilham em ondinhas que correm, com um
-// reflexo branco piscando de vez em quando; as cascatas descem em listras claras. Os pixels de
+// reflexo branco piscando de vez em quando (mais vezes e mais forte com o sol limpo e alto); as
+// cascatas descem em listras claras. Os pixels de
 // água vêm do gerador (QUADROS_CENARIO.agua, achados pela cor na arte); aqui a paisagem é copiada
 // para um canvas próprio e só esses pixels são repintados, umas 20 vezes por segundo.
 
@@ -46,7 +47,7 @@ function misturar(d: Uint8ClampedArray, i: number, cor: number[], k: number): vo
   d[i + 2] = base[i + 2] + (cor[2] - base[i + 2]) * k;
 }
 
-function animar(t: number): void {
+function animar(t: number, sol: number): void {
   const d = quadro.data;
   const piscada = Math.floor(t * 3);
   for (let p = 0; p < agua.length; p += 4) {
@@ -62,8 +63,8 @@ function animar(t: number): void {
     }
     // Rio: duas ondas cruzadas correndo; onde as duas sobem juntas, o brilho da água.
     const onda = Math.sin(x * 0.45 - t * 2.4 + y * 1.3) + 0.8 * Math.sin(x * 0.13 + t * 1.1 - y * 0.4);
-    if (acaso(x, y, piscada) > 0.996) misturar(d, i, ESPUMA, 0.9);
-    else if (onda > 1.35) misturar(d, i, CLARO, 0.5);
+    if (acaso(x, y, piscada) > 0.997 - 0.006 * sol) misturar(d, i, ESPUMA, 0.9);
+    else if (onda > 1.35) misturar(d, i, CLARO, 0.4 + 0.25 * sol);
     else if (onda > 1.0) misturar(d, i, CLARO, 0.22);
     else if (onda < -1.45) misturar(d, i, [base[i] * 0.82, base[i + 1] * 0.86, base[i + 2] * 0.92], 1);
     else misturar(d, i, CLARO, 0);
@@ -71,11 +72,12 @@ function animar(t: number): void {
   ctx.putImageData(quadro, 0, 0);
 }
 
-// A paisagem com a água no instante `tempo` (segundos).
-export function paisagemViva(folha: CanvasImageSource, tempo: number): HTMLCanvasElement {
+// A paisagem com a água no instante `tempo` (segundos). `sol`: 0–1, o quanto o sol bate (a água
+// cintila mais com ele forte).
+export function paisagemViva(folha: CanvasImageSource, tempo: number, sol = 0): HTMLCanvasElement {
   if (!canvas) preparar(folha);
   if (tempo - ultimo >= PASSO || tempo < ultimo) {
-    animar(tempo);
+    animar(tempo, sol);
     ultimo = tempo;
   }
   return canvas!;

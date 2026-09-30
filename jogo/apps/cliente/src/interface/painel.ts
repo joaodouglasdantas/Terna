@@ -1,14 +1,18 @@
 // Painel de cada personagem, num canto de cima da tela: o seu à esquerda e o do sósia à
 // direita, espelhado. Fica sempre no mesmo canto, com a tela dividida ou não. Cada um tem a
 // borda na cor do jogador (a mesma do nome em cima da cabeça) e, do canto para dentro: a foto
-// do personagem, a barra de vida, a barra de energia pixy e, embaixo, os quadrinhos:
+// do personagem, a barra de vida, a barra de energia pixy e, embaixo, os quadrinhos.
+// A energia pixy é a força do cristal: enquanto carrega, a barra é amarela, no dourado do cristal,
+// para todos. Quando enche, a energia se adapta a quem a carrega: a cor do personagem corre pela
+// barra, do ícone para a ponta, com um clarão na frente, e ela fica assim (e brilhando) até ser
+// gasta — verde na Leslie, marrom no Grow, lilás no Anjo.
 // - Leslie: o da arma da mão e os três dos poderes, lado a lado; o que o clique esquerdo usa
-//   agora (a tecla R troca) fica aceso e o outro lado, apagado. A energia pixy é verde e brilha
-//   quando a Flor Carnívora está pronta.
-// - Grow: de gente, como a Leslie (a energia pixy em verde-musgo, que brilha quando dá para virar
-//   golem); de golem, a barra de pedra com o tempo que resta, descendo, e os três poderes do golem.
-// - Anjo: na forma base, a energia pixy (brilha quando dá para virar anjo) e o quadrinho da arma;
-//   de anjo, o tempo que resta e os três poderes.
+//   agora (a tecla R troca) fica aceso e o outro lado, apagado. A barra cheia é a Flor Carnívora
+//   pronta.
+// - Grow: de gente, como a Leslie (a barra cheia: dá para virar golem); de golem, a barra de pedra
+//   com o tempo que resta, descendo, e os três poderes do golem.
+// - Anjo: na forma base, a energia pixy (cheia, dá para virar anjo) e o quadrinho da arma; de
+//   anjo, o tempo que resta e os três poderes.
 // O escolhido fica em destaque. Em pixels da tela do jogo, desenhado por último, por cima da luz.
 // Tudo sai do canto para dentro: as barras se esvaziam em direção à borda da tela, dos dois lados.
 
@@ -74,12 +78,17 @@ const MOLDURA = '#1a1428';
 const VIDA: CoresBarra = { fundo: '#3b1622', cheio: '#e8445e', brilho: '#ff9aaa', sombra: '#a8283e' };
 const ANJO: CoresBarra = { fundo: '#2a2442', cheio: '#ffd966', brilho: '#fff4c2', sombra: '#d9a53a' };
 const ANJO_PISCANDO: CoresBarra = { fundo: '#2a2442', cheio: '#fff4c2', brilho: '#ffffff', sombra: '#ffd966' };
-// Na forma base do Anjo, a barra é a energia pixy, no lilás; cheia, ganha o brilho que corre.
+// A energia pixy carregando: o amarelo do cristal, igual para todos.
+const CRISTAL: CoresBarra = { fundo: '#2a2210', cheio: '#ffc93c', brilho: '#fff1b0', sombra: '#d9961e' };
+// Cheia, a cor de quem a carrega: o lilás do Anjo, o verde da floresta da Leslie, o marrom da terra
+// do Grow. De golem, a barra vira pedra (e clareia piscando no fim).
 const ENERGIA: CoresBarra = { fundo: '#2a2442', cheio: '#b48cff', brilho: '#e6d9ff', sombra: '#7c52e8' };
-// A energia pixy da Leslie, no verde da floresta.
 const ENERGIA_LESLIE: CoresBarra = { fundo: '#1c2a18', cheio: '#8fd45a', brilho: '#d4f7a8', sombra: '#4f9a38' };
-// A do Grow, no verde do musgo; de golem, a barra vira pedra (e clareia piscando no fim).
-const ENERGIA_GROW: CoresBarra = { fundo: '#1e2214', cheio: '#9cbc45', brilho: '#d8ec9a', sombra: '#6b8a2a' };
+const ENERGIA_GROW: CoresBarra = { fundo: '#241a12', cheio: '#b07a45', brilho: '#e6bf8e', sombra: '#7a4f2c' };
+// As marquinhas dos poderes baratos na barra: escuras onde a energia já passou, claras onde falta.
+const MARCA_CRISTAL = { passou: 'rgba(70, 44, 6, 0.55)', falta: 'rgba(255, 241, 176, 0.55)' };
+const MARCA_CHEIA: Record<'leslie' | 'grow', string> = { leslie: 'rgba(20, 40, 16, 0.55)', grow: 'rgba(44, 26, 12, 0.55)' };
+const ADAPTAR = 0.6; // segundos da cor do personagem correndo pela barra, quando ela enche
 const GOLEM: CoresBarra = { fundo: '#221c16', cheio: '#a8977a', brilho: '#d2c3a2', sombra: '#75654f' };
 const GOLEM_PISCANDO: CoresBarra = { fundo: '#221c16', cheio: '#d2c3a2', brilho: '#fff4dc', sombra: '#a8977a' };
 
@@ -135,10 +144,53 @@ function desenharFoto(p: Pincel, retrato: HTMLCanvasElement, cores: CorDoJogador
 function desenharBarra(p: Pincel, y: number, altura: number, cheia: number, cores: CoresBarra): void {
   p.arredondado(BARRA_X, y, BARRA + 2, altura + 2, MOLDURA);
   p.retangulo(BARRA_X + 1, y + 1, BARRA, altura, cores.fundo);
-  const w = Math.round(BARRA * Math.max(0, Math.min(1, cheia)));
-  p.retangulo(BARRA_X + 1, y + 1, w, altura, cores.cheio);
-  p.retangulo(BARRA_X + 1, y + 1, w, 1, cores.brilho);
-  if (altura > 2) p.retangulo(BARRA_X + 1, y + altura, w, 1, cores.sombra);
+  pintarTrecho(p, y, altura, 0, Math.round(BARRA * Math.max(0, Math.min(1, cheia))), cores);
+}
+
+// O cheio da barra de `de` a `ate` (px de dentro da barra), com a linha de brilho e a de sombra.
+function pintarTrecho(p: Pincel, y: number, altura: number, de: number, ate: number, cores: CoresBarra): void {
+  const w = ate - de;
+  p.retangulo(BARRA_X + 1 + de, y + 1, w, altura, cores.cheio);
+  p.retangulo(BARRA_X + 1 + de, y + 1, w, 1, cores.brilho);
+  if (altura > 2) p.retangulo(BARRA_X + 1 + de, y + altura, w, 1, cores.sombra);
+}
+
+// Desde quando a energia de cada personagem está cheia (em `tempo` do jogo); null carregando.
+const cheiaDesde = new WeakMap<Personagem, number | null>();
+
+// A barra da energia pixy: amarela carregando; cheia, a cor do personagem corre do ícone para a
+// ponta em ADAPTAR segundos, com um clarão na frente, e fica. Devolve se está cheia.
+function desenharEnergia(
+  p: Pincel,
+  personagem: Personagem,
+  cheia: number,
+  cores: CoresBarra,
+  tempo: number,
+): boolean {
+  const completa = cheia >= 1;
+  let desde = cheiaDesde.get(personagem) ?? null;
+  if (!completa) desde = null;
+  else if (desde === null || desde > tempo) desde = tempo; // (tempo menor: a partida recomeçou)
+  cheiaDesde.set(personagem, desde);
+
+  if (!completa) {
+    desenharBarra(p, ANJO_Y, 3, cheia, CRISTAL);
+    return false;
+  }
+  const t = Math.min(1, (tempo - (desde ?? tempo)) / ADAPTAR);
+  const frente = Math.round(BARRA * (1 - (1 - t) ** 2)); // corre depressa e assenta
+  p.arredondado(BARRA_X, ANJO_Y, BARRA + 2, 5, MOLDURA);
+  pintarTrecho(p, ANJO_Y, 3, 0, frente, cores);
+  pintarTrecho(p, ANJO_Y, 3, frente, BARRA, CRISTAL);
+  if (t < 1) {
+    // O clarão na frente da cor nova: uns pixels brancos que se apagam para trás.
+    for (let i = 0; i < 4; i++) {
+      const x = frente - i;
+      if (x < 0 || x >= BARRA) continue;
+      p.retangulo(BARRA_X + 1 + x, ANJO_Y + 1, 1, 3, `rgba(255, 255, 255, ${0.9 - i * 0.22})`);
+    }
+  }
+  return true;
 }
 
 // Os ícones dos três poderes (11×11, dentro do quadrinho), nos rosas da referência dos poderes:
@@ -493,16 +545,20 @@ export function desenharPainel(
     const golem = barraDoGolem(personagem.golem, personagem.energia);
     const piscando = golem.ativa && golem.resta <= ALERTA_ANJO && Math.floor(tempo * PISCADAS) % 2 === 0;
     p.imagem(PEDRINHA, ICONE_X, ANJO_Y + 1, golem.ativa ? 1 : golem.disponivel ? 0.7 + 0.3 * pulso : 0.6);
-    desenharBarra(p, ANJO_Y, 3, golem.cheia, !golem.ativa ? ENERGIA_GROW : piscando ? GOLEM_PISCANDO : GOLEM);
-    if (!golem.ativa) {
+    if (golem.ativa) {
+      cheiaDesde.delete(personagem);
+      desenharBarra(p, ANJO_Y, 3, golem.cheia, piscando ? GOLEM_PISCANDO : GOLEM);
+    } else {
+      const completa = desenharEnergia(p, personagem, golem.cheia, ENERGIA_GROW, tempo);
       // Marquinhas onde a Revoada e o Vendaval já saem.
       for (const poder of ['aves', 'vento'] as const) {
         const custo = ENERGIA_PIXY.custoGrow[poder];
         const x = Math.round((BARRA * custo) / ENERGIA_PIXY.maxima);
-        p.retangulo(BARRA_X + 1 + x, ANJO_Y + 1, 1, 3, personagem.energia >= custo ? 'rgba(20, 30, 10, 0.55)' : 'rgba(216, 236, 154, 0.55)');
+        const cor = completa ? MARCA_CHEIA.grow : personagem.energia >= custo ? MARCA_CRISTAL.passou : MARCA_CRISTAL.falta;
+        p.retangulo(BARRA_X + 1 + x, ANJO_Y + 1, 1, 3, cor);
       }
     }
-    if (golem.disponivel) desenharBrilho(p, ANJO_Y, 3, tempo);
+    if (golem.disponivel) desenharBrilho(p, ANJO_Y, 3, tempo, ENERGIA_GROW.brilho);
     // De golem, só os três poderes dele (a mão não segura arma).
     if (formaDo(personagem) === 'golem') {
       desenharPoderes(p, personagem);
@@ -514,21 +570,28 @@ export function desenharPainel(
     // A energia pixy, que enche para a Flor; e a arma e os poderes lado a lado.
     const cheia = personagem.energia >= ENERGIA_PIXY.maxima;
     p.imagem(FOLHA, ICONE_X, ANJO_Y + 1, cheia ? 0.7 + 0.3 * pulso : 0.6);
-    desenharBarra(p, ANJO_Y, 3, personagem.energia / ENERGIA_PIXY.maxima, ENERGIA_LESLIE);
+    desenharEnergia(p, personagem, personagem.energia / ENERGIA_PIXY.maxima, ENERGIA_LESLIE, tempo);
     // Marquinhas na barra onde o 1 e o 2 já saem.
     for (const poder of ['chicote', 'raizes'] as const) {
-      const x = Math.round((BARRA * ENERGIA_PIXY.custoLeslie[poder]) / ENERGIA_PIXY.maxima);
-      p.retangulo(BARRA_X + 1 + x, ANJO_Y + 1, 1, 3, personagem.energia >= ENERGIA_PIXY.custoLeslie[poder] ? 'rgba(20, 40, 16, 0.55)' : 'rgba(212, 247, 168, 0.55)');
+      const custo = ENERGIA_PIXY.custoLeslie[poder];
+      const x = Math.round((BARRA * custo) / ENERGIA_PIXY.maxima);
+      const cor = cheia ? MARCA_CHEIA.leslie : personagem.energia >= custo ? MARCA_CRISTAL.passou : MARCA_CRISTAL.falta;
+      p.retangulo(BARRA_X + 1 + x, ANJO_Y + 1, 1, 3, cor);
     }
-    if (cheia) desenharBrilho(p, ANJO_Y, 3, tempo);
+    if (cheia) desenharBrilho(p, ANJO_Y, 3, tempo, ENERGIA_LESLIE.brilho);
     desenharEspacoDaArma(p, personagem.arma, tempo, personagem.modo === 'arma');
     desenharPoderes(p, personagem, ESPACO + ENTRE_ESPACOS);
   } else {
     const anjo = barraDoAnjo(personagem.anjo, personagem.energia);
     const piscando = anjo.ativa && anjo.resta <= ALERTA_ANJO && Math.floor(tempo * PISCADAS) % 2 === 0;
     p.imagem(AUREOLA, ICONE_X, ANJO_Y + 1, anjo.ativa ? 1 : anjo.disponivel ? 0.7 + 0.3 * pulso : 0.5);
-    desenharBarra(p, ANJO_Y, 3, anjo.cheia, !anjo.ativa ? ENERGIA : piscando ? ANJO_PISCANDO : ANJO);
-    if (anjo.disponivel) desenharBrilho(p, ANJO_Y, 3, tempo);
+    if (anjo.ativa) {
+      cheiaDesde.delete(personagem);
+      desenharBarra(p, ANJO_Y, 3, anjo.cheia, piscando ? ANJO_PISCANDO : ANJO);
+    } else {
+      desenharEnergia(p, personagem, anjo.cheia, ENERGIA, tempo);
+    }
+    if (anjo.disponivel) desenharBrilho(p, ANJO_Y, 3, tempo, ENERGIA.brilho);
     // Os poderes só aparecem de anjo; na forma base, só a arma (menos coisa na tela).
     if (!usaPoderes(personagem)) desenharEspacoDaArma(p, personagem.arma, tempo);
     else desenharPoderes(p, personagem);
@@ -537,11 +600,12 @@ export function desenharPainel(
   ctx.restore();
 }
 
-// A barra cheia com a transformação disponível: uma faixa de luz corre por ela, a borda pulsa e
-// soltam-se faíscas para cima.
-function desenharBrilho(p: Pincel, y: number, altura: number, tempo: number): void {
+// A barra cheia com a transformação disponível: uma faixa de luz corre por ela, a borda pulsa (na
+// cor clara do personagem, `borda`) e soltam-se faíscas para cima.
+function desenharBrilho(p: Pincel, y: number, altura: number, tempo: number, borda: string): void {
   const pulso = 0.5 + 0.5 * Math.sin(tempo * 5);
-  p.contorno(BARRA_X - 1, y - 1, BARRA + 4, altura + 4, `rgba(230, 217, 255, ${0.25 + 0.45 * pulso})`);
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(borda.slice(i, i + 2), 16));
+  p.contorno(BARRA_X - 1, y - 1, BARRA + 4, altura + 4, `rgba(${r}, ${g}, ${b}, ${0.25 + 0.45 * pulso})`);
   const faixa = 8;
   const volta = BARRA + faixa * 3; // a faixa sai da barra e espera um pouco antes de voltar
   const inicio = Math.floor((tempo * 70) % volta) - faixa;

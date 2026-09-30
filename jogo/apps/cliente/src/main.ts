@@ -54,6 +54,7 @@ import {
   desenharLuz,
   desenharVegetacao,
   luzDoSol,
+  luzNaTela,
 } from './mundo/cenario';
 import { TILE, criarChao } from './mundo/chao';
 import { desenharRaizes } from './mundo/raizes';
@@ -376,7 +377,7 @@ function desenhar(tempo: number): void {
   } else {
     desenharVista(tempo, luz, esquerda, altos.esquerda, 0, LARGURA);
   }
-  desenharLuz(ctx, luz, LARGURA, ALTURA, tempo);
+  desenharLuz(ctx, luzNaTela(luz, altos.esquerda), LARGURA, ALTURA, tempo, Y_CHAO + altos.esquerda);
   const p = partida;
   if (!p) return;
   // Os nomes vêm depois da luz, para o sol não tingir o azul e o vermelho.

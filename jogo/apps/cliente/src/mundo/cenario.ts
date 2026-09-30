@@ -9,6 +9,7 @@ import { sortear, suavizar } from '../motor/matematica';
 import { paisagemViva } from './agua';
 import { criarCeu, desenharCirros, desenharSerraDeLonge } from './ceu';
 import { graduarImagem, type Graduacao } from './cor';
+import { acompanharNuvens, avisarCobertura, desenharRaios, solLivre, sombraDaNuvem } from './raios';
 import type { Luz, Paleta, Recorte } from '../motor/tipos';
 
 // Quanto cada camada anda quando a câmera anda 1px: as distantes andam menos (paralaxe).
@@ -237,7 +238,6 @@ const LUZ = {
   ladoEscuro: 0.12, // o lado da tela longe do sol fica um pouco mais escuro
   entardecer: 0.22, // tom alaranjado quando o sol está baixo
   vinheta: 0.28, // cantos da tela mais escuros
-  raios: 0.11, // fachos de luz saindo do sol
 };
 
 // O acabamento de cor das nuvens e das plantas (cor.ts), feito uma vez numa cópia da folha: verdes
@@ -296,6 +296,12 @@ export function luzDoSol(tempo: number, largura: number): Luz {
   };
 }
 
+// O sol na tela com a câmera descida `olharY` (ele desce um pouco com ela: ACOMPANHA.sol). A luz
+// da cena (desenharLuz) sai daqui, para os raios saírem de onde o disco está.
+export function luzNaTela(luz: Luz, olharY: number): Luz {
+  return { ...luz, y: luz.y + Math.round(olharY * ACOMPANHA.sol) };
+}
+
 // Brilho em degradê radial liso atrás do disco; os dois ficam entre o céu e a paisagem,
 // então o sol nasce e se põe por trás das montanhas.
 function desenharSol(ctx: CanvasRenderingContext2D, folha: CanvasImageSource, luz: Luz, tempo: number): void {
@@ -319,14 +325,45 @@ function desenharSol(ctx: CanvasRenderingContext2D, folha: CanvasImageSource, lu
 }
 
 // Posição calculada direto do tempo e da câmera: a nuvem sai por um lado e volta pelo outro.
+function posicaoDaNuvem(indice: number, x: number, velocidade: number, tempo: number, camX: number, largura: number): number {
+  const q = QUADROS_CENARIO.nuvens[indice];
+  const volta = largura + q.w;
+  const andou = x - velocidade * tempo - camX * PARALAXE.nuvens;
+  const deslocado = (((andou + q.w) % volta) + volta) % volta;
+  return Math.round(deslocado - q.w);
+}
+
 function desenharNuvens(ctx: CanvasRenderingContext2D, folha: CanvasImageSource, tempo: number, camX: number, largura: number): void {
   NUVENS.forEach(({ indice, x, y, velocidade }) => {
-    const q = QUADROS_CENARIO.nuvens[indice];
-    const volta = largura + q.w;
-    const andou = x - velocidade * tempo - camX * PARALAXE.nuvens;
-    const deslocado = (((andou + q.w) % volta) + volta) % volta;
-    desenharQuadro(ctx, folha, q, Math.round(deslocado - q.w), y);
+    desenharQuadro(ctx, folha, QUADROS_CENARIO.nuvens[indice], posicaoDaNuvem(indice, x, velocidade, tempo, camX, largura), y);
   });
+}
+
+// Quanto do disco do sol as nuvens cobrem, 0–1: uns pontos do disco testados contra o miolo de
+// cada nuvem (uma elipse um pouco menor que o recorte, que é fofo nas bordas). `sobeSol` e
+// `sobeNuvens`: quanto cada camada desceu com a câmera (ACOMPANHA).
+const PONTOS_DO_SOL = [
+  [0, 0], [4, 0], [-4, 0], [0, 4], [0, -4], [3, 3], [-3, 3], [3, -3], [-3, -3],
+];
+
+function coberturaDoSol(luz: Luz, tempo: number, camX: number, largura: number, desceSol: number, desceNuvens: number): number {
+  if (luz.forca <= 0) return 0;
+  let cobertos = 0;
+  for (const [dx, dy] of PONTOS_DO_SOL) {
+    const px = luz.x + dx;
+    const py = luz.y + desceSol + dy;
+    const coberto = NUVENS.some(({ indice, x, y, velocidade }) => {
+      const q = QUADROS_CENARIO.nuvens[indice];
+      const nx = posicaoDaNuvem(indice, x, velocidade, tempo, camX, largura);
+      const cx = nx + q.w / 2;
+      const cy = y + desceNuvens + q.h * 0.55;
+      const u = (px - cx) / (q.w * 0.42);
+      const v = (py - cy) / (q.h * 0.38);
+      return u * u + v * v < 1;
+    });
+    if (coberto) cobertos++;
+  }
+  return cobertos / PONTOS_DO_SOL.length;
 }
 
 // Cada pássaro guarda `x` na camada do seu nível; na tela ele fica em x - camX * paralaxe.
@@ -450,12 +487,15 @@ export function desenharFundo(
   descer('sol');
   desenharSol(ctx, folha, luz, tempo);
   ctx.restore();
+  avisarCobertura(
+    coberturaDoSol(luz, tempo, camX, largura, Math.round(olharY * ACOMPANHA.sol), Math.round(olharY * ACOMPANHA.ceu)),
+  );
   descer('cirros');
   desenharCirros(ctx, tempo, camX, largura, CIRROS_Y);
   ctx.restore();
   desenharSerraDeLonge(ctx, camX, largura, Math.round(olharY * ACOMPANHA.serra));
   ctx.drawImage(
-    paisagemViva(folha, tempo),
+    paisagemViva(folha, tempo, luz.forca * solLivre()),
     -deslocamentoPaisagem(camX, largura),
     Math.round(olharY * ACOMPANHA.paisagem) - PAISAGEM_ACIMA,
   );
@@ -659,13 +699,16 @@ export function desenharVegetacao(
 }
 
 // Última camada, em coordenadas de tela: calor em volta do sol, o lado longe dele um pouco
-// mais escuro, um tom alaranjado quando ele está baixo, a vinheta nos cantos e os raios de sol.
-// Tudo bem de leve.
-export function desenharLuz(ctx: CanvasRenderingContext2D, luz: Luz, largura: number, altura: number, tempo = 0): void {
+// mais escuro, um tom alaranjado quando ele está baixo, a vinheta nos cantos e os raios de sol
+// (raios.ts), que também clareiam o que está embaixo deles. Uma nuvem na frente do sol apaga o
+// calor e os raios aos poucos e escurece a cena um tanto. Tudo bem de leve. `chao`: a linha da
+// grama na tela.
+export function desenharLuz(ctx: CanvasRenderingContext2D, luz: Luz, largura: number, altura: number, tempo = 0, chao = altura): void {
+  acompanharNuvens(tempo);
   ctx.save();
   ctx.globalCompositeOperation = 'soft-light';
   const calor = ctx.createRadialGradient(luz.x, luz.y, 0, luz.x, luz.y, largura * 1.1);
-  calor.addColorStop(0, `rgba(255, 226, 160, ${LUZ.calor * luz.forca})`);
+  calor.addColorStop(0, `rgba(255, 226, 160, ${LUZ.calor * luz.forca * solLivre()})`);
   calor.addColorStop(1, 'rgba(255, 226, 160, 0)');
   ctx.fillStyle = calor;
   ctx.fillRect(0, 0, largura, altura);
@@ -684,6 +727,13 @@ export function desenharLuz(ctx: CanvasRenderingContext2D, luz: Luz, largura: nu
   ctx.fillStyle = lado;
   ctx.fillRect(0, 0, largura, altura);
 
+  // A sombra da nuvem que passa na frente do sol: a cena toda um pouco mais fria e escura.
+  const nuvem = sombraDaNuvem() * luz.forca;
+  if (nuvem > 0.004) {
+    ctx.fillStyle = `rgba(70, 86, 130, ${nuvem})`;
+    ctx.fillRect(0, 0, largura, altura);
+  }
+
   // Vinheta: os cantos um pouco mais escuros, puxando o olho para o meio da cena.
   const vinheta = ctx.createRadialGradient(largura / 2, altura * 0.45, altura * 0.35, largura / 2, altura * 0.45, largura * 0.62);
   vinheta.addColorStop(0, 'rgba(30, 26, 60, 0)');
@@ -692,41 +742,5 @@ export function desenharLuz(ctx: CanvasRenderingContext2D, luz: Luz, largura: nu
   ctx.fillRect(0, 0, largura, altura);
   ctx.restore();
 
-  desenharRaios(ctx, luz, tempo, largura, altura);
-}
-
-// Raios de sol: fachos claros em leque saindo do disco para baixo, cada um respirando no seu
-// ritmo e balançando devagar. Somem com o sol baixo (luz.forca).
-const RAIOS = [
-  { angulo: 0.62, largura: 0.07, periodo: 11, fase: 0 },
-  { angulo: 0.95, largura: 0.05, periodo: 7, fase: 1.3 },
-  { angulo: 1.22, largura: 0.09, periodo: 13, fase: 2.1 },
-  { angulo: 1.52, largura: 0.045, periodo: 9, fase: 0.7 },
-  { angulo: 1.86, largura: 0.08, periodo: 12, fase: 3.2 },
-  { angulo: 2.2, largura: 0.05, periodo: 8, fase: 4.4 },
-  { angulo: 2.5, largura: 0.07, periodo: 10, fase: 5.1 },
-];
-
-function desenharRaios(ctx: CanvasRenderingContext2D, luz: Luz, tempo: number, largura: number, altura: number): void {
-  const forca = LUZ.raios * luz.forca;
-  if (forca < 0.005) return;
-  const alcance = Math.hypot(largura, altura);
-  ctx.save();
-  ctx.globalCompositeOperation = 'screen';
-  for (const r of RAIOS) {
-    const respira = 0.55 + 0.45 * Math.sin((2 * Math.PI * tempo) / r.periodo + r.fase);
-    const a = r.angulo + 0.04 * Math.sin(tempo * 0.07 + r.fase);
-    const g = ctx.createLinearGradient(luz.x, luz.y, luz.x + Math.cos(a) * alcance * 0.8, luz.y + Math.sin(a) * alcance * 0.8);
-    g.addColorStop(0, `rgba(255, 244, 205, ${forca * respira})`);
-    g.addColorStop(0.45, `rgba(255, 238, 190, ${forca * respira * 0.35})`);
-    g.addColorStop(1, 'rgba(255, 238, 190, 0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.moveTo(luz.x, luz.y);
-    ctx.lineTo(luz.x + Math.cos(a - r.largura) * alcance, luz.y + Math.sin(a - r.largura) * alcance);
-    ctx.lineTo(luz.x + Math.cos(a + r.largura) * alcance, luz.y + Math.sin(a + r.largura) * alcance);
-    ctx.closePath();
-    ctx.fill();
-  }
-  ctx.restore();
+  desenharRaios(ctx, luz, tempo, largura, altura, chao);
 }
