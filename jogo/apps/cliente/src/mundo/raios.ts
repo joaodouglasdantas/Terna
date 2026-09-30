@@ -37,11 +37,11 @@ const CAMADAS = [
 ];
 
 const RAIOS = {
-  forca: 0.23, // alfa do facho visível (screen), com o sol forte
-  aquece: 0.42, // alfa do que o facho clareia e esquenta embaixo dele (soft-light)
-  horaDourada: 0.5, // quanto mais fortes os raios ficam com o sol baixo
+  forca: 0.15, // alfa do facho visível (screen), com o sol forte
+  aquece: 0.27, // alfa do que o facho clareia e esquenta embaixo dele (soft-light)
+  horaDourada: 0.3, // quanto mais fortes os raios ficam com o sol baixo
   inicio: 9, // px a partir do centro do sol onde o facho começa (dentro do brilho)
-  poca: 0.28, // a poça de luz no chão
+  poca: 0.17, // a poça de luz no chão
   nuvem: 0.8, // quanto uma nuvem na frente do sol apaga os raios
   sombraDaNuvem: 0.1, // e quanto a cena escurece com ela
   seguir: 1.6, // por segundo: a cobertura muda aos poucos (a nuvem entrando e saindo do sol)
@@ -293,7 +293,7 @@ function pintarBrilhoNaGrama(ctx: CanvasRenderingContext2D, feixes: Feixe[], luz
     ctx.translate(alvo.x, chao - 2);
     ctx.scale(alvo.meia * 0.9, 3);
     const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-    grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${0.85 * forca})`);
+    grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${0.55 * forca})`);
     grad.addColorStop(0.55, `rgba(${r}, ${g}, ${b}, ${0.4 * forca})`);
     grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
     ctx.fillStyle = grad;
@@ -314,7 +314,7 @@ function pintarBrilhoNaGrama(ctx: CanvasRenderingContext2D, feixes: Feixe[], luz
       if (miolo <= 0) continue;
       const pisca = Math.sin(tempo * (1.2 + 3 * acaso(coluna, 2)) + acaso(coluna, 3) * 40);
       if (pisca < 0.25) continue;
-      const a = Math.min(1, forca * 2.3 * miolo * ((pisca - 0.25) / 0.75));
+      const a = Math.min(1, forca * 1.6 * miolo * ((pisca - 0.25) / 0.75));
       if (a < 0.05) continue;
       const y = Math.round(chao - ORVALHO.acima + acaso(coluna, 4) * (ORVALHO.acima + ORVALHO.abaixo));
       const tom = acaso(coluna, 5);
@@ -383,6 +383,6 @@ export function desenharRaios(
   ctx.globalCompositeOperation = 'screen';
   pintarPocas(ctx, feixes, luz, cor, RAIOS.poca * forca, chao);
   pintarBrilhoNaGrama(ctx, feixes, luz, cor, tempo, Math.min(1, forca), chao, camX);
-  pintarPoeira(ctx, feixes, luz, tempo, Math.min(1, 1.6 * forca), largura, chao);
+  pintarPoeira(ctx, feixes, luz, tempo, Math.min(1, 1.1 * forca), largura, chao);
   ctx.restore();
 }

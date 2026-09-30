@@ -230,11 +230,11 @@ const LUZ = {
   lateral: 0.28, // lado das plantas virado para o sol clareia, o outro escurece
   topo: 0.14, // copa clareia por cima quando o sol está alto
   base: 0.3, // pé das plantas mais escuro (luz que não chega embaixo)
-  contorno: 0.6, // filete de luz quente na borda das plantas virada para o sol, onde um raio bate
+  contorno: 0.42, // filete de luz quente na borda das plantas virada para o sol, onde um raio bate
   contornoSombra: 0.22, // e a borda do outro lado, um pouco mais escura
   nevoa: 'rgba(92, 140, 188, 0.34)', // véu azul da distância nas árvores de trás
   sombra: 0.44, // sombra no chão, embaixo de plantas e do personagem
-  calor: 0.3, // brilho quente em volta do sol, espalhado na cena
+  calor: 0.2, // brilho quente em volta do sol, espalhado na cena
   ladoEscuro: 0.12, // o lado da tela longe do sol fica um pouco mais escuro
   entardecer: 0.22, // tom alaranjado quando o sol está baixo
   vinheta: 0.28, // cantos da tela mais escuros
