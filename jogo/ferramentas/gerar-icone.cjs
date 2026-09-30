@@ -9,13 +9,16 @@
 // - icone.svg: a aba dos navegadores que aceitam SVG (nítido em qualquer tamanho);
 // - icone-32.png: a aba dos outros;
 // - icone-180.png: o ícone do iPhone/iPad (com fundo, que lá não pode ser transparente);
-// - icone-192.png e icone-512.png: os do app instalado (manifest.webmanifest).
+// - icone-192.png e icone-512.png: os do app instalado (manifest.webmanifest);
+// - previa.jpg: a imagem que aparece quando o link do jogo é compartilhado (WhatsApp, Discord,
+//   redes), 1200×630: a floresta ao pôr do sol da tela inicial com a logo no meio.
 
 const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 
 const SAIDA = path.join(__dirname, '..', 'apps', 'cliente', 'public');
+const ASSETS = path.join(__dirname, '..', 'apps', 'cliente', 'src', 'assets');
 const FUNDO = '#1b1b24'; // o fundo da página do jogo
 
 // o: contorno; Y, y, O, r: as faces do cristal, da luz à sombra; p, w: o brilho em cruz;
@@ -121,6 +124,18 @@ function svg() {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LADO} ${LADO}" shape-rendering="crispEdges">${partes.join('')}</svg>\n`;
 }
 
+// A prévia do link: a arte da tela inicial cobrindo 1200×630 e a logo por cima, no meio.
+async function previa() {
+  const [largura, altura] = [1200, 630];
+  const fundo = await sharp(path.join(ASSETS, 'tela-inicial.webp')).resize(largura, altura, { fit: 'cover' }).toBuffer();
+  const logo = await sharp(path.join(ASSETS, 'logo.webp')).resize({ height: 500 }).toBuffer();
+  const { width: wLogo } = await sharp(logo).metadata();
+  await sharp(fundo)
+    .composite([{ input: logo, left: Math.round((largura - wLogo) / 2), top: Math.round((altura - 500) / 2) - 10 }])
+    .jpeg({ quality: 86 })
+    .toFile(path.join(SAIDA, 'previa.jpg'));
+}
+
 async function main() {
   fs.mkdirSync(SAIDA, { recursive: true });
   fs.writeFileSync(path.join(SAIDA, 'icone.svg'), svg());
@@ -128,6 +143,7 @@ async function main() {
   await png('icone-180.png', 5, FUNDO, 10); // 160 + 2 × 10
   await png('icone-192.png', 6, FUNDO);
   await png('icone-512.png', 16, FUNDO);
+  await previa();
   console.log('ícones gerados em', path.relative(process.cwd(), SAIDA));
 }
 

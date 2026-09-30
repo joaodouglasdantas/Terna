@@ -36,6 +36,6 @@ services:
       # string de conexão do Neon (postgresql://...neon.tech/neondb?sslmode=require)
       - key: DATABASE_URL
         sync: false
-      # endereço do jogo publicado no Cloudflare (ex.: https://terna.seu-nome.workers.dev)
+      # endereço do jogo publicado no Cloudflare Pages: https://terna.pages.dev (mais de um, separados por vírgula)
       - key: ORIGENS_PERMITIDAS
         sync: false

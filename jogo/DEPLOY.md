@@ -1,14 +1,14 @@
 # Deploy grátis do Terna
 
 ```
-jogador ──► Cloudflare Workers  (o jogo: arquivos estáticos)
+jogador ──► Cloudflare Pages  (o jogo: arquivos estáticos, em terna.pages.dev)
               │
               └─ /api e WebSocket ──► Render  (servidor Node)  ──► Neon  (Postgres)
 ```
 
 | Parte | Onde | Endereço |
 |---|---|---|
-| Jogo (`apps/cliente`) | Cloudflare Workers, plano Free | `https://terna.<seu-subdominio>.workers.dev` |
+| Jogo (`apps/cliente`) | Cloudflare Pages, plano Free | `https://terna.pages.dev` |
 | Servidor (`apps/servidor`) | Render, plano Free | `https://terna-servidor.onrender.com` |
 | Banco | Neon, plano Free | string de conexão `postgresql://…neon.tech/neondb?sslmode=require` |
 
@@ -41,7 +41,7 @@ Antes de tudo: faça commit e push deste projeto para o GitHub (`joaodouglasdant
    mostra o serviço `terna-servidor`.
 3. Ele pede duas variáveis:
    - **DATABASE_URL:** cole a string do Neon.
-   - **ORIGENS_PERMITIDAS:** por enquanto `https://terna.workers.dev` (você corrige no passo 4).
+   - **ORIGENS_PERMITIDAS:** `https://terna.pages.dev` (o endereço do jogo, do passo 3).
 4. **Apply**. O primeiro deploy leva uns 3 minutos. Ao subir, o servidor cria as tabelas
    no Neon sozinho.
 5. Confira no navegador:
@@ -51,25 +51,36 @@ Antes de tudo: faça commit e push deste projeto para o GitHub (`joaodouglasdant
    Se o Render deu outro endereço ao serviço (ex.: `terna-servidor-ab12.onrender.com`),
    troque o endereço em `jogo/apps/cliente/.env.production`, faça commit e push.
 
-### 3. Jogo — Cloudflare
+### 3. Jogo — Cloudflare Pages
 
 1. Entre em <https://dash.cloudflare.com> (Sign up) e confirme o e-mail.
-2. **Workers & Pages → Create → Import a repository**, conecte o GitHub e escolha `Terna`.
-3. Preencha:
-   - **Project name:** `terna` (igual ao `name` de `apps/cliente/wrangler.jsonc`)
+2. **Workers & Pages → Create application**. Essa tela abre no **Workers**: role até o fim e
+   clique em **Get started** em *"Looking to deploy Pages?"*. Depois, **Import an existing Git
+   repository**, conecte o GitHub e escolha `Terna`.
+3. Preencha (sem espaço antes nem depois de cada valor):
+   - **Project name:** `terna` (o endereço sai `https://terna.pages.dev`)
+   - **Production branch:** `main`
+   - **Framework preset:** `None`
    - **Build command:** `npm ci && npm run build -w @terna/cliente`
-   - **Deploy command:** `npx wrangler deploy -c apps/cliente/wrangler.jsonc`
-   - **Path / Root directory** (em *Advanced settings*): `jogo`
-4. **Deploy**. No fim aparece o endereço `https://terna.<seu-subdominio>.workers.dev`.
-5. Em **Settings → Build → Build watch paths**, deixe só
-   `jogo/apps/cliente/*`, `jogo/packages/*` e `jogo/package*.json`. Assim, commit que não
-   mexe no jogo não gasta build.
+   - **Build output directory:** `apps/cliente/dist`
+   - **Root directory (advanced):** `jogo`
+   - **Environment variables (advanced):** `NODE_VERSION` = `22`
+4. **Save and Deploy**. Em uns 3 minutos o jogo está em `https://terna.pages.dev`.
+5. Em **Settings → Build → Build watch paths**, deixe só `apps/cliente/*`, `packages/*` e
+   `package*.json` (caminhos a partir da pasta `jogo`). Assim, commit que não mexe no jogo não
+   gasta build.
+
+O jogo já ficou num Worker (`terna.<subdominio-da-conta>.workers.dev`, com a configuração em
+`apps/cliente/wrangler.jsonc`). O Pages ficou no lugar dele porque o endereço é só o nome do
+projeto, sem o subdomínio da conta (que é o mesmo de todos os Workers dela). Depois de apagar o
+Worker antigo no Cloudflare, o `wrangler.jsonc` pode ser apagado também.
 
 ### 4. Ligar um no outro
 
-No Render, em **terna-servidor → Environment**, troque **ORIGENS_PERMITIDAS** pelo endereço
-exato do jogo (`https://terna.<seu-subdominio>.workers.dev`, sem barra no fim) e salve. O
-Render reinicia o serviço. Sem isso o navegador bloqueia o jogo de falar com o servidor.
+No Render, em **terna-servidor → Environment**, o **ORIGENS_PERMITIDAS** tem que ter o endereço
+exato do jogo (`https://terna.pages.dev`, sem barra no fim). Mais de um endereço vai separado por
+vírgula. O Render reinicia o serviço ao salvar. Sem isso o navegador bloqueia o jogo de falar com
+o servidor.
 
 Pronto: abra o endereço do jogo.
 
@@ -88,8 +99,8 @@ longe de cada uma:
 | Render: minutos de build | 500 min | ~2 min por deploy | `buildFilter` no `render.yaml`: só faz build quando muda o servidor ou o pacote compartilhado. |
 | Neon: horas de processamento | 100 CU-h | 0,25 CU = até 400 h acordado | o banco dorme 5 min depois da última consulta. A checagem de saúde (`/api/vivo`) não consulta o banco e o servidor fecha as conexões 10 s depois de usá-las, então ele só fica acordado enquanto alguém entra, salva ou vê o ranking. |
 | Neon: armazenamento | 0,5 GB | ~1 KB por jogador | 3 saves por jogador no máximo, 1 recorde por categoria, e as sessões vencidas são apagadas a cada login e a cada vez que o servidor sobe. |
-| Cloudflare: acessos ao jogo | ilimitado | — | só arquivos estáticos (grátis e sem limite no Workers). |
-| Cloudflare: minutos de build | 3.000 min | ~1 min por deploy | build watch paths do passo 3. |
+| Cloudflare: acessos ao jogo | ilimitado | — | só arquivos estáticos (grátis e sem limite no Pages). |
+| Cloudflare: builds | 500 por mês | 1 por push que mexe no jogo | build watch paths do passo 3. |
 
 E o que **não** foi usado de propósito: o Postgres grátis do **Render** (esse sim apaga o
 banco 30 dias depois de criado) e o disco do servidor (é apagado a cada reinício, por isso o
@@ -122,20 +133,10 @@ Uma vez por mês, dê uma olhada em:
   servidor, cada um só se a sua parte mudou.
 - **Mudar o banco:** edite `schema.ts`, rode `npm run db:gerar`, faça commit. O servidor aplica
   a migração no Neon ao subir.
-- **Trocar o endereço do jogo (grátis):** o endereço é `<nome-do-projeto>.<subdomínio-da-conta>.workers.dev`.
-  O nome do projeto já é `terna` (`name` em `apps/cliente/wrangler.jsonc`); o subdomínio é da conta
-  do Cloudflare. Para trocá-lo:
-  1. No Cloudflare, abra **Workers & Pages** e clique em **Change** ao lado de **Your subdomain**
-     (ou, no projeto `terna`, na aba **Domains**). O nome tem que estar livre no Cloudflare inteiro,
-     com até 63 letras, números ou hífens, sem hífen na ponta. Ex.: `jogo` → `terna.jogo.workers.dev`.
-     Vale para todos os Workers da conta, e o endereço antigo deixa de funcionar.
-  2. Espere uns minutos e abra o endereço novo.
-  3. No Render, em **terna-servidor → Environment**, acrescente o endereço novo em
-     **ORIGENS_PERMITIDAS**, separado por vírgula do antigo (ex.:
-     `https://terna.antigo.workers.dev,https://terna.jogo.workers.dev`), e salve. Sem isso a parte
-     online não conecta. Quando o novo estiver funcionando, pode tirar o antigo.
-- **Domínio próprio** (ex.: `terna.com.br`): dá para apontar para o Cloudflare de graça (só paga
-  o domínio). Aí troque `ORIGENS_PERMITIDAS` no Render.
+- **Domínio próprio** (ex.: `terna.com.br`): dá para apontar para o Cloudflare Pages de graça
+  (só paga o domínio), em **terna → Custom domains**. Aí acrescente o domínio em
+  `ORIGENS_PERMITIDAS` no Render e troque `terna.pages.dev` no `og:url` e no `og:image` de
+  `apps/cliente/index.html` (a prévia do link compartilhado).
 - **Sair do grátis:** quando precisar, um plano pago do Render tira o sono do servidor e amplia
   a banda; confira o preço atual em <https://render.com/pricing>. Neon e Cloudflare aguentam
   bastante coisa ainda no grátis.
