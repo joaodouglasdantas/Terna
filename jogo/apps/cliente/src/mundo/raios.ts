@@ -37,12 +37,17 @@ const CAMADAS = [
   { largura: 0.3, alfa: 0.35 },
 ];
 
+// A faixa da grama onde a luz deita (px a partir da linha do chão): a luz some de leve para cima
+// (as pontas dos tufos) e para baixo (onde a grama vira terra), sem borda.
+const CHAO = { meio: 1, altura: 3, de: -3, cheio: [-1, 2] as const, ate: 5 };
+
 const RAIOS = {
   forca: 0.15, // alfa do facho visível (screen), com o sol forte
   aquece: 0.27, // alfa do que o facho clareia e esquenta embaixo dele (soft-light)
   horaDourada: 0.3, // quanto mais fortes os raios ficam com o sol baixo
   inicio: 9, // px a partir do centro do sol onde o facho começa (dentro do brilho)
-  poca: 0.17, // a poça de luz no chão
+  poca: 0.5, // a luz deitada na grama (soft-light: clareia e esquenta a grama, não brilha no ar)
+  brilhoNoChao: 0.06, // e um quase nada dela brilhando (screen), só no miolo
   nuvem: 0.8, // quanto uma nuvem na frente do sol apaga os raios
   sombraDaNuvem: 0.1, // e quanto a cena escurece com ela
   seguir: 1.6, // por segundo: a cobertura muda aos poucos (a nuvem entrando e saindo do sol)
@@ -217,7 +222,8 @@ function pintarFeixes(
   ctx.globalAlpha = 1;
 }
 
-// Onde cada feixe bate no chão, uma poça de luz achatada na grama, da largura do feixe ali.
+// Onde cada feixe bate no chão, a luz deitada na grama: bem achatada (o chão visto quase de lado),
+// da largura do feixe ali e com a borda sumindo devagar. Vai na camada do chão (pintarLuzNoChao).
 function pintarPocas(ctx: CanvasRenderingContext2D, feixes: Feixe[], luz: Luz, cor: number[], alfa: number, chao: number): void {
   const [r, g, b] = cor;
   for (const f of feixes) {
@@ -225,11 +231,13 @@ function pintarPocas(ctx: CanvasRenderingContext2D, feixes: Feixe[], luz: Luz, c
     const forca = alfa * f.forca;
     if (!alvo || forca < 0.004) continue;
     ctx.save();
-    ctx.translate(alvo.x, chao + 1);
-    ctx.scale(alvo.meia, 5);
+    ctx.translate(alvo.x, chao + CHAO.meio);
+    ctx.scale(alvo.meia * 1.25, CHAO.altura);
     const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
     grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${forca})`);
-    grad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, ${forca * 0.45})`);
+    grad.addColorStop(0.3, `rgba(${r}, ${g}, ${b}, ${forca * 0.8})`);
+    grad.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, ${forca * 0.4})`);
+    grad.addColorStop(0.85, `rgba(${r}, ${g}, ${b}, ${forca * 0.12})`);
     grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
     ctx.fillStyle = grad;
     ctx.beginPath();
@@ -278,30 +286,6 @@ function noChao(f: Feixe, luz: Luz, chao: number): { x: number; meia: number } |
   if (s < 0.2 || chao <= luz.y) return null;
   const distancia = (chao - luz.y) / s;
   return { x: luz.x + Math.cos(f.angulo) * distancia, meia: Math.max(6, (distancia * Math.tan(f.meia)) / s) };
-}
-
-// A grama que o feixe pega: uma faixa fina de luz na ponta dos tufos (pintada junto com os
-// fachos, na camada guardada: pintarCamadas).
-function pintarFaixaNaGrama(ctx: CanvasRenderingContext2D, feixes: Feixe[], luz: Luz, cor: number[], alfa: number, chao: number): void {
-  const [r, g, b] = cor;
-  for (const f of feixes) {
-    const alvo = noChao(f, luz, chao);
-    const forca = alfa * f.forca;
-    if (!alvo || forca < 0.02) continue;
-    // Bem achatada, na altura das pontas da grama.
-    ctx.save();
-    ctx.translate(alvo.x, chao - 2);
-    ctx.scale(alvo.meia * 0.9, 3);
-    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-    grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${0.55 * forca})`);
-    grad.addColorStop(0.55, `rgba(${r}, ${g}, ${b}, ${0.4 * forca})`);
-    grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(0, 0, 1, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
 }
 
 // O orvalho cintilando na grama onde o feixe bate: gotinhas de 1px, as mais acesas com uma cruz
@@ -377,6 +361,7 @@ const MARGEM = 24;
 interface Camadas {
   aquece: HTMLCanvasElement;
   facho: HTMLCanvasElement;
+  chao: HTMLCanvasElement;
   tempo: number;
   luz: { x: number; y: number };
   largura: number;
@@ -394,16 +379,36 @@ function pintarCamadas(c: Camadas, feixes: Feixe[], luz: Luz, cor: number[], for
   aquece.setTransform(1, 0, 0, 1, 0, 0);
   aquece.clearRect(0, 0, c.aquece.width, c.aquece.height);
   pintarFeixes(aquece, feixes, mover, cor, RAIOS.aquece * forca, alcance, 'source-over');
-  aquece.globalCompositeOperation = 'source-over';
-  pintarPocas(aquece, feixes, mover, cor, RAIOS.poca * 1.4 * forca, yChao);
 
   const facho = contexto2d(c.facho);
   facho.setTransform(1, 0, 0, 1, 0, 0);
   facho.clearRect(0, 0, c.facho.width, c.facho.height);
   pintarFeixes(facho, feixes, mover, cor, RAIOS.forca * forca, alcance, 'source-over');
-  facho.globalCompositeOperation = 'source-over';
-  pintarPocas(facho, feixes, mover, cor, RAIOS.poca * forca, yChao);
-  pintarFaixaNaGrama(facho, feixes, mover, cor, Math.min(1, forca), yChao);
+
+  pintarLuzNoChao(c.chao, feixes, mover, cor, forca, yChao);
+}
+
+// A luz que os feixes deitam na grama, numa camada só dela: as poças, e por cima uma máscara que
+// some para cima e para baixo da faixa da grama (CHAO), para a luz ficar no chão e não flutuar
+// por cima dele nem acabar numa linha reta.
+function pintarLuzNoChao(tela: HTMLCanvasElement, feixes: Feixe[], luz: Luz, cor: number[], forca: number, chao: number): void {
+  const ctx = contexto2d(tela);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.clearRect(0, 0, tela.width, tela.height);
+  pintarPocas(ctx, feixes, luz, cor, Math.min(1, RAIOS.poca * forca), chao);
+  const de = chao + CHAO.de;
+  const ate = chao + CHAO.ate;
+  const altura = ate - de;
+  const mascara = ctx.createLinearGradient(0, de, 0, ate);
+  mascara.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  mascara.addColorStop((CHAO.cheio[0] - CHAO.de) / altura, 'rgba(0, 0, 0, 1)');
+  mascara.addColorStop((CHAO.cheio[1] - CHAO.de) / altura, 'rgba(0, 0, 0, 1)');
+  mascara.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.fillStyle = mascara;
+  ctx.fillRect(0, 0, tela.width, tela.height);
+  ctx.globalCompositeOperation = 'source-over';
 }
 
 // Os raios, a luz que eles jogam na cena, as poças e o brilho na grama e a poeira. `chao`: a linha
@@ -424,7 +429,7 @@ export function desenharRaios(
   if (!camadas || camadas.largura !== largura || camadas.altura !== altura) {
     const w = largura + 2 * MARGEM;
     const h = altura + 2 * MARGEM;
-    camadas = { aquece: novoCanvas(w, h), facho: novoCanvas(w, h), tempo: -Infinity, luz: { x: luz.x, y: luz.y }, largura, altura };
+    camadas = { aquece: novoCanvas(w, h), facho: novoCanvas(w, h), chao: novoCanvas(w, h), tempo: -Infinity, luz: { x: luz.x, y: luz.y }, largura, altura };
   }
   if (Math.abs(tempo - camadas.tempo) >= 1 / REFAZER) {
     // As camadas são pintadas com o sol e o chão de agora; entre uma refeita e outra, andam junto
@@ -438,7 +443,7 @@ export function desenharRaios(
   ctx.save();
   // Os fachos param na grama (a terra embaixo não pega sol); as poças ficam na linha dela.
   ctx.beginPath();
-  ctx.rect(0, 0, largura, chao + 4);
+  ctx.rect(0, 0, largura, chao + CHAO.ate);
   ctx.clip();
   // A cena embaixo do facho clareia e esquenta (as copas, a grama, quem estiver ali)...
   ctx.globalCompositeOperation = 'soft-light';
@@ -446,6 +451,13 @@ export function desenharRaios(
   // ...e o próprio facho aparece no ar.
   ctx.globalCompositeOperation = 'screen';
   ctx.drawImage(camadas.facho, dx, dy);
+  // A luz deitada na grama: clareia e esquenta a própria grama, e só um quase nada brilha.
+  ctx.globalCompositeOperation = 'soft-light';
+  ctx.drawImage(camadas.chao, dx, dy);
+  ctx.globalCompositeOperation = 'screen';
+  ctx.globalAlpha = RAIOS.brilhoNoChao / RAIOS.poca;
+  ctx.drawImage(camadas.chao, dx, dy);
+  ctx.globalAlpha = 1;
   pintarOrvalho(ctx, feixes, luz, tempo, Math.min(1, forca), chao, camX);
   pintarPoeira(ctx, feixes, luz, tempo, Math.min(1, 1.1 * forca), largura, chao);
   ctx.restore();
