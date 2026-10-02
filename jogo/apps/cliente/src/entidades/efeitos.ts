@@ -7,7 +7,8 @@
 // número de dano mostra o que passou e, em cima dele, o que a defesa segurou ("DEF 32").
 //
 // Online, cada um confere só o que acerta o próprio personagem: os efeitos do outro também
-// passam pelo corpo dele aqui, mas só para a imagem — a vida dele chega pela rede.
+// passam pelo corpo dele aqui, mas só para a imagem — a vida dele chega pela rede. E os efeitos
+// do outro conferem o seu personagem onde o outro o via (o fantasma: entidades/fantasma.ts).
 
 import { VENENO, VIDA_MAXIMA, type ZonaDoCorpo } from '@terna/compartilhado';
 import { ALTURA_FONTE, textoEmPixels } from '../motor/fonte';
@@ -173,7 +174,13 @@ const SOMBRA_DA_DEFESA = '#1a2430';
 const SOMBRA_DA_CURA = '#16361a';
 const ZONA_VALE = 1; // segundos: a vida do outro chegou até isto depois do acerto, é dele
 
-function numero(e: Nucleo<EfeitoBase>, alvo: { x: number; y: number; medida?: Medida }, texto: string, cor: string, sombra: string, escala = 1, vida = 0.9): { x: number; y: number } {
+// O corpo de verdade por trás de um fantasma (entidades/fantasma.ts); os outros são eles mesmos.
+export const CORPO_REAL = Symbol('o corpo de verdade');
+export const deVerdade = <T extends object>(c: T): T => ((c as { [CORPO_REAL]?: T })[CORPO_REAL] ?? c);
+
+function numero(e: Nucleo<EfeitoBase>, quem: { x: number; y: number; medida?: Medida }, texto: string, cor: string, sombra: string, escala = 1, vida = 0.9): { x: number; y: number } {
+  // O número sai de quem apanhou de verdade, não de onde o outro o via.
+  const alvo = deVerdade(quem);
   // Sai de um lado da cabeça, um de cada vez: dois acertos seguidos não se empilham, e nenhum
   // nasce em cima do nome.
   ladoDoNumero = ladoDoNumero === 1 ? -1 : 1;

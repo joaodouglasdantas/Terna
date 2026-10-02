@@ -42,6 +42,7 @@ import { criarBordas, desenharBordas, sentirBordas } from './interface/bordas';
 import { desenharContagem } from './interface/contagem';
 import { desenharCronometro } from './interface/cronometro';
 import { desenharEtiquetas } from './interface/etiqueta';
+import { criarContadorDeQuadros, desenharMedidor } from './interface/medidor';
 import { aplicarMira } from './interface/mira';
 import { desenharPainel } from './interface/painel';
 import { contexto2d } from './motor/imagens';
@@ -66,6 +67,7 @@ import {
   atualizarPartida,
   criarPartida,
   encerrarPartida,
+  SEM_ACOES,
   type AcoesMouse,
   type FimDaPartida,
   type Partida,
@@ -280,19 +282,33 @@ function olharNaTela(): { esquerda: number; direita: number } {
   return { esquerda, direita: camera.dividida ? Math.round(olhar.direita) : esquerda };
 }
 
+// A partida anda em passos de no máximo PASSO_MAXIMO: num computador que não dá conta de 60
+// quadros por segundo, um quadro vira dois ou mais passos (o golpe rápido não atravessa ninguém
+// entre um quadro e outro, e o jogo não fica em câmera lenta). Um quadro mais longo que
+// QUADRO_MAXIMO (a aba voltando de segundo plano) não vira um salto.
+const PASSO_MAXIMO = 1 / 60;
+const QUADRO_MAXIMO = 0.1;
+// O cenário (bichos, folhas, pássaros) só enfeita: anda com o quadro, até este tanto por vez.
+const PASSO_DO_CENARIO = 1 / 30;
+
 function atualizar(dt: number, tempo: number): void {
   const acoes = lerMouse();
   if (partida) {
-    atualizarPartida(partida, lerTeclado(), acoes, dt, tempo);
+    const teclado = lerTeclado();
+    const passos = Math.max(1, Math.ceil(dt / PASSO_MAXIMO - 1e-6));
+    // O clique e as teclas de um toque valem uma vez, no primeiro passo; o botão segurado, em todos.
+    const depois: AcoesMouse = { ...SEM_ACOES, segurando: acoes.segurando };
+    for (let i = 0; i < passos; i++) atualizarPartida(partida, teclado, i === 0 ? acoes : depois, dt / passos, tempo);
     atualizarCamera(partida, dt);
     sentirBordas(bordas, partida.jogador, dt);
   }
-  atualizarOlhar(dt);
+  const passo = Math.min(dt, PASSO_DO_CENARIO);
+  atualizarOlhar(passo);
   const { esquerda, direita } = camerasNaTela();
-  atualizarPassaros(dt, LARGURA, esquerda, direita);
-  atualizarAnimais(dt, partida ? [partida.jogador, partida.outro] : [], vistas());
-  atualizarMinhocas(dt);
-  atualizarFolhas(dt, tempo, vistas());
+  atualizarPassaros(passo, LARGURA, esquerda, direita);
+  atualizarAnimais(passo, partida ? [partida.jogador, partida.outro] : [], vistas());
+  atualizarMinhocas(passo);
+  atualizarFolhas(passo, tempo, vistas());
 }
 
 // Uma tela inteira vista pela câmera `camX`, recortada na faixa de `x0` a `x0 + largura` da
@@ -406,6 +422,8 @@ function desenhar(tempo: number): void {
   desenharPainel(ctx, p.jogador, p.eu, 'esquerda', LARGURA, tempo, true);
   desenharPainel(ctx, p.outro, p.ele, 'direita', LARGURA, tempo);
   desenharCronometro(ctx, p.restanteMs, LARGURA, tempo);
+  // Ligado no menu: os quadros por segundo e, online, o ping até o outro, no canto de baixo.
+  desenharMedidor(ctx, { fps: contador.fps(), online: p.remoto ? p.remoto.conexao.rede() : null }, ALTURA);
   desenharContagem(ctx, p.contagem, p.relogio - p.contagemInicial, LARGURA, ALTURA);
 }
 
@@ -415,10 +433,14 @@ function atualizarMira(): void {
   aplicarMira(ctx.canvas, p &&!p.menuAberto && !p.acabou ? (acaoPronta(p) ? 'pronta' : 'apagada') : null);
 }
 
+const contador = criarContadorDeQuadros();
+// Só em desenvolvimento: a partida em andamento, para os testes de ponta a ponta (some do build).
+if (import.meta.env.DEV) Object.assign(window, { __terna: { partida: () => partida } });
 let ultimoTempo = 0;
 function loop(tempoAtual: number): void {
-  const dt = ultimoTempo ? Math.min((tempoAtual - ultimoTempo) / 1000, 1 / 30) : 0;
+  const dt = ultimoTempo ? Math.min((tempoAtual - ultimoTempo) / 1000, QUADRO_MAXIMO) : 0;
   ultimoTempo = tempoAtual;
+  contador.quadro(tempoAtual);
 
   atualizar(dt, tempoAtual / 1000);
   desenhar(tempoAtual / 1000);

@@ -11,7 +11,7 @@
 // - 1 · Chicote de Espinhos: uma vinha com espinhos sai da mão dela em linha reta na direção do
 //   cursor e volta para a mão como um chicote. Pega o primeiro que encontrar: pouco dano, mas
 //   deixa envenenado (perde um pouquinho de vida de tempos em tempos) — sai-se da linha ou pula.
-//   Cada pinguinho do veneno cura a Leslie em metade do que tirou.
+//   Cada pinguinho do veneno cura a Leslie em parte do que tirou (2 de cada 5).
 // - 2 · Raízes: uma fileira de três rodas de raízes, como o Impacto do Anjo: a primeira na direção
 //   do cursor e as outras duas logo em seguida, cada uma depois de onde a anterior acaba. Em cada
 //   uma a terra racha e as raízes saem do chão e prendem quem está em cima (sem andar nem pular);
@@ -30,7 +30,7 @@ export const PODERES_LESLIE = ['chicote', 'raizes', 'flor'] as const;
 
 export const CHICOTE = {
   nome: 'Chicote de Espinhos',
-  dano: 8, // no acerto; o veneno tira o resto aos poucos
+  dano: 11, // no acerto; o veneno tira o resto aos poucos
   recarga: 1.4,
   alcance: 130, // até onde a vinha estica, da mão
   estica: 0.2, // segundos para esticar tudo
@@ -38,19 +38,19 @@ export const CHICOTE = {
   raio: 3, // da ponta, para o acerto
 };
 
-// O veneno do chicote: tira `dano` a cada `intervalo`, por `duracao` segundos (5 × 4 = 20). Um novo
+// O veneno do chicote: tira `dano` a cada `intervalo`, por `duracao` segundos (5 × 5 = 25). Um novo
 // acerto recomeça a contagem (não soma). A cada pinguinho, a Leslie recupera `cura` do que ele
-// tirou (a metade: 4 de veneno, 2 de cura; no golem, que segura parte, a metade do que passou).
+// tirou (5 de veneno, 2 de cura; no golem, que segura parte, 3 passam e 1 volta).
 export const VENENO = {
   duracao: 2.5,
   intervalo: 0.5,
-  dano: 4, // por tique: 20 no total
-  cura: 0.5, // da vida que o veneno tirou, volta para a Leslie
+  dano: 5, // por tique: 25 no total
+  cura: 0.4, // da vida que o veneno tirou, volta para a Leslie (arredondado: 2 a cada pinguinho)
 };
 
 export const RAIZES = {
   nome: 'Raízes',
-  dano: 14, // por roda da fileira
+  dano: 18, // por roda da fileira
   recarga: 9,
   alcance: 140, // da Leslie até o centro da primeira roda, na horizontal
   perto: 30, // a primeira nunca fica mais perto que isto dela
@@ -104,6 +104,6 @@ export const FLOR = {
   // ele está) e outra na altura de quem pula (`alturas[1]`): parado, a baixa pega; num pulo
   // simples (até ~45 px), a alta. Só o pulo duplo, na hora, passa por cima das duas. O par fere
   // uma vez só: acertando uma, a outra atravessa quem foi acertado (o golem, alto, pegaria as duas).
-  tiro: { dano: 23, velocidade: 320, alcance: 420, raio: 3, alturas: [6, 42] }, // ~9 × 23 = 207, e envenena
+  tiro: { dano: 29, velocidade: 320, alcance: 420, raio: 3, alturas: [6, 42] }, // ~9 × 29 = 261, e envenena
   toca: { longe: 140, espera: 2.5, afunda: 0.45, velocidade: 220, aviso: 0.45, sobe: 0.4 },
 };

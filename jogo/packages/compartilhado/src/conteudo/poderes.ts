@@ -13,7 +13,8 @@ export * from './leslie';
 export * from './grow';
 
 // A vida de cada um. Os números do jogo foram acertados juntos (BALANCEAMENTO.md, na pasta jogo/)
-// para uma luta entre dois do mesmo nível durar uns 3 a 4 minutos, dos 5 do relógio.
+// para uma luta entre dois do mesmo nível durar uns 2 minutos e meio a 3, e quase nunca passar de 4:
+// os 5 do relógio são a exceção, uma luta muito dura.
 export const VIDA_MAXIMA = 2500;
 
 // A energia pixy vem do dano que o personagem dá no adversário (com poder, arma ou soco): com 0,2

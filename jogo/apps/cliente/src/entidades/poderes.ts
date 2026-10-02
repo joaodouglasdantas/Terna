@@ -61,8 +61,8 @@ import {
 
 export { desenharBordaDoEncanto, desenharEncanto } from './anjo/poderes';
 export { desenharPreso, desenharVeneno } from './leslie/poderes';
-export { absorvidoDoQuePassou, acertaCorpo, ferirAlvo, mostrarCura, mostrarDano } from './efeitos';
-export type { Alvo, Ameacas, CorpoAlvo, Encanto, Manobra, Medida } from './efeitos';
+export { absorvidoDoQuePassou, acertaCorpo, CORPO_REAL, deVerdade, ferirAlvo, mostrarCura, mostrarDano } from './efeitos';
+export type { Alvo, Ameacas, CorpoAlvo, Dono, Encanto, Manobra, Medida } from './efeitos';
 
 // ---- O que cada personagem tem ----
 
@@ -191,13 +191,21 @@ export function soprando(e: Efeitos, dono: Dono): boolean {
   return ventoDo(e, dono);
 }
 
-export function atualizarEfeitos(e: Efeitos, dt: number, alvos: readonly Alvo[]): void {
+// Um quadro dos efeitos no mapa. `alvos`: os corpos de verdade (o veneno corre neles). `alvosDe`:
+// quem cada dono pode acertar, se não for `alvos` — online, os efeitos do outro conferem o seu
+// personagem onde o outro o via (o fantasma: entidades/fantasma.ts; veja partida.ts).
+export function atualizarEfeitos(
+  e: Efeitos,
+  dt: number,
+  alvos: readonly Alvo[],
+  alvosDe: (dono: Dono) => readonly Alvo[] = () => alvos,
+): void {
   e.lista = e.lista.filter((ef) =>
     efeitoDaLeslie(ef)
-      ? atualizarEfeitoLeslie(e as Nucleo<EfeitoLeslie>, ef, dt, alvos)
+      ? atualizarEfeitoLeslie(e as Nucleo<EfeitoLeslie>, ef, dt, alvosDe(ef.dono))
       : efeitoDoGrow(ef)
-        ? atualizarEfeitoGrow(e as Nucleo<EfeitoGrow>, ef, dt, alvos)
-        : atualizarEfeitoAnjo(e as Nucleo<EfeitoAnjo>, ef, dt, alvos),
+        ? atualizarEfeitoGrow(e as Nucleo<EfeitoGrow>, ef, dt, alvosDe(ef.dono))
+        : atualizarEfeitoAnjo(e as Nucleo<EfeitoAnjo>, ef, dt, alvosDe(ef.dono)),
   );
   atualizarVeneno(e, alvos, dt);
   atualizarNucleo(e, dt);

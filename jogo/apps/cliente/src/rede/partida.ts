@@ -4,9 +4,14 @@
 // manda o próprio estado (e os poderes e golpes que usa) e recebe os do outro. As armas do mapa
 // são do servidor: ele avisa as que caem e quem pega; daqui só se pede.
 //
-// Na mesma rede (a partida hospedada), os dois computadores se ligam direto (direto.ts) e o estado,
-// os poderes e os golpes vão por essa ligação; o resto (armas, tempo, fim) continua no servidor.
-// Sem ela abrir, tudo vai pelo servidor.
+// Os dois computadores tentam se ligar direto (direto.ts) — na mesma rede ou, numa sala com código,
+// pela internet — e o estado, os poderes e os golpes vão por essa ligação; o resto (armas, tempo,
+// fim, a vida para o fim por tempo) continua no servidor. Sem ela abrir, tudo vai pelo servidor.
+//
+// O ping: o servidor diz a cada segundo a ida e volta de cada um até ele (`rede`); ligados direto,
+// a ligação mede a ida e volta até o outro. Os dois dão o atraso de um jogador a outro, que a
+// partida usa (adiantar o boneco do outro, conferir os golpes onde você estava quando eles saíram)
+// e mostra na tela.
 
 import {
   IdDaAba,
@@ -58,6 +63,13 @@ const PELA_LIGACAO = new Set(['estado', 'poder', 'golpe']);
 // engasgada, e o próximo estado (50 ms depois) já é mais novo. Poderes, golpes e armas sempre vão.
 const FILA_MAXIMA = 8 * 1024;
 
+// Como está a rede: a ida e volta até o outro jogador (ms; null sem medida ainda) e se é pela
+// ligação direta (sem passar pelo servidor).
+export interface MedidaRede {
+  ping: number | null;
+  direto: boolean;
+}
+
 export interface ConexaoPartida {
   // Troca quem recebe as mensagens (a tela de espera, depois o jogo). `aoFechar` recebe o
   // último erro que o servidor mandou, se mandou algum. O que ficou guardado por `segurar` chega
@@ -69,8 +81,10 @@ export interface ConexaoPartida {
   segurar(): void;
   // Com os dois na sala: o personagem escolhido (mandar de novo troca, até o outro escolher).
   escolherHeroi(heroi: Heroi): void;
-  // Ligados direto pela rede local (o estado, os poderes e os golpes não passam pelo servidor).
+  // Ligados direto (o estado, os poderes e os golpes não passam pelo servidor).
   direta(): boolean;
+  // A ida e volta até o outro jogador, agora (o atraso de um estado é a metade).
+  rede(): MedidaRede;
   // O próprio estado; com a rede engasgada, fica de fora (o próximo o substitui).
   enviar(estado: EstadoJogador): void;
   enviarPoder(uso: PoderUsado): void;
@@ -103,6 +117,8 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
   let ultimoErro: string | null = null;
   let fechadaPorMim = false;
   let ligacao: LigacaoDireta | null = null;
+  // As idas e voltas até o servidor (a sua e a do outro), da última mensagem `rede`.
+  let pings = { meu: 0, dele: 0 };
   // Segurando (segurar): as mensagens que chegaram e se a conexão caiu, para o próximo `ouvir`.
   let guardado: { mensagens: MensagemPartidaDoServidor[]; caiu: boolean } | null = null;
 
@@ -129,25 +145,45 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
     mandar(mensagem);
   };
   // Quem hospedou oferece a ligação; quem entrou espera a oferta. Na revanche, a que ainda está de
-  // pé continua; a que não abriu (ou caiu) é tentada de novo.
+  // pé continua; a que não abriu (ou caiu) é tentada de novo. `pelaInternet`: a sala é com código.
+  let pelaInternet = false;
   const ligar = (oferece: boolean): void => {
     if (ligacao && !ligacao.morta()) return;
     ligacao?.fechar();
     ligacao = ligarDireto(
       oferece,
+      pelaInternet,
       (sinal) => mandar({ tipo: 'sinal', sinal }),
       (texto) => {
         const m = ler(texto);
-        if (m && PELA_LIGACAO.has(m.tipo)) entregar(m);
+        if (!m || !PELA_LIGACAO.has(m.tipo)) return;
+        // O estado que veio direto levou a metade da ida e volta da ligação.
+        const ida = ligacao?.ping();
+        entregar(m.tipo === 'estado' && ida ? { ...m, atraso: Math.min(5000, Math.round(ida / 2)) } : m);
       },
     );
+  };
+  // A ida e volta até o outro: direto, a da ligação; pelo servidor, a sua até ele mais a dele.
+  const rede = (): MedidaRede => {
+    const direto = ligacao?.aberta() ?? false;
+    const ida = direto ? ligacao?.ping() : null;
+    if (direto && ida) return { ping: Math.round(ida), direto };
+    if (!pings.meu) return { ping: null, direto };
+    return { ping: pings.meu + (pings.dele || pings.meu), direto };
   };
 
   socket.addEventListener('message', (evento) => {
     const mensagem = ler(String(evento.data));
     if (!mensagem) return;
     if (mensagem.tipo === 'erro') ultimoErro = mensagem.erro;
-    if (mensagem.tipo === 'escolher' && mensagem.direto) ligar(mensagem.lado === 'anfitriao');
+    if (mensagem.tipo === 'rede') {
+      pings = { meu: mensagem.ping, dele: mensagem.pingOponente };
+      return;
+    }
+    if (mensagem.tipo === 'escolher' && mensagem.direto) {
+      pelaInternet = mensagem.internet === true;
+      ligar(mensagem.lado === 'anfitriao');
+    }
     if (mensagem.tipo === 'sinal') {
       if (mensagem.sinal.descricao?.type === 'offer' && (!ligacao || ligacao.morta())) ligar(false);
       ligacao?.receberSinal(mensagem.sinal);
@@ -185,8 +221,9 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
       mandar({ tipo: 'heroi', heroi });
     },
     direta: () => ligacao?.aberta() ?? false,
+    rede,
     enviar(estado) {
-      if (ligacao?.enviar(JSON.stringify({ tipo: 'estado', estado }))) return;
+      if (ligacao?.enviarEstado(JSON.stringify({ tipo: 'estado', estado }))) return;
       if (socket.bufferedAmount > FILA_MAXIMA) return;
       mandar({ tipo: 'estado', estado });
     },

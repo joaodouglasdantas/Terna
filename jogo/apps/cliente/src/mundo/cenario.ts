@@ -747,19 +747,30 @@ export function desenharSombra(
 ): void {
   const comprimento = largura * (0.6 + 0.7 * (1 - luz.elevacao) * luz.forca);
   const cx = centroX - luz.lado * largura * 0.35 * (1 - 0.5 * luz.elevacao) * luz.forca;
-  const alfa = LUZ.sombra * (0.45 + 0.55 * luz.forca) * intensidade;
+  const alfa = Math.round(LUZ.sombra * (0.45 + 0.55 * luz.forca) * intensidade * 500) / 500;
   ctx.save();
   ctx.translate(cx, yBase + 2);
   ctx.scale(comprimento / 2, 2.5);
-  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-  g.addColorStop(0, `rgba(12, 32, 14, ${alfa})`);
-  g.addColorStop(0.55, `rgba(12, 32, 14, ${alfa * 0.6})`);
-  g.addColorStop(1, 'rgba(12, 32, 14, 0)');
-  ctx.fillStyle = g;
+  ctx.fillStyle = degradeDaSombra(ctx, alfa);
   ctx.beginPath();
   ctx.arc(0, 0, 1, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+}
+
+// O degradê da sombra é o mesmo para todas com o mesmo alfa (o círculo de raio 1 é esticado no
+// lugar): guardado, em vez de um novo por sombra a cada quadro.
+const degradesDaSombra = new Map<number, CanvasGradient>();
+function degradeDaSombra(ctx: CanvasRenderingContext2D, alfa: number): CanvasGradient {
+  let g = degradesDaSombra.get(alfa);
+  if (g) return g;
+  if (degradesDaSombra.size > 64) degradesDaSombra.clear();
+  g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+  g.addColorStop(0, `rgba(12, 32, 14, ${alfa})`);
+  g.addColorStop(0.55, `rgba(12, 32, 14, ${alfa * 0.6})`);
+  g.addColorStop(1, 'rgba(12, 32, 14, 0)');
+  degradesDaSombra.set(alfa, g);
+  return g;
 }
 
 // Sombras e plantas da frente, em coordenadas do mapa (o chamador já transladou pela
@@ -776,13 +787,15 @@ export function desenharVegetacao(
 ): void {
   // +1 para a base encostar dentro da grama, sem vão.
   const apoio = yBase + 1;
+  // Só as que aparecem (a sombra vai até ~1,3 largura do objeto para o lado).
+  const naVista = (x: number, w: number): boolean => x + 1.5 * w >= camX && x - 1.5 * w <= camX + largura;
   ARVORES_CHAO.forEach(({ indice, x }) => {
     const { w, m = 0 }: Recorte = QUADROS_CENARIO.arvores[indice][0];
-    desenharSombra(ctx, luz, x, yBase, (w - m) * 0.8);
+    if (naVista(x, w)) desenharSombra(ctx, luz, x, yBase, (w - m) * 0.8);
   });
   ARBUSTOS_CHAO.forEach(({ indice, x }) => {
     const { w, m = 0 }: Recorte = QUADROS_CENARIO.arbustos[indice][0];
-    desenharSombra(ctx, luz, x, yBase, w - m, 0.6);
+    if (naVista(x, w)) desenharSombra(ctx, luz, x, yBase, w - m, 0.6);
   });
   desenharFileira(ctx, folha, tempo, luz, 'arvores', ARVORES_CHAO, apoio, camX, largura, olharY);
   desenharFileira(ctx, folha, tempo, luz, 'arbustos', ARBUSTOS_CHAO, apoio, camX, largura, olharY);
@@ -793,6 +806,19 @@ export function desenharVegetacao(
 // (raios.ts), que também clareiam o que está embaixo deles. Uma nuvem na frente do sol apaga o
 // calor e os raios aos poucos e escurece a cena um tanto. Tudo bem de leve. `chao`: a linha da
 // grama na tela.
+//
+// O calor e o tom do entardecer vão numa camada (soft-light), e o lado escuro, a sombra da nuvem e
+// a vinheta noutra (multiply): cada uma é pintada à parte e só refeita quando o sol anda um pixel
+// ou a luz muda um degrau; a cada quadro, a cena recebe as duas coladas, em vez de cinco degradês
+// e misturas pela tela inteira.
+interface CamadasDaLuz {
+  suave: HTMLCanvasElement;
+  escura: HTMLCanvasElement;
+  chave: string;
+}
+let camadasDaLuz: CamadasDaLuz | null = null;
+const degrau = (v: number): number => Math.round(v * 200);
+
 export function desenharLuz(
   ctx: CanvasRenderingContext2D,
   luz: Luz,
@@ -803,41 +829,53 @@ export function desenharLuz(
   camX = 0,
 ): void {
   acompanharNuvens(tempo);
+  const calorForca = LUZ.calor * luz.forca * solLivre();
+  const entardecer = LUZ.entardecer * (1 - suavizar(0.2, 0.6, luz.elevacao)) * suavizar(0, 0.15, luz.elevacao);
+  const escuro = LUZ.ladoEscuro * luz.forca * Math.abs(luz.lado);
+  const nuvem = sombraDaNuvem() * luz.forca;
+  const chave = [Math.round(luz.x), Math.round(luz.y), Math.sign(luz.lado), degrau(calorForca), degrau(entardecer), degrau(escuro), degrau(nuvem), largura, altura].join(':');
+  if (!camadasDaLuz || camadasDaLuz.suave.width !== largura || camadasDaLuz.suave.height !== altura) {
+    camadasDaLuz = { suave: novoCanvas(largura, altura), escura: novoCanvas(largura, altura), chave: '' };
+  }
+  const camadas = camadasDaLuz;
+  if (camadas.chave !== chave) {
+    camadas.chave = chave;
+    const s = contexto2d(camadas.suave);
+    s.clearRect(0, 0, largura, altura);
+    const calor = s.createRadialGradient(luz.x, luz.y, 0, luz.x, luz.y, largura * 1.1);
+    calor.addColorStop(0, `rgba(255, 226, 160, ${calorForca})`);
+    calor.addColorStop(1, 'rgba(255, 226, 160, 0)');
+    s.fillStyle = calor;
+    s.fillRect(0, 0, largura, altura);
+    if (entardecer > 0.005) {
+      s.fillStyle = `rgba(255, 140, 70, ${entardecer})`;
+      s.fillRect(0, 0, largura, altura);
+    }
+
+    const e = contexto2d(camadas.escura);
+    e.clearRect(0, 0, largura, altura);
+    const lado = e.createLinearGradient(luz.lado < 0 ? 0 : largura, 0, luz.lado < 0 ? largura : 0, 0);
+    lado.addColorStop(0, 'rgba(40, 50, 90, 0)');
+    lado.addColorStop(1, `rgba(40, 50, 90, ${escuro})`);
+    e.fillStyle = lado;
+    e.fillRect(0, 0, largura, altura);
+    // A sombra da nuvem que passa na frente do sol: a cena toda um pouco mais fria e escura.
+    if (nuvem > 0.004) {
+      e.fillStyle = `rgba(70, 86, 130, ${nuvem})`;
+      e.fillRect(0, 0, largura, altura);
+    }
+    // Vinheta: os cantos um pouco mais escuros, puxando o olho para o meio da cena.
+    const vinheta = e.createRadialGradient(largura / 2, altura * 0.45, altura * 0.35, largura / 2, altura * 0.45, largura * 0.62);
+    vinheta.addColorStop(0, 'rgba(30, 26, 60, 0)');
+    vinheta.addColorStop(1, `rgba(30, 26, 60, ${LUZ.vinheta})`);
+    e.fillStyle = vinheta;
+    e.fillRect(0, 0, largura, altura);
+  }
   ctx.save();
   ctx.globalCompositeOperation = 'soft-light';
-  const calor = ctx.createRadialGradient(luz.x, luz.y, 0, luz.x, luz.y, largura * 1.1);
-  calor.addColorStop(0, `rgba(255, 226, 160, ${LUZ.calor * luz.forca * solLivre()})`);
-  calor.addColorStop(1, 'rgba(255, 226, 160, 0)');
-  ctx.fillStyle = calor;
-  ctx.fillRect(0, 0, largura, altura);
-
-  const entardecer = LUZ.entardecer * (1 - suavizar(0.2, 0.6, luz.elevacao)) * suavizar(0, 0.15, luz.elevacao);
-  if (entardecer > 0.005) {
-    ctx.fillStyle = `rgba(255, 140, 70, ${entardecer})`;
-    ctx.fillRect(0, 0, largura, altura);
-  }
-
+  ctx.drawImage(camadas.suave, 0, 0);
   ctx.globalCompositeOperation = 'multiply';
-  const escuro = LUZ.ladoEscuro * luz.forca * Math.abs(luz.lado);
-  const lado = ctx.createLinearGradient(luz.lado < 0 ? 0 : largura, 0, luz.lado < 0 ? largura : 0, 0);
-  lado.addColorStop(0, 'rgba(40, 50, 90, 0)');
-  lado.addColorStop(1, `rgba(40, 50, 90, ${escuro})`);
-  ctx.fillStyle = lado;
-  ctx.fillRect(0, 0, largura, altura);
-
-  // A sombra da nuvem que passa na frente do sol: a cena toda um pouco mais fria e escura.
-  const nuvem = sombraDaNuvem() * luz.forca;
-  if (nuvem > 0.004) {
-    ctx.fillStyle = `rgba(70, 86, 130, ${nuvem})`;
-    ctx.fillRect(0, 0, largura, altura);
-  }
-
-  // Vinheta: os cantos um pouco mais escuros, puxando o olho para o meio da cena.
-  const vinheta = ctx.createRadialGradient(largura / 2, altura * 0.45, altura * 0.35, largura / 2, altura * 0.45, largura * 0.62);
-  vinheta.addColorStop(0, 'rgba(30, 26, 60, 0)');
-  vinheta.addColorStop(1, `rgba(30, 26, 60, ${LUZ.vinheta})`);
-  ctx.fillStyle = vinheta;
-  ctx.fillRect(0, 0, largura, altura);
+  ctx.drawImage(camadas.escura, 0, 0);
   ctx.restore();
 
   desenharRaios(ctx, luz, tempo, largura, altura, chao, camX);

@@ -53,8 +53,10 @@ export const PartidaNaRede = z.object({ codigo: CodigoSala, anfitriao: z.string(
 export type PartidaNaRede = z.infer<typeof PartidaNaRede>;
 export const PartidasNaRede = z.object({ partidas: z.array(PartidaNaRede) });
 
-// Na mesma rede, os dois computadores se ligam direto (WebRTC) e o estado, os poderes e os golpes
-// vão por essa ligação, sem passar pelo servidor. O servidor só leva os recados para ela abrir: a
+// Os dois computadores tentam se ligar direto (WebRTC) e o estado, os poderes e os golpes vão por
+// essa ligação, sem passar pelo servidor: na mesma rede, pelos endereços dela; pela internet, com o
+// endereço de fora que um servidor STUN mostra a cada um (a rede de quem está atrás de um NAT
+// muito fechado não deixa, e aí segue pelo servidor). O servidor só leva os recados para ela abrir: a
 // descrição da ligação (a oferta de quem hospeda, a resposta de quem entrou) e os caminhos
 // possíveis de cada um (candidatos). Não abrindo, tudo continua pelo servidor.
 export const Sinal = z.object({
@@ -177,13 +179,15 @@ export const MensagemPartidaDoServidor = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('sala-criada'), codigo: CodigoSala }),
   // Os dois estão na sala: cada um escolhe o personagem (e manda `heroi`; até o outro escolher,
   // pode mandar de novo e trocar). `prazoMs`: o tempo para os dois escolherem; acabando antes,
-  // ninguém entra no jogo e a sala cai. `direto`: estão na mesma rede — tentem a ligação direta.
+  // ninguém entra no jogo e a sala cai. `direto`: tentem a ligação direta — na mesma rede, ou,
+  // com `internet`, pela internet (com o STUN).
   z.object({
     tipo: z.literal('escolher'),
     lado: Lado,
     oponente: z.string(),
     prazoMs: z.number().int().positive(),
     direto: z.boolean().optional(),
+    internet: z.boolean().optional(),
   }),
   // O personagem que o outro escolheu (a cada escolha e troca dele): fica bloqueado para quem
   // recebe. Volta também para quem pediu um personagem que o outro já tinha (os dois clicaram
@@ -217,6 +221,10 @@ export const MensagemPartidaDoServidor = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('revanche') }),
   // Só para o outro: um recado de quem mandou para a ligação direta.
   z.object({ tipo: z.literal('sinal'), sinal: Sinal }),
+  // A cada medida do batimento (uma por segundo), com os dois na sala: a ida e volta de quem recebe
+  // até o servidor (`ping`, ms) e a do outro (`pingOponente`; 0 ainda sem medida). Pelo servidor,
+  // um estado leva a metade da soma dos dois de um jogador ao outro.
+  z.object({ tipo: z.literal('rede'), ping: z.number().min(0).max(10_000), pingOponente: z.number().min(0).max(10_000) }),
   z.object({ tipo: z.literal('erro'), erro: z.string() }),
 ]);
 export type MensagemPartidaDoServidor = z.infer<typeof MensagemPartidaDoServidor>;

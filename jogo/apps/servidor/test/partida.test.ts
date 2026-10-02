@@ -70,8 +70,8 @@ describe('salas de partida', () => {
     expect(a.ultima()).toEqual({ tipo: 'sala-criada', codigo: 'K7P2Q' });
 
     const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
-    expect(a.ultima()).toEqual({ tipo: 'escolher', lado: 'anfitriao', oponente: 'Bia', prazoMs: ESCOLHA_MS });
-    expect(b.ultima()).toEqual({ tipo: 'escolher', lado: 'convidado', oponente: 'Ana', prazoMs: ESCOLHA_MS });
+    expect(a.ultima()).toEqual({ tipo: 'escolher', lado: 'anfitriao', oponente: 'Bia', prazoMs: ESCOLHA_MS, direto: true, internet: true });
+    expect(b.ultima()).toEqual({ tipo: 'escolher', lado: 'convidado', oponente: 'Ana', prazoMs: ESCOLHA_MS, direto: true, internet: true });
 
     salas.receber(anfitriao, JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
     // O outro vê na hora qual ela escolheu.
@@ -200,16 +200,17 @@ describe('salas de partida', () => {
     expect(salas.naRede('200.1.2.3')).toEqual([{ codigo: 'K7P2Q', anfitriao: 'Ana' }]);
   });
 
-  it('a sala com código não aparece na rede e não repassa recados de ligação direta', () => {
+  it('a sala com código não aparece na rede, e os dois tentam a ligação direta pela internet', () => {
     const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
     const a = conexaoFalsa();
     const b = conexaoFalsa();
     const anfitriao = salas.criar('Ana', a.conexao)!;
     expect(salas.naRede('local')).toEqual([]);
     salas.entrar('K7P2Q', 'Bia', b.conexao, '189.9.9.9');
-    expect(a.ultima()).toEqual({ tipo: 'escolher', lado: 'anfitriao', oponente: 'Bia', prazoMs: ESCOLHA_MS });
+    expect(a.ultima()).toEqual({ tipo: 'escolher', lado: 'anfitriao', oponente: 'Bia', prazoMs: ESCOLHA_MS, direto: true, internet: true });
+    // Os recados da ligação passam (pela internet, com o STUN de cada lado).
     salas.receber(anfitriao, JSON.stringify({ tipo: 'sinal', sinal: { descricao: { type: 'offer', sdp: 'v=0' } } }));
-    expect(b.ultima()?.tipo).toBe('escolher');
+    expect(b.ultima()).toEqual({ tipo: 'sinal', sinal: { descricao: { type: 'offer', sdp: 'v=0' } } });
   });
 
   it('recusa código que não existe e sala cheia', () => {
@@ -259,6 +260,38 @@ describe('salas de partida', () => {
     salas.medirPing(anfitriao, 300);
     salas.receber(anfitriao, JSON.stringify({ tipo: 'estado', estado: ESTADO }));
     expect(b.ultima()).toEqual({ tipo: 'estado', estado: ESTADO, atraso: 110 });
+  });
+
+  it('a cada medida do ping, cada um fica sabendo do seu e do outro', () => {
+    const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    const anfitriao = salas.criar('Ana', a.conexao)!;
+    // Sozinho na sala ainda não há o que mostrar.
+    salas.medirPing(anfitriao, 120);
+    expect(a.recebidas.some((m) => m.tipo === 'rede')).toBe(false);
+    const convidado = salas.entrar('K7P2Q', 'Bia', b.conexao)!;
+    salas.medirPing(convidado, 80);
+    expect(b.ultima()).toEqual({ tipo: 'rede', ping: 80, pingOponente: 120 });
+    salas.medirPing(anfitriao, 140);
+    expect(a.ultima()).toEqual({ tipo: 'rede', ping: 140, pingOponente: 80 });
+  });
+
+  it('o limite de estados por segundo não engole os golpes, os poderes nem a vida', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-02T12:00:00.100Z'));
+    const salas = new Salas({ gerarCodigo: () => 'K7P2Q' });
+    const a = conexaoFalsa();
+    const b = conexaoFalsa();
+    const anfitriao = salas.criar('Ana', a.conexao)!;
+    escolherOsDois(salas, anfitriao, salas.entrar('K7P2Q', 'Bia', b.conexao)!);
+    const antes = b.recebidas.length;
+    // Depois de um engasgo da rede, 100 estados chegam de uma vez, e logo atrás um poder.
+    for (let i = 0; i < 100; i++) salas.receber(anfitriao, JSON.stringify({ tipo: 'estado', estado: ESTADO }));
+    salas.receber(anfitriao, JSON.stringify({ tipo: 'poder', uso: RAJADA_USADA }));
+    const chegaram = b.recebidas.slice(antes);
+    expect(chegaram.filter((m) => m.tipo === 'estado')).toHaveLength(60);
+    expect(chegaram.at(-1)).toEqual({ tipo: 'poder', uso: RAJADA_USADA });
   });
 
   it('não empilha estado na conexão engasgada de quem recebe, mas o poder sempre vai', () => {
@@ -320,8 +353,8 @@ describe('salas de partida', () => {
     salas.receber(anfitriao, JSON.stringify({ tipo: 'revanche' })); // repetido: nada
     expect(b.recebidas.filter((m) => m.tipo === 'revanche')).toHaveLength(1);
     salas.receber(convidado, JSON.stringify({ tipo: 'revanche' }));
-    expect(a.ultima()).toEqual({ tipo: 'escolher', lado: 'anfitriao', oponente: 'Bia', prazoMs: ESCOLHA_MS });
-    expect(b.ultima()).toEqual({ tipo: 'escolher', lado: 'convidado', oponente: 'Ana', prazoMs: ESCOLHA_MS });
+    expect(a.ultima()).toEqual({ tipo: 'escolher', lado: 'anfitriao', oponente: 'Bia', prazoMs: ESCOLHA_MS, direto: true, internet: true });
+    expect(b.ultima()).toEqual({ tipo: 'escolher', lado: 'convidado', oponente: 'Ana', prazoMs: ESCOLHA_MS, direto: true, internet: true });
     salas.receber(anfitriao, JSON.stringify({ tipo: 'heroi', heroi: 'grow' }));
     salas.receber(convidado, JSON.stringify({ tipo: 'heroi', heroi: 'leslie' }));
     expect(a.ultima()).toMatchObject({ tipo: 'comecou', heroi: 'grow', heroiOponente: 'leslie' });

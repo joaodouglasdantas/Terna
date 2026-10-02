@@ -1,8 +1,9 @@
 """Simulador de duelo do Terna, para o balanceamento (BALANCEAMENTO.md explica).
 
-Uso (na pasta jogo/):  python3 ferramentas/simular-duelo.py        # os números de agora
-                       python3 ferramentas/simular-duelo.py antes  # os de antes do balanceamento
-                       python3 ferramentas/simular-duelo.py furia  # com a Fúria, antes da Flor
+Uso (na pasta jogo/):  python3 ferramentas/simular-duelo.py           # os números de agora
+                       python3 ferramentas/simular-duelo.py anterior  # os de antes do dano subir (lutas de 3 a 4 min)
+                       python3 ferramentas/simular-duelo.py antes     # os de antes do primeiro balanceamento
+                       python3 ferramentas/simular-duelo.py furia     # com a Fúria, antes da Flor
 
 Os números do jogo ficam em packages/compartilhado/src/conteudo/*.ts; aqui eles estão copiados em
 NUMEROS (mudou lá, mude aqui também). 'p' (a chance de acertar), 'ocupa', 'engajado', 'longe',
@@ -30,30 +31,31 @@ NUMEROS = {'vida': 2500,
  'engajado': 4.0,
  'longe': 3.0,
  'pegarArma': 0.125,
- 'espada': {'dano': 26, 'recarga': 1.15, 'ocupa': 0.34, 'p': 0.45},
- 'arco': {'dano': 22, 'recarga': 1.4, 'ocupa': 0.4, 'p': 0.35},
+ 'espada': {'dano': 33, 'recarga': 1.15, 'ocupa': 0.34, 'p': 0.45},
+ 'arco': {'dano': 28, 'recarga': 1.4, 'ocupa': 0.4, 'p': 0.35},
  'durabilidade': 30,
- 'soco': {'dano': 4, 'recarga': 0.45, 'ocupa': 0.25, 'p': 0.45},
- 'chicote': {'dano': 8, 'recarga': 1.4, 'ocupa': 0.44, 'p': 0.4, 'custo': 2},
- 'veneno': {'dano': 4, 'intervalo': 0.5, 'duracao': 2.5, 'cura': 0.5},
- 'raizes': {'dano': 14, 'rodas': 3, 'recarga': 9, 'ocupa': 0.5, 'p': 0.35, 'custo': 6, 'prende': 2.4},
+ 'soco': {'dano': 5, 'recarga': 0.45, 'ocupa': 0.25, 'p': 0.45},
+ 'chicote': {'dano': 11, 'recarga': 1.4, 'ocupa': 0.44, 'p': 0.4, 'custo': 2},
+ # cura 0,4: no jogo, cada pinguinho de 5 devolve 2 (arredondado).
+ 'veneno': {'dano': 5, 'intervalo': 0.5, 'duracao': 2.5, 'cura': 0.4},
+ 'raizes': {'dano': 18, 'rodas': 3, 'recarga': 9, 'ocupa': 0.5, 'p': 0.35, 'custo': 6, 'prende': 2.4},
  'furia': {'dano': 250, 'recarga': 3, 'ocupa': 0.4, 'p': 0.35, 'pPreso': 0.9, 'custo': 100, 'cura': 100},
  # A Flor Carnívora (a ult da Leslie no lugar da Fúria): brota, segue o outro (longe, por baixo
  # da terra) e cospe de longe, esteja a luta perto ou não. 'antes': segundos até a primeira
  # cusparada. 'p' 0,6 (era 0,35): cada cusparada é um par de bolas, uma baixa e uma alta, a
  # 320 px/s (era uma, a 230) — o pulo simples não escapa; só o pulo duplo na hora, ou sair do
  # alcance. O par fere uma vez só.
- 'flor': {'dano': 23, 'envenena': True, 'duracao': 14, 'intervalo': 1.6, 'antes': 1.6, 'recarga': 3, 'ocupa': 0.4, 'p': 0.6, 'custo': 100},
- 'aves': {'dano': 55, 'bicada': 6, 'recarga': 6.5, 'ocupa': 0.35, 'p': 0.35, 'custo': 2, 'tira': 2.0},
- 'vento': {'tique': 0.3, 'dano': 5, 'duracao': 3.6, 'recarga': 8, 'p': 0.5, 'custo': 3, 'atrapalha': 0.5},
+ 'flor': {'dano': 29, 'envenena': True, 'duracao': 14, 'intervalo': 1.6, 'antes': 1.6, 'recarga': 3, 'ocupa': 0.4, 'p': 0.6, 'custo': 100},
+ 'aves': {'dano': 69, 'bicada': 8, 'recarga': 6.5, 'ocupa': 0.35, 'p': 0.35, 'custo': 2, 'tira': 2.0},
+ 'vento': {'tique': 0.3, 'dano': 6, 'duracao': 3.6, 'recarga': 8, 'p': 0.5, 'custo': 3, 'atrapalha': 0.5},
  'golem': {'duracao': 30, 'recarga': 10, 'defesa': 0.4, 'custo': 100},
- 'salto': {'dano': 140, 'recarga': 5, 'ocupa': 1.25, 'p': 0.35},
- 'investida': {'dano': 130, 'recarga': 6, 'ocupa': 1.3, 'p': 0.35},
- 'pedra': {'dano': 125, 'lascas': 65, 'recarga': 5, 'ocupa': 0.6, 'p': 0.3, 'pLascas': 0.3},
+ 'salto': {'dano': 175, 'recarga': 5, 'ocupa': 1.25, 'p': 0.35},
+ 'investida': {'dano': 163, 'recarga': 6, 'ocupa': 1.3, 'p': 0.35},
+ 'pedra': {'dano': 156, 'lascas': 81, 'recarga': 5, 'ocupa': 0.6, 'p': 0.3, 'pLascas': 0.3},
  'anjo': {'duracao': 35, 'recarga': 8, 'custo': 100},
- 'impacto': {'dano': 80, 'explosoes': 3, 'recarga': 4, 'ocupa': 0.35, 'p': 0.3},
- 'rajada': {'dano': 60, 'coracoes': 2, 'recarga': 8, 'ocupa': 0.3, 'p': 0.3, 'encanto': 1.5},
- 'julgamento': {'dano': 320, 'recarga': 18, 'ocupa': 0.3, 'p': 0.35, 'pPreso': 0.9},
+ 'impacto': {'dano': 100, 'explosoes': 3, 'recarga': 4, 'ocupa': 0.35, 'p': 0.3},
+ 'rajada': {'dano': 75, 'coracoes': 2, 'recarga': 8, 'ocupa': 0.3, 'p': 0.3, 'encanto': 1.5},
+ 'julgamento': {'dano': 400, 'recarga': 18, 'ocupa': 0.3, 'p': 0.35, 'pPreso': 0.9},
  'porDano_anjo': 0.45}
 
 
@@ -383,9 +385,11 @@ def relatorio(cfg, herois=('leslie', 'grow', 'anjo'), n=400, seed=1):
                 ko += k
                 for f, d in a.porFonte.items():
                     fontes[(ha, f)] = fontes.get((ha, f), 0) + d
+            tempos.sort()
             linhas.append({
                 'duelo': f'{ha} x {hb}',
                 'mediana_s': statistics.median(tempos),
+                'p90_s': tempos[int(0.9 * (n - 1))],
                 'ko_%': 100 * ko / n,
                 'vitA_%': 100 * vit['a'] / n,
                 'vitB_%': 100 * vit['b'] / n,
@@ -394,8 +398,19 @@ def relatorio(cfg, herois=('leslie', 'grow', 'anjo'), n=400, seed=1):
     return linhas
 
 
+# Os de antes de o dano subir ~25% (a luta durava 3 a 4 min; agora ~2,5 a 3 e quase nunca passa de 4).
+ANTERIOR = copy.deepcopy(NUMEROS)
+for chave, valor in {
+    'espada': {'dano': 26}, 'arco': {'dano': 22}, 'soco': {'dano': 4}, 'chicote': {'dano': 8},
+    'veneno': {'dano': 4, 'cura': 0.5}, 'raizes': {'dano': 14}, 'flor': {'dano': 23},
+    'aves': {'dano': 55, 'bicada': 6}, 'vento': {'dano': 5}, 'salto': {'dano': 140}, 'investida': {'dano': 130},
+    'pedra': {'dano': 125, 'lascas': 65}, 'impacto': {'dano': 80}, 'rajada': {'dano': 60}, 'julgamento': {'dano': 320},
+}.items():
+    ANTERIOR[chave].update(valor)
+
+
 # Os números de antes do balanceamento (vida 1000), para comparar.
-ANTES = copy.deepcopy(NUMEROS)
+ANTES = copy.deepcopy(ANTERIOR)
 for chave, valor in {
     'vida': 1000, 'porDano': 0.3, 'porDano_grow': 0.4, 'porDano_anjo': 0.3, 'soco': None,
     'espada': {'dano': 35, 'recarga': 0.6}, 'arco': {'dano': 30, 'recarga': 0.9},
@@ -412,23 +427,25 @@ for chave, valor in {
 
 
 # Os de logo antes da Flor Carnívora: a Fúria da Floresta (com a cura) e o chicote sem cura.
-FURIA = copy.deepcopy(NUMEROS)
+FURIA = copy.deepcopy(ANTERIOR)
 FURIA['flor'] = None
 FURIA['veneno'].update({'cura': 0, 'duracao': 3})
 FURIA['chicote']['dano'] = 10
 
 
 def imprimir(cfg, n=600):
-    print(f"{'duelo':16s} {'mediana':>8s} {'por KO':>7s} {'vence A':>8s} {'vence B':>8s} {'armas*':>7s}  dano de A por fonte (média)")
+    print(f"{'duelo':16s} {'mediana':>8s} {'90%**':>7s} {'por KO':>7s} {'vence A':>8s} {'vence B':>8s} {'armas*':>7s}  dano de A por fonte (média)")
     for l in relatorio(cfg, n=n):
         f = l['fontesA']
         tot = sum(f.values()) or 1
         armas = (f.get('espada', 0) + f.get('arco', 0) + f.get('soco', 0)) / tot
         fontes = ', '.join(f'{k} {v}' for k, v in sorted(f.items(), key=lambda x: -x[1]))
-        print(f"{l['duelo']:16s} {l['mediana_s']:6.0f} s {l['ko_%']:6.0f}% {l['vitA_%']:7.0f}% {l['vitB_%']:7.0f}% {100 * armas:6.0f}%  {fontes}")
+        print(f"{l['duelo']:16s} {l['mediana_s']:6.0f} s {l['p90_s']:5.0f} s {l['ko_%']:6.1f}% {l['vitA_%']:7.0f}% {l['vitB_%']:7.0f}% {100 * armas:6.0f}%  {fontes}")
     print('* a parte do dano de A que veio da espada, do arco e do soco')
+    print('** 9 de cada 10 lutas acabam até este tempo')
 
 
 if __name__ == '__main__':
     import sys
-    imprimir(ANTES if 'antes' in sys.argv[1:] else FURIA if 'furia' in sys.argv[1:] else NUMEROS)
+    args = sys.argv[1:]
+    imprimir(ANTERIOR if 'anterior' in args else ANTES if 'antes' in args else FURIA if 'furia' in args else NUMEROS, n=2000 if 'mais' in args else 600)

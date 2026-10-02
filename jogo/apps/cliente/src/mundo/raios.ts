@@ -15,6 +15,7 @@
 // - as nuvens: quando uma passa na frente do sol, os fachos, as poças e o calor da luz somem aos
 //   poucos e a cena escurece um pouco (cenario.ts mede a cobertura: coberturaDoSol).
 
+import { contexto2d, novoCanvas } from '../motor/imagens';
 import { suavizar } from '../motor/matematica';
 import type { Luz } from '../motor/tipos';
 
@@ -279,16 +280,15 @@ function noChao(f: Feixe, luz: Luz, chao: number): { x: number; meia: number } |
   return { x: luz.x + Math.cos(f.angulo) * distancia, meia: Math.max(6, (distancia * Math.tan(f.meia)) / s) };
 }
 
-// A grama que o feixe pega: uma faixa fina de luz na ponta dos tufos e o orvalho cintilando.
-// `camX`: a câmera, para as gotinhas ficarem presas no mapa quando ela anda.
-function pintarBrilhoNaGrama(ctx: CanvasRenderingContext2D, feixes: Feixe[], luz: Luz, cor: number[], tempo: number, alfa: number, chao: number, camX: number): void {
+// A grama que o feixe pega: uma faixa fina de luz na ponta dos tufos (pintada junto com os
+// fachos, na camada guardada: pintarCamadas).
+function pintarFaixaNaGrama(ctx: CanvasRenderingContext2D, feixes: Feixe[], luz: Luz, cor: number[], alfa: number, chao: number): void {
   const [r, g, b] = cor;
   for (const f of feixes) {
     const alvo = noChao(f, luz, chao);
     const forca = alfa * f.forca;
     if (!alvo || forca < 0.02) continue;
-    // A faixa: bem achatada, na altura das pontas da grama.
-    ctx.globalCompositeOperation = 'screen';
+    // Bem achatada, na altura das pontas da grama.
     ctx.save();
     ctx.translate(alvo.x, chao - 2);
     ctx.scale(alvo.meia * 0.9, 3);
@@ -301,9 +301,18 @@ function pintarBrilhoNaGrama(ctx: CanvasRenderingContext2D, feixes: Feixe[], luz
     ctx.arc(0, 0, 1, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+  }
+}
 
-    // O orvalho: gotinhas de 1px, as mais acesas com uma cruz (e as mais ainda, com as pontas longas).
-    ctx.globalCompositeOperation = 'source-over';
+// O orvalho cintilando na grama onde o feixe bate: gotinhas de 1px, as mais acesas com uma cruz
+// (e as mais ainda, com as pontas longas). `camX`: a câmera, para as gotinhas ficarem presas no
+// mapa quando ela anda.
+function pintarOrvalho(ctx: CanvasRenderingContext2D, feixes: Feixe[], luz: Luz, tempo: number, alfa: number, chao: number, camX: number): void {
+  ctx.globalCompositeOperation = 'source-over';
+  for (const f of feixes) {
+    const alvo = noChao(f, luz, chao);
+    const forca = alfa * f.forca;
+    if (!alvo || forca < 0.02) continue;
     const de = Math.floor(alvo.x - alvo.meia);
     const ate = Math.ceil(alvo.x + alvo.meia);
     for (let x = de; x <= ate; x++) {
@@ -354,6 +363,49 @@ export function luzDoRaio(x: number, y: number): number {
   return Math.min(1, dentroDosFeixes(quadro.feixes, quadro.luz, x, y) * quadro.forca);
 }
 
+// Os fachos, as poças e a faixa de luz na grama mudam devagar (respiram em 7 a 13 s, e o sol
+// anda mais devagar ainda): em vez de pintar ~40 formas com degradê por cima da cena a cada
+// quadro (cada uma, no modo soft-light, faz a placa de vídeo ler a tela de volta), eles são
+// pintados em duas camadas guardadas, refeitas umas REFAZER vezes por segundo, e cada quadro só
+// cola as duas: a que clareia e esquenta (soft-light) e a que aparece no ar (screen). Entre uma
+// refeita e outra, as camadas acompanham o sol na tela (a câmera subindo num pulo). O orvalho e a
+// poeira piscam rápido e continuam a cada quadro.
+const REFAZER = 20;
+// As camadas pegam um pouco além da tela (o deslocamento entre duas refeitas não deixa borda).
+const MARGEM = 24;
+
+interface Camadas {
+  aquece: HTMLCanvasElement;
+  facho: HTMLCanvasElement;
+  tempo: number;
+  luz: { x: number; y: number };
+  largura: number;
+  altura: number;
+}
+
+let camadas: Camadas | null = null;
+
+function pintarCamadas(c: Camadas, feixes: Feixe[], luz: Luz, cor: number[], forca: number, chao: number): void {
+  const alcance = Math.hypot(c.largura, c.altura) * 1.05;
+  // Nas camadas, o ponto (0, 0) da tela fica em (MARGEM, MARGEM).
+  const mover = { ...luz, x: luz.x + MARGEM, y: luz.y + MARGEM };
+  const yChao = chao + MARGEM;
+  const aquece = contexto2d(c.aquece);
+  aquece.setTransform(1, 0, 0, 1, 0, 0);
+  aquece.clearRect(0, 0, c.aquece.width, c.aquece.height);
+  pintarFeixes(aquece, feixes, mover, cor, RAIOS.aquece * forca, alcance, 'source-over');
+  aquece.globalCompositeOperation = 'source-over';
+  pintarPocas(aquece, feixes, mover, cor, RAIOS.poca * 1.4 * forca, yChao);
+
+  const facho = contexto2d(c.facho);
+  facho.setTransform(1, 0, 0, 1, 0, 0);
+  facho.clearRect(0, 0, c.facho.width, c.facho.height);
+  pintarFeixes(facho, feixes, mover, cor, RAIOS.forca * forca, alcance, 'source-over');
+  facho.globalCompositeOperation = 'source-over';
+  pintarPocas(facho, feixes, mover, cor, RAIOS.poca * forca, yChao);
+  pintarFaixaNaGrama(facho, feixes, mover, cor, Math.min(1, forca), yChao);
+}
+
 // Os raios, a luz que eles jogam na cena, as poças e o brilho na grama e a poeira. `chao`: a linha
 // da grama na tela; `camX`: a câmera (o orvalho fica preso no mapa).
 export function desenharRaios(
@@ -369,20 +421,32 @@ export function desenharRaios(
   const { feixes, forca } = quadro!;
   if (forca < 0.02) return;
   const cor = corDoFacho(luz);
-  const alcance = Math.hypot(largura, altura) * 1.05;
+  if (!camadas || camadas.largura !== largura || camadas.altura !== altura) {
+    const w = largura + 2 * MARGEM;
+    const h = altura + 2 * MARGEM;
+    camadas = { aquece: novoCanvas(w, h), facho: novoCanvas(w, h), tempo: -Infinity, luz: { x: luz.x, y: luz.y }, largura, altura };
+  }
+  if (Math.abs(tempo - camadas.tempo) >= 1 / REFAZER) {
+    // As camadas são pintadas com o sol e o chão de agora; entre uma refeita e outra, andam junto
+    // com o sol (o chão anda junto com ele na tela: os dois descem com a câmera).
+    pintarCamadas(camadas, feixes, luz, cor, forca, chao);
+    camadas.tempo = tempo;
+    camadas.luz = { x: luz.x, y: luz.y };
+  }
+  const dx = Math.round(luz.x - camadas.luz.x) - MARGEM;
+  const dy = Math.round(luz.y - camadas.luz.y) - MARGEM;
   ctx.save();
   // Os fachos param na grama (a terra embaixo não pega sol); as poças ficam na linha dela.
   ctx.beginPath();
   ctx.rect(0, 0, largura, chao + 4);
   ctx.clip();
   // A cena embaixo do facho clareia e esquenta (as copas, a grama, quem estiver ali)...
-  pintarFeixes(ctx, feixes, luz, cor, RAIOS.aquece * forca, alcance, 'soft-light');
-  pintarPocas(ctx, feixes, luz, cor, RAIOS.poca * 1.4 * forca, chao);
+  ctx.globalCompositeOperation = 'soft-light';
+  ctx.drawImage(camadas.aquece, dx, dy);
   // ...e o próprio facho aparece no ar.
-  pintarFeixes(ctx, feixes, luz, cor, RAIOS.forca * forca, alcance, 'screen');
   ctx.globalCompositeOperation = 'screen';
-  pintarPocas(ctx, feixes, luz, cor, RAIOS.poca * forca, chao);
-  pintarBrilhoNaGrama(ctx, feixes, luz, cor, tempo, Math.min(1, forca), chao, camX);
+  ctx.drawImage(camadas.facho, dx, dy);
+  pintarOrvalho(ctx, feixes, luz, tempo, Math.min(1, forca), chao, camX);
   pintarPoeira(ctx, feixes, luz, tempo, Math.min(1, 1.1 * forca), largura, chao);
   ctx.restore();
 }

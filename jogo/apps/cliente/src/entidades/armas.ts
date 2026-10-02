@@ -53,6 +53,9 @@ export interface Ataque {
   mira: number; // ângulo da mira no corpo (0 = para a frente, positivo = para baixo)
   idade: number;
   atingidos: CorpoAlvo[]; // a espada acerta cada um uma vez por golpe
+  // O golpe do outro online: de onde o ombro dele estava lá, quando o golpe saiu, até o ombro do
+  // corpo dele aqui (que chega pela rede, um pouco atrás). O acerto sai de lá, onde ele bateu.
+  desvio: Ponto;
 }
 
 // O que as armas precisam de um personagem (o corpo é de entidades/personagem.ts).
@@ -88,6 +91,15 @@ function ombroDoSoco(c: CorpoArmado): Ponto {
   const ombro = ombroDe(c);
   return { x: ombro.x, y: ombro.y + POSE.ombroDoSoco };
 }
+
+// O ombro de onde o golpe acerta: o do corpo, mais o desvio do golpe que veio pela rede.
+function ombroDoAcerto(ombro: Ponto, ataque: Ataque): Ponto {
+  return { x: ombro.x + ataque.desvio.x, y: ombro.y + ataque.desvio.y };
+}
+
+// Mais longe que isto, o corpo do outro aqui está num lugar bem diferente (pulou direto para a
+// posição nova): o golpe sai do corpo daqui mesmo.
+const DESVIO_MAXIMO = 48;
 const DURACAO_ATAQUE: Record<TipoAtaque, number> = { espada: ESPADA.golpe + 0.08, arco: 0.4, soco: SOCO.golpe + 0.04 };
 const LIMITE_DA_MIRA: Record<TipoAtaque, number> = { espada: POSE.miraEspada, arco: POSE.miraArco, soco: POSE.miraSoco };
 const LAMINA = { de: 4, ate: 15 }; // pixels da mão até o começo e a ponta da lâmina (o cabo fica na mão)
@@ -361,7 +373,18 @@ function virarPara(c: CorpoArmado, alvo: Ponto): void {
 export function lancarAtaque(a: Arsenal, c: CorpoArmado, uso: AtaqueUsado): void {
   const alvo = { x: uso.alvoX, y: uso.alvoY };
   virarPara(c, alvo);
-  c.ataque = { tipo: uso.arma, mira: anguloDaMira(c, alvo, LIMITE_DA_MIRA[uso.arma]), idade: 0, atingidos: [] };
+  // A espada e o soco saem do ombro (`uso.x`, `uso.y`): no seu e no da CPU é o mesmo daqui; no do
+  // outro online, é onde ele estava lá.
+  const ombro = ombroDe(c);
+  const desvio = { x: uso.x - ombro.x, y: uso.y - ombro.y };
+  const perto = uso.arma !== 'arco' && Math.hypot(desvio.x, desvio.y) <= DESVIO_MAXIMO;
+  c.ataque = {
+    tipo: uso.arma,
+    mira: anguloDaMira(c, alvo, LIMITE_DA_MIRA[uso.arma]),
+    idade: 0,
+    atingidos: [],
+    desvio: perto ? desvio : { x: 0, y: 0 },
+  };
   if (uso.arma !== 'arco') return;
   let dx = uso.alvoX - uso.x;
   let dy = uso.alvoY - uso.y;
@@ -383,7 +406,7 @@ const vivos = (alvos: readonly Alvo[], dono: CorpoAlvo): Alvo[] =>
 // A parte do corpo que o golpe pega: onde a linha da mira passa no eixo do alvo. (A lâmina vem
 // de cima e sempre encosta primeiro na cabeça; o que vale é para onde o golpe foi mirado.)
 function zonaDoGolpe(c: CorpoArmado, ataque: Ataque, alvo: CorpoAlvo): ZonaDoCorpo {
-  const ombro = ombroDe(c);
+  const ombro = ombroDoAcerto(ombroDe(c), ataque);
   const dx = Math.max(0, (alvo.x - ombro.x) * c.direcao);
   return zonaDoAcerto(alvo.y - (ombro.y + Math.tan(ataque.mira) * dx));
 }
@@ -392,7 +415,7 @@ function zonaDoGolpe(c: CorpoArmado, ataque: Ataque, alvo: CorpoAlvo): ZonaDoCor
 function golpear(e: Efeitos, a: Arsenal, c: CorpoArmado, ataque: Ataque, alvos: readonly Alvo[]): void {
   const t = ataque.idade / ESPADA.golpe;
   if (t < 0.12 || t > 1) return;
-  const ombro = ombroDe(c);
+  const ombro = ombroDoAcerto(ombroDe(c), ataque);
   const ang = anguloNoMapa(anguloDoGolpe(ataque.mira, t), c.direcao);
   const cos = Math.cos(ang);
   const sin = Math.sin(ang);
@@ -414,9 +437,10 @@ function golpear(e: Efeitos, a: Arsenal, c: CorpoArmado, ataque: Ataque, alvos: 
 // O quanto o braço do soco está esticado (0 a 1) em `t` (0 a 1): sai rápido e volta.
 const esticadoDoSoco = (t: number): number => (t < 0.4 ? 1 - (1 - t / 0.4) ** 2 : Math.max(0, 1 - (t - 0.4) / 0.6));
 
-// A ponta do punho no mapa, com o braço `esticado`.
-function pontaDoPunho(c: CorpoArmado, mira: number, esticado: number): Ponto {
-  const ombro = ombroDoSoco(c);
+// A ponta do punho no mapa, com o braço `esticado` (`desvio`: o do golpe que veio pela rede).
+function pontaDoPunho(c: CorpoArmado, mira: number, esticado: number, desvio: Ponto = { x: 0, y: 0 }): Ponto {
+  const soco = ombroDoSoco(c);
+  const ombro = { x: soco.x + desvio.x, y: soco.y + desvio.y };
   const ang = anguloNoMapa(mira, c.direcao);
   const comprimento = POSE.punhoRecolhido + maisBraco(c) + (SOCO.alcance - POSE.punhoRecolhido) * esticado;
   return { x: ombro.x + Math.cos(ang) * comprimento, y: ombro.y + Math.sin(ang) * comprimento };
@@ -427,7 +451,7 @@ function pontaDoPunho(c: CorpoArmado, mira: number, esticado: number): Ponto {
 function socar(e: Efeitos, a: Arsenal, c: CorpoArmado, ataque: Ataque, alvos: readonly Alvo[]): void {
   const t = ataque.idade / SOCO.golpe;
   if (t < 0.25 || t > 0.75) return;
-  const punho = pontaDoPunho(c, ataque.mira, esticadoDoSoco(t));
+  const punho = pontaDoPunho(c, ataque.mira, esticadoDoSoco(t), ataque.desvio);
   for (const alvo of vivos(alvos, c)) {
     if (ataque.atingidos.includes(alvo.corpo) || !acertaCorpo(alvo.corpo, punho.x, punho.y, 2)) continue;
     ataque.atingidos.push(alvo.corpo);
@@ -511,24 +535,26 @@ function atualizarNoChao(a: Arsenal, i: ArmaNoChao, dt: number): void {
 }
 
 // Um quadro das armas: as que caem e esperam, as flechas, os golpes de espada em curso (de
-// `corpos`, acertando `alvos`) e as partículas.
+// `corpos`, acertando `alvos`) e as partículas. `alvosDe`: quem cada dono acerta, se não for
+// `alvos` (online, os golpes do outro conferem o fantasma do seu personagem: veja partida.ts).
 export function atualizarArsenal(
   a: Arsenal,
   e: Efeitos,
   dt: number,
   corpos: readonly CorpoArmado[],
   alvos: readonly Alvo[],
+  alvosDe: (dono: CorpoAlvo) => readonly Alvo[] = () => alvos,
 ): void {
   for (const i of a.chao) atualizarNoChao(a, i, dt);
   for (const c of corpos) {
     const ataque = c.ataque;
     if (!ataque) continue;
     ataque.idade += dt;
-    if (ataque.tipo === 'espada') golpear(e, a, c, ataque, alvos);
-    if (ataque.tipo === 'soco') socar(e, a, c, ataque, alvos);
+    if (ataque.tipo === 'espada') golpear(e, a, c, ataque, alvosDe(c));
+    if (ataque.tipo === 'soco') socar(e, a, c, ataque, alvosDe(c));
     if (ataque.idade >= DURACAO_ATAQUE[ataque.tipo]) c.ataque = null;
   }
-  a.flechas = a.flechas.filter((f) => atualizarFlecha(e, a, f, dt, alvos));
+  a.flechas = a.flechas.filter((f) => atualizarFlecha(e, a, f, dt, alvosDe(f.dono)));
   a.descartadas = a.descartadas.filter((d) => atualizarDescartada(a, d, dt));
   for (const p of a.particulas) {
     p.vida -= dt;

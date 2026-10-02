@@ -7,6 +7,7 @@
 import type { Heroi } from '@terna/compartilhado';
 import { montarAjuda } from './ajuda';
 import { botao, elemento, mostrarTela, sairComEsmaecer } from './dom';
+import { ligarMedidor, medidorLigado } from '../interface/medidor';
 import { botaoDaMusica } from './musica';
 import { botaoDaOpiniao } from './opiniao';
 import type { Revanche } from './revanche';
@@ -27,6 +28,18 @@ export interface MenusDaPartida {
   abrirMenu(): void;
   // Tira tudo da tela (saiu da partida).
   remover(): void;
+}
+
+// Liga e desliga o medidor de FPS e ping no canto da tela (interface/medidor.ts).
+function botaoDoMedidor(): HTMLButtonElement {
+  const texto = (): string => `FPS e ping: ${medidorLigado() ? 'ligado' : 'desligado'}`;
+  const b = botao(texto(), 'inicio-botao inicio-botao-claro', () => {
+    ligarMedidor(!medidorLigado());
+    b.textContent = texto();
+    b.setAttribute('aria-pressed', String(medidorLigado()));
+  });
+  b.setAttribute('aria-pressed', String(medidorLigado()));
+  return b;
 }
 
 // Engrenagem em pixels (13×13), no mesmo estilo da arte do jogo: o corpo redondo com o furo no
@@ -120,7 +133,7 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
     caixa.append(titulo);
     if (online) caixa.append(elemento('p', 'inicio-sub', 'A partida continua enquanto o menu está aberto.'));
     const controles = botao('Controles (Tab)', 'inicio-botao inicio-botao-claro', abrirAjuda);
-    caixa.append(continuar, controles, botaoDaMusica(), botaoDaOpiniao(), sair);
+    caixa.append(continuar, controles, botaoDaMusica(), botaoDoMedidor(), botaoDaOpiniao(), sair);
     tela.append(caixa);
     // Clicar fora da caixa fecha, como o Esc.
     tela.addEventListener('click', (evento) => {

@@ -26,7 +26,7 @@ export const PODERES_ANJO = ['impacto', 'rajada', 'julgamento'] as const;
 
 export const IMPACTO = {
   nome: 'Impacto Angelical',
-  dano: 80, // por explosão da fileira
+  dano: 100, // por explosão da fileira
   recarga: 4,
   alcance: 150, // do anjo até o centro da primeira explosão, na horizontal
   perto: 30, // a primeira nunca fica mais perto que isto do anjo
@@ -40,7 +40,7 @@ export const IMPACTO = {
 
 export const RAJADA = {
   nome: 'Rajada de Amor',
-  dano: 60, // por coração: os dois acertando, 120
+  dano: 75, // por coração: os dois acertando, 150
   recarga: 8,
   alcanceCurto: 110, // até onde o primeiro coração vai antes de sumir
   alcance: 220, // e o segundo
@@ -54,7 +54,7 @@ export const RAJADA = {
 
 export const JULGAMENTO = {
   nome: 'Julgamento Celestial',
-  dano: 320,
+  dano: 400,
   recarga: 18,
   alcance: 280,
   aviso: 1.1, // a marca no chão antes de o pilar descer: andando, dá para sair ~100 px

@@ -25,8 +25,11 @@ import type { Conexao } from '../tempo-real/sala';
 
 // Salas de partida 1v1, sem conta: quem cria recebe um código; quem entra com ele completa a
 // sala. Hospedando na mesma rede, a sala guarda a rede de quem hospedou (rede.ts): ela aparece
-// na lista de quem está nessa rede, só entra quem está nela, e os dois tentam se ligar direto
-// (WebRTC), com o servidor levando os recados (`sinal`) até a ligação abrir.
+// na lista de quem está nessa rede e só entra quem está nela. Em toda sala os dois tentam se ligar
+// direto (WebRTC), com o servidor levando os recados (`sinal`) até a ligação abrir: na mesma rede
+// pelos endereços da própria rede; pela internet (`internet`), descobrindo o endereço de fora com
+// um servidor STUN. Ligados direto, o estado, os poderes e os golpes não fazem a volta pelo
+// servidor (que fica nos Estados Unidos): de um jogador a outro no Brasil, o atraso cai muito.
 // Com os dois lá, cada um escolhe o personagem (`escolher` → `heroi`), e cada personagem é de um
 // só: o que um escolhe o outro vê na hora (`oponente-escolheu`) e não pode pegar — os dois pedindo
 // o mesmo juntos, leva quem chegou primeiro. Até o outro escolher, dá para trocar (mandando de
@@ -40,10 +43,13 @@ import type { Conexao } from '../tempo-real/sala';
 // As armas também são daqui: o servidor sorteia quando e onde cada uma cai (as mesmas para os
 // dois) e decide quem pega — os dois encostando juntos numa, só o primeiro pedido leva.
 
-// Mensagens por segundo que um jogador pode mandar; o excesso é ignorado. O cliente manda até ~20
-// estados (5 parado), uns poucos golpes de arma e, raramente, um poder ou um pedido de arma — a
-// folga é para ele não se perder.
-const LIMITE_POR_SEGUNDO = 60;
+// Estados por segundo que um jogador pode mandar; o excesso é ignorado (o próximo estado já é mais
+// novo). O cliente manda até ~30 andando (5 parado) e uns a mais quando um botão muda.
+const LIMITE_DE_ESTADOS = 60;
+// Tudo o mais (poderes, golpes, armas, a vida, a morte) nunca é jogado fora pelo limite dos estados:
+// perder um golpe era o dano que não contava. Só um teto bem alto, contra quem manda lixo sem parar.
+// Depois de um engasgo da rede, o que ficou preso chega de uma vez: a folga é para isso.
+const LIMITE_POR_SEGUNDO = 300;
 
 // Bytes esperando para sair na conexão de quem recebe a partir dos quais um estado novo não entra
 // na fila: a conexão dele está engasgada, e o próximo estado (50 ms depois) já é mais novo que
@@ -120,7 +126,13 @@ export interface Participante {
   sala: SalaPartida;
   janela: number; // segundo atual (para o limite)
   mensagens: number; // mensagens neste segundo
+  estados: number; // estados neste segundo
   latencia: number; // ms daqui até ele: metade da ida e volta do ping, suavizada (0 = sem medida ainda)
+  idaEVolta: number; // ms da última ida e volta medida (o ping que ele vê na tela)
+}
+
+function novoParticipante(nome: string, conexao: Conexao, sala: SalaPartida): Participante {
+  return { nome, conexao, sala, janela: 0, mensagens: 0, estados: 0, latencia: 0, idaEVolta: 0 };
 }
 
 export class Salas {
@@ -156,7 +168,7 @@ export class Salas {
       revanche: { anfitriao: false, convidado: false },
       vidas: { anfitriao: VIDA_MAXIMA, convidado: VIDA_MAXIMA },
     } as SalaPartida;
-    sala.anfitriao = { nome, conexao, sala, janela: 0, mensagens: 0, latencia: 0 };
+    sala.anfitriao = novoParticipante(nome, conexao, sala);
     sala.timer = setTimeout(() => this.fechar(sala, 'ninguém entrou na sala a tempo'), this.opcoes.esperaMaxMs);
     this.salas.set(codigo, sala);
     this.mandar(conexao, { tipo: 'sala-criada', codigo });
@@ -170,7 +182,7 @@ export class Salas {
     if (!sala || (sala.rede !== null && sala.rede !== rede)) return this.recusar(conexao, 'não achei essa sala; confira o código');
     if (sala.convidado) return this.recusar(conexao, 'essa sala já está cheia');
 
-    const convidado: Participante = { nome, conexao, sala, janela: 0, mensagens: 0, latencia: 0 };
+    const convidado = novoParticipante(nome, conexao, sala);
     sala.convidado = convidado;
     this.abrirEscolha(sala);
     return convidado;
@@ -197,8 +209,8 @@ export class Salas {
     sala.revanche = { anfitriao: false, convidado: false };
     clearTimeout(sala.timer);
     sala.timer = setTimeout(() => this.acabouAEscolha(sala), this.opcoes.escolhaMaxMs);
-    // Na mesma rede, os dois tentam a ligação direta (quem hospedou começa).
-    const direto = sala.rede !== null ? { direto: true } : {};
+    // Os dois tentam a ligação direta (quem hospedou começa); pela internet, com o STUN.
+    const direto = sala.rede !== null ? { direto: true } : { direto: true, internet: true };
     const prazoMs = this.opcoes.escolhaMaxMs;
     this.mandar(sala.anfitriao.conexao, { tipo: 'escolher', lado: 'anfitriao', oponente: convidado.nome, prazoMs, ...direto });
     this.mandar(convidado.conexao, { tipo: 'escolher', lado: 'convidado', oponente: sala.anfitriao.nome, prazoMs, ...direto });
@@ -251,10 +263,17 @@ export class Salas {
     this.agendarArma(sala, this.opcoes.contagemMs + this.opcoes.primeiraArmaMs);
   }
 
-  // O batimento (batimento.ts) mediu a ida e a volta até ele.
+  // O batimento (batimento.ts) mediu a ida e a volta até ele. Com os dois na sala, cada um fica
+  // sabendo do próprio ping e do outro (`rede`): é o que a tela da partida mostra.
   medirPing(p: Participante, idaEVoltaMs: number): void {
     const ida = idaEVoltaMs / 2;
     p.latencia = p.latencia ? p.latencia + (ida - p.latencia) * PESO_DO_PING : ida;
+    p.idaEVolta = idaEVoltaMs;
+    const { sala } = p;
+    const outro = p === sala.anfitriao ? sala.convidado : sala.anfitriao;
+    if (!outro || this.salas.get(sala.codigo) !== sala) return;
+    const ms = (v: number): number => Math.min(10_000, Math.round(v));
+    this.mandar(p.conexao, { tipo: 'rede', ping: ms(p.idaEVolta), pingOponente: ms(outro.idaEVolta) });
   }
 
   receber(p: Participante, texto: string): void {
@@ -264,6 +283,7 @@ export class Salas {
     if (segundo !== p.janela) {
       p.janela = segundo;
       p.mensagens = 0;
+      p.estados = 0;
     }
     if (++p.mensagens > LIMITE_POR_SEGUNDO) return;
 
@@ -279,11 +299,8 @@ export class Salas {
     const lado: Lado = p === sala.anfitriao ? 'anfitriao' : 'convidado';
     const { armas } = sala;
     const m = mensagem.data;
-    // Os recados da ligação direta passam em qualquer fase, e só na mesma rede.
-    if (m.tipo === 'sinal') {
-      if (sala.rede === null) return;
-      return this.mandar(outro.conexao, { tipo: 'sinal', sinal: m.sinal });
-    }
+    // Os recados da ligação direta passam em qualquer fase.
+    if (m.tipo === 'sinal') return this.mandar(outro.conexao, { tipo: 'sinal', sinal: m.sinal });
     // Na escolha, só vale o personagem; no fim, só o pedido de revanche; jogando, o resto.
     if (m.tipo === 'heroi') {
       if (sala.fase !== 'escolher') return;
@@ -308,7 +325,7 @@ export class Salas {
     if (sala.fase !== 'jogando') return;
     switch (m.tipo) {
       case 'estado':
-        if ((outro.conexao.bufferedAmount ?? 0) > FILA_MAXIMA) return;
+        if (++p.estados > LIMITE_DE_ESTADOS || (outro.conexao.bufferedAmount ?? 0) > FILA_MAXIMA) return;
         // `atraso`: quanto tempo o estado levou de lá até o outro (a ida de quem mandou mais a de
         // quem recebe): o outro adianta a posição por isso.
         return this.mandar(outro.conexao, { tipo: 'estado', estado: m.estado, atraso: Math.min(5000, Math.round(p.latencia + outro.latencia)) });

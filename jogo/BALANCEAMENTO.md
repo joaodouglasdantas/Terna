@@ -6,8 +6,9 @@ Os números ficam em `packages/compartilhado/src/conteudo/` (`poderes.ts`, `arma
 
 ## O que se buscou
 
-- **Duração:** uma luta entre dois jogadores do mesmo nível dura **de 3 a 4 minutos**, então os 5
-  minutos do relógio viram margem e a maioria das partidas termina por KO.
+- **Duração:** uma luta entre dois jogadores do mesmo nível dura **uns 2 minutos e meio a 3** e
+  quase nunca passa de **4**. Os 5 minutos do relógio são a exceção, uma luta muito dura (veja
+  **Dano +25%**, logo abaixo).
 - **Fim por tempo:** se o relógio zera, **vence quem tiver mais vida**. Com a vida igual, dá
   empate. Online, cada um avisa a própria vida ao servidor, e é ele quem decide.
 - **Armas como complemento:** os poderes são o principal. A espada e o arco ajudam e enchem a
@@ -17,6 +18,37 @@ Os números ficam em `packages/compartilhado/src/conteudo/` (`poderes.ts`, `arma
 - **Nenhum personagem sobrando:** entre dois do mesmo nível, cada duelo fica perto de 50% para
   cada lado.
 - **O Anjo**, mesmo escondido, entrou na conta e está pronto para quando voltar.
+
+## Dano +25% (outubro de 2026)
+
+Com os números de antes, a luta durava 3 a 4 minutos e uma boa parte passava de 4 (Leslie × Grow,
+o único duelo possível hoje: 44% passavam de 4 min e 3% chegavam ao fim do relógio). Todo o dano
+subiu **~25%**, a vida continua 2 500 e a cura do veneno ficou igual (2 por pinguinho).
+
+| Duelo (2 400 de cada) | Mediana | 9 de 10 até | 99 de 100 até | Passam de 4 min | Chegam aos 5 min |
+|---|---|---|---|---|---|
+| Leslie × Grow, antes | 234 s | 281 s | 300 s | 44% | 2,6% |
+| **Leslie × Grow, agora** | **169 s** | **208 s** | **245 s** | **1,4%** | **0,1%** |
+| Grow × Grow (quando houver), agora | 186 s | 241 s | 283 s | 10% | 0,4% |
+| Leslie × Leslie (quando houver), agora | 140 s | 168 s | 201 s | 0% | 0% |
+
+Quem vence continua perto de 50% × 50% (Leslie × Grow: 49% × 51%). Como a energia pixy vem do
+dano dado, as ults (a Flor e o golem) também chegam um pouco antes, e isso já está na conta.
+
+| Ataque | Antes | Agora |
+|---|---|---|
+| Espada / Arco / Soco | 26 / 22 / 4 | **33 / 28 / 5** |
+| Chicote (acerto) / veneno (por pinguinho, ×5) | 8 / 4 | **11 / 5** (a cura: 0,4 do que tira = 2, igual) |
+| Raízes (por roda) | 14 | **18** |
+| Flor (por cusparada) | 23 | **29** |
+| Revoada (tombo / bicada no golem) | 55 / 6 | **69 / 8** |
+| Vendaval (por lasquinha) | 5 | **6** |
+| Salto / Investida | 140 / 130 | **175 / 163** |
+| Pedra (em cheio / lascas) | 125 / 65 | **156 / 81** |
+| Anjo: Impacto / Rajada / Julgamento | 80 / 60 / 320 | **100 / 75 / 400** |
+
+As tabelas abaixo contam a história do primeiro balanceamento, com os números daquela época.
+`python3 ferramentas/simular-duelo.py anterior` roda os números de antes desta subida.
 
 ## Como foi medido
 

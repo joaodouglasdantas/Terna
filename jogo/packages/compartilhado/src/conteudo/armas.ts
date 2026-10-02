@@ -30,7 +30,7 @@ export const QUEDA_DE_ARMAS = {
 
 export const ESPADA = {
   nome: 'Espada',
-  dano: 26,
+  dano: 33,
   recarga: 1.15, // entre dois golpes
   durabilidade: 30, // segundos na mão até quebrar
   golpe: 0.26, // o movimento do golpe, de cima para a frente
@@ -38,7 +38,7 @@ export const ESPADA = {
 
 export const ARCO = {
   nome: 'Arco',
-  dano: 22,
+  dano: 28,
   recarga: 1.4, // entre duas flechas
   durabilidade: 30,
   velocidade: 340, // da flecha, ao sair
@@ -51,7 +51,7 @@ export const ARCO = {
 // como tira pouco, enche bem pouco a energia pixy.
 export const SOCO = {
   nome: 'Soco',
-  dano: 4,
+  dano: 5,
   recarga: 0.45, // entre dois socos
   golpe: 0.2, // o braço indo e voltando
   alcance: 9, // do ombro até o punho esticado

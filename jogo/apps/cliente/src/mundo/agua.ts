@@ -17,6 +17,7 @@ let ctx: CanvasRenderingContext2D;
 let quadro: ImageData;
 let base: Uint8ClampedArray; // as cores da arte, sem animação
 let agua: Int32Array; // [índice no quadro, x, y, tipo] por pixel de água
+let caixa = { x: 0, y: 0, w: 0, h: 0 }; // o retângulo em volta da água: só ele é repintado
 let ultimo = -Infinity;
 
 function preparar(folha: CanvasImageSource): void {
@@ -33,6 +34,14 @@ function preparar(folha: CanvasImageSource): void {
     for (let k = 0; k < n; k++) lista.push((fy * w + fx + k) * 4, fx + k, fy, tipo);
   }
   agua = Int32Array.from(lista);
+  let [x0, y0, x1, y1] = [w, h, 0, 0];
+  for (let p = 0; p < agua.length; p += 4) {
+    x0 = Math.min(x0, agua[p + 1]);
+    x1 = Math.max(x1, agua[p + 1] + 1);
+    y0 = Math.min(y0, agua[p + 2]);
+    y1 = Math.max(y1, agua[p + 2] + 1);
+  }
+  caixa = x1 > x0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : { x: 0, y: 0, w: 0, h: 0 };
 }
 
 // Um sorteio fixo por ponto (e por instante, quando `t` muda).
@@ -41,23 +50,33 @@ function acaso(x: number, y: number, t: number): number {
   return s - Math.floor(s);
 }
 
-function misturar(d: Uint8ClampedArray, i: number, cor: number[], k: number): void {
+function misturar(d: Uint8ClampedArray, i: number, cor: readonly number[], k: number): void {
   d[i] = base[i] + (cor[0] - base[i]) * k;
   d[i + 1] = base[i + 1] + (cor[1] - base[i + 1]) * k;
   d[i + 2] = base[i + 2] + (cor[2] - base[i + 2]) * k;
+}
+
+// A água mais escura (a sombra da onda e a da cascata): a cor da arte vezes `r`, `g`, `b`.
+function escurecer(d: Uint8ClampedArray, i: number, r: number, g: number, b: number): void {
+  d[i] = base[i] * r;
+  d[i + 1] = base[i + 1] * g;
+  d[i + 2] = base[i + 2] * b;
 }
 
 function animar(t: number, sol: number): void {
   const d = quadro.data;
   const piscada = Math.floor(t * 3);
   for (let p = 0; p < agua.length; p += 4) {
-    const [i, x, y, tipo] = [agua[p], agua[p + 1], agua[p + 2], agua[p + 3]];
+    const i = agua[p];
+    const x = agua[p + 1];
+    const y = agua[p + 2];
+    const tipo = agua[p + 3];
     if (tipo === 2) {
       // Cascata: listras claras descendo, cada coluna no seu passo.
       const fase = (y - t * 32) / 5 + acaso(x, 0, 0) * 3;
       const f = fase - Math.floor(fase);
       if (f < 0.35) misturar(d, i, ESPUMA, 0.75);
-      else if (f > 0.82) misturar(d, i, [base[i] * 0.8, base[i + 1] * 0.85, base[i + 2] * 0.9], 1);
+      else if (f > 0.82) escurecer(d, i, 0.8, 0.85, 0.9);
       else misturar(d, i, ESPUMA, 0);
       continue;
     }
@@ -66,10 +85,11 @@ function animar(t: number, sol: number): void {
     if (acaso(x, y, piscada) > 0.997 - 0.006 * sol) misturar(d, i, ESPUMA, 0.9);
     else if (onda > 1.35) misturar(d, i, CLARO, 0.4 + 0.25 * sol);
     else if (onda > 1.0) misturar(d, i, CLARO, 0.22);
-    else if (onda < -1.45) misturar(d, i, [base[i] * 0.82, base[i + 1] * 0.86, base[i + 2] * 0.92], 1);
+    else if (onda < -1.45) escurecer(d, i, 0.82, 0.86, 0.92);
     else misturar(d, i, CLARO, 0);
   }
-  ctx.putImageData(quadro, 0, 0);
+  // Só o retângulo da água volta para a imagem (o resto da paisagem não muda).
+  ctx.putImageData(quadro, 0, 0, caixa.x, caixa.y, caixa.w, caixa.h);
 }
 
 // A paisagem com a água no instante `tempo` (segundos). `sol`: 0–1, o quanto o sol bate (a água

@@ -1,14 +1,16 @@
 // O batimento de cada conexão da partida: um ping do WebSocket a cada `batidaMs` (o navegador
 // responde sozinho, sem código do jogo). Serve para três coisas:
 // - medir quanto tempo leva a ida e a volta de cada jogador até aqui: com isso o outro adianta o
-//   estado que chega pelo atraso da viagem (salas.ts);
+//   estado que chega pelo atraso da viagem, confere os golpes onde estava quando eles saíram, e
+//   cada um vê o ping na tela (salas.ts). Uma batida por segundo: o atraso acompanha a rede de
+//   perto, e o ping custa uns poucos bytes;
 // - manter a conexão viva nas telas paradas (a espera do convidado, a escolha do personagem): o
 //   proxy na frente do Render fecha conexão muda em ~100 s;
 // - perceber a conexão que caiu sem avisar (Wi-Fi que some, notebook fechado): sem resposta por
 //   `semRespostaMs`, ela é derrubada e a sala avisa o outro na hora, em vez de ele ficar jogando
 //   contra um boneco parado até o TCP desistir, minutos depois.
 
-export const BATIDA_MS = 2000;
+export const BATIDA_MS = 1000;
 export const SEM_RESPOSTA_MS = 10_000;
 
 // O que o batimento precisa do WebSocket (o do `ws` serve).

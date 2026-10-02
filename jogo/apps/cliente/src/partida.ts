@@ -12,7 +12,9 @@
 //
 // Os poderes: o seu sai do clique (o botão direito troca o escolhido), o da CPU do cérebro dela
 // e o do outro online chega pela rede e é lançado no corpo dele aqui. Cada um confere o dano que
-// leva — online, a vida do outro chega com o estado dele. A vida de alguém chegando a 0 acaba a
+// leva — online, a vida do outro chega com o estado dele. Os poderes e os golpes do outro conferem
+// o seu personagem onde o outro o via quando eles saíram de lá (o fantasma: entidades/fantasma.ts):
+// o golpe que acertou na tela dele conta aqui também. A vida de alguém chegando a 0 acaba a
 // partida, com o outro de vencedor.
 //
 // As armas: o clique esquerdo ataca com a arma da mão (se tiver) quando não está com os poderes
@@ -92,6 +94,7 @@ import {
   type Alvo,
   type Efeitos,
 } from './entidades/poderes';
+import { criarFantasma, type Fantasma } from './entidades/fantasma';
 import { criarCerebroSosia, pensarSosia, type CerebroSosia } from './entidades/sosia';
 import type { Escolha } from './inicio/inicio';
 import type { Etiqueta } from './interface/etiqueta';
@@ -107,10 +110,12 @@ const VERMELHO = { cor: '#ff5a67', clara: '#ffd8dc' };
 const MEIO = MUNDO / 2;
 const AO_LADO = MUNDO / 2 + 70;
 
-const ENVIO_MS = 50; // manda o estado ~20 vezes por segundo enquanto se mexe…
-const ENVIO_PARADO_MS = 200; // …~5 parado (nada a contar: economiza a banda do servidor)…
+// Manda o estado enquanto se mexe ~30 vezes por segundo ligado direto ao outro (sem custo para
+// o servidor) e ~20 pelo servidor (a banda dele é contada)…
+const ENVIO_MS = { direto: 33, servidor: 50 };
+const ENVIO_PARADO_MS = 200; // …~5 parado (nada a contar)…
 const ENVIO_MINIMO_MS = 33; // …e na hora em que um botão muda, mas nunca mais de ~30 por segundo
-const CORRIGIR = 10; // quanto maior, mais rápido o corpo do outro alcança a posição recebida
+const CORRIGIR = 18; // por segundo: quanto maior, mais rápido o corpo do outro alcança a posição recebida (~0,06 s)
 const TELEPORTE = 64; // pixels de diferença a partir dos quais pula direto para lá
 // Segundos: até quanto adivinha para onde ele andou desde que mandou o estado (a viagem pela
 // rede, que o servidor mede, mais o tempo desde que chegou).
@@ -153,6 +158,7 @@ interface Remoto {
   lado: Lado;
   morteEnviada: boolean;
   pediuArma: number; // segundos desde o último pedido de arma (esperando a resposta)
+  fantasma: Fantasma; // o seu personagem onde o outro o via: é o que os golpes dele conferem
 }
 
 export interface Partida {
@@ -230,6 +236,7 @@ export function criarPartida(
       lado: escolha.lado,
       morteEnviada: false,
       pediuArma: REPEDIR_ARMA,
+      fantasma: criarFantasma(p.jogador),
     };
     p.remoto = remoto;
     escolha.conexao.ouvir(
@@ -240,6 +247,7 @@ export function criarPartida(
           remoto.alvo = m.estado;
           remoto.idadeAlvo = 0;
           remoto.atraso = (m.atraso ?? 0) / 1000;
+          remoto.fantasma.ajustar(remoto.atraso);
           // Os dois toques de um dash podem ser rápidos demais para chegar como botões; a
           // velocidade dele chega, e aí o dash (com o rastro) começa aqui também.
           if (Math.abs(m.estado.vx) >= VELOCIDADE_DASH) comecarDash(p.outro, m.estado.vx > 0 ? 1 : -1);
@@ -391,6 +399,7 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
     atualizarPersonagem(p.jogador, PARADO, dt, tempo);
     if (p.cpu) atualizarPersonagem(p.outro, PARADO, dt, tempo);
     if (p.remoto) {
+      p.remoto.fantasma.gravar(performance.now() / 1000);
       atualizarRemoto(p.remoto, p.outro, dt, tempo);
       enviarEstado(p.remoto, p.jogador, PARADO);
       p.restanteMs = Math.max(0, Math.min(p.restanteMs, p.fimEm - performance.now()));
@@ -409,6 +418,7 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
   // Soltou o botão (ou abriu o menu, ou caiu): o Vendaval para.
   if (p.jogador.canalizando && !(livre && mouse.segurando)) pararVento(p.efeitos, p.jogador);
   atualizarPersonagem(p.jogador, livre ? teclado : PARADO, dt, tempo);
+  p.remoto?.fantasma.gravar(performance.now() / 1000);
   if (p.cpu) {
     const pode = !p.acabou && p.outro.vida > 0;
     const decisao = pensarSosia(p.cpu, p.outro, dt, p.jogador, ameacasPara(p.efeitos, p.outro), armasNoChao(p.arsenal));
@@ -441,11 +451,15 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
         { corpo: p.jogador, ferir: true },
         { corpo: p.outro, ferir: !p.online },
       ];
-  atualizarEfeitos(p.efeitos, dt, alvos);
+  // Online, o que é do outro confere o fantasma do seu personagem (onde ele o via), não você agora.
+  const fantasma = p.remoto?.fantasma.corpo;
+  const doOutro: Alvo[] | null = fantasma && !p.acabou ? [{ corpo: fantasma, ferir: true }, { corpo: p.outro, ferir: false }] : null;
+  const alvosDe = (dono: object): readonly Alvo[] => (doOutro && dono === p.outro ? doOutro : alvos);
+  atualizarEfeitos(p.efeitos, dt, alvos, alvosDe);
   // Sopra enquanto o Vendaval dele estiver no mapa.
   p.jogador.canalizando = soprando(p.efeitos, p.jogador);
   p.outro.canalizando = soprando(p.efeitos, p.outro);
-  atualizarArsenal(p.arsenal, p.efeitos, dt, [p.jogador, p.outro], alvos);
+  atualizarArsenal(p.arsenal, p.efeitos, dt, [p.jogador, p.outro], alvos, alvosDe);
   // Online, a energia do outro vem da rede e a sua sai da vida dele que chega (acima).
   if (!p.online) {
     ganharEnergia(p.outro, vidas[0] - p.jogador.vida);
@@ -554,7 +568,7 @@ function enviarEstado(r: Remoto, corpo: Personagem, segurados: Controles, agora 
   const controles = { ...segurados, ...r.apertados };
   const instante = performance.now();
   const passou = instante - r.ultimoEnvio;
-  const intervalo = quieto(corpo, controles, r.vidaEnviada) ? ENVIO_PARADO_MS : ENVIO_MS;
+  const intervalo = quieto(corpo, controles, r.vidaEnviada) ? ENVIO_PARADO_MS : r.conexao.direta() ? ENVIO_MS.direto : ENVIO_MS.servidor;
   if (!agora && passou < intervalo && !(mudou(controles, r.enviados) && passou >= ENVIO_MINIMO_MS)) return;
   r.ultimoEnvio = instante;
   r.enviados = controles;

@@ -44,7 +44,7 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 
 - **Leslie**, a dríade da floresta: pega as armas que caem do céu e, com **R**, troca o clique
   esquerdo entre a arma e os poderes dela (Chicote de Espinhos, Raízes e Flor Carnívora; o
-  botão direito troca o poder escolhido). O veneno do Chicote cura a Leslie em metade do que tira.
+  botão direito troca o poder escolhido). O veneno do Chicote cura a Leslie em 2 de cada 5 que tira.
   O Chicote e as Raízes gastam quase nada de energia pixy; dar dano enche a barra, e a Flor
   Carnívora (brota do chão, persegue o outro — longe, por baixo da terra — e cospe bolas rápidas de veneno de longe) só sai com ela cheia. Números em `packages/compartilhado/src/conteudo/leslie.ts`
   e, os custos de energia, em `conteudo/poderes.ts`.
@@ -62,8 +62,8 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 
 Sem arma na mão (no modo arma), o clique esquerdo dá um **soco**: curto, o ataque mais fraco do
 jogo, que enche bem pouco a energia. A vida é 2500, e os danos, as recargas e a energia foram
-acertados juntos para uma luta durar uns 3 a 4 minutos dos 5 do relógio; se ele zerar, vence quem
-tiver mais vida. A tabela anotada e o porquê de cada número estão em **[BALANCEAMENTO.md](BALANCEAMENTO.md)**
+acertados juntos para uma luta durar uns 2 minutos e meio a 3 e quase nunca passar de 4 (os 5 do
+relógio são a exceção); se ele zerar, vence quem tiver mais vida. A tabela anotada e o porquê de cada número estão em **[BALANCEAMENTO.md](BALANCEAMENTO.md)**
 (o simulador usado: `python3 ferramentas/simular-duelo.py`).
 
 A escolha é feita na tela de seleção, depois do Singleplayer (a CPU espera a sua escolha e fica com
@@ -216,7 +216,11 @@ em cima da cabeça sem acento, porque a fonte de pixels não tem acentos.
     está nela. Os dois computadores se ligam direto (WebRTC, `apps/cliente/src/rede/direto.ts`): o
     estado, os poderes e os golpes vão por essa ligação, sem passar pelo servidor. Se ela não abrir,
     tudo vai pelo servidor.
-  - **Pela internet:** um cria a sala e passa o código de 5 caracteres; o outro entra com ele.
+  - **Pela internet:** um cria a sala e passa o código de 5 caracteres; o outro entra com ele. Os
+    dois também tentam a ligação direta, cada um descobrindo o próprio endereço de fora com um
+    servidor STUN público: entre dois jogadores no Brasil, isso evita a ida e a volta até o
+    servidor nos Estados Unidos. Se a rede de alguém não deixar (NAT muito fechado), tudo segue
+    pelo servidor, como antes.
 
   Na escolha de personagem, os dois escolhem ao mesmo tempo e cada um vê na hora o que o outro
   escolheu (apertando Jogar): esse fica bloqueado, com o nome de quem pegou. Os dois apertando
@@ -226,11 +230,18 @@ em cima da cabeça sem acento, porque a fonte de pixels não tem acentos.
   de os dois escolherem, ninguém entra no jogo e a sala cai. Alguém saindo da sala — na escolha ou
   no combate —, ela cai para o outro, que volta à tela inicial com o aviso do porquê.
   O servidor marca o tempo e avisa o fim aos dois ao mesmo tempo. Cada cliente simula o próprio
-  personagem e manda os botões segurados e a posição ~20 vezes por segundo andando (~5 parado); o
-  outro lado move o corpo com os mesmos botões e corrige a posição aos poucos, adiantada pelo
-  atraso da viagem. O servidor mede esse atraso com um ping a cada 2 s em cada conexão
+  personagem e manda os botões segurados e a posição andando ~30 vezes por segundo ligado direto
+  (~20 pelo servidor; ~5 parado); o estado vai num canal sem reenvio (um pacote perdido não segura
+  os de depois), e os poderes e os golpes, num confiável. O outro lado move o corpo com os mesmos
+  botões e corrige a posição aos poucos, adiantada pelo atraso da viagem. Cada um confere o dano
+  que leva, e os golpes do outro conferem o seu personagem **onde o outro o via** quando o golpe
+  saiu (o fantasma, `apps/cliente/src/entidades/fantasma.ts`): o golpe que acertou na tela dele
+  conta na sua. O servidor mede o atraso com um ping a cada 1 s em cada conexão
   (`apps/servidor/src/partida/batimento.ts`), que também mantém viva a conexão das telas paradas
-  e derruba em ~10 s a que caiu sem avisar (o outro recebe o fim na hora). A engrenagem só abre o menu: a
+  e derruba em ~10 s a que caiu sem avisar (o outro recebe o fim na hora); ligados direto, a
+  própria ligação mede a ida e a volta entre os dois. No menu da partida, **FPS e ping** liga um
+  medidor no canto de baixo da tela (verde, bom; amarelo, aceitável; vermelho, ruim; o pontinho
+  cheio quer dizer ligação direta, vazado, pelo servidor). A engrenagem só abre o menu: a
   partida continua, e o seu personagem fica parado enquanto isso. Sair da partida encerra para
   os dois.
 
