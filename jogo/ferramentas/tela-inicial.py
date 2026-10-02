@@ -8,12 +8,15 @@ Lê fontes/tela-inicial.png (a arte original, 1672x940) e grava:
   parada do que se mexe. Cada um é apagado e preenchido com pedaços da própria arte em volta.
 - apps/cliente/src/assets/tela-inicial-arvores.png: a máscara das árvores grandes das beiradas
   (branco onde é árvore, transparente no céu), para os pássaros que o jogo desenha passarem por
-  trás delas (inicio/cena.ts).
+  trás delas (inicio/cena.ts) — com a borda clara do tronco (com_casca).
+
+Só a máscara: python3 ferramentas/tela-inicial.py arvores  (não mexe na arte).
 
 Depois dele, rode npm run arte:tela-inicial-feixes (ferramentas/tela-inicial-sem-feixes.cjs): tira do
 céu da arte gravada os feixes de luz parados, que brigavam com os raios da logo.
 """
 import os
+import sys
 import cv2
 import numpy as np
 
@@ -80,13 +83,46 @@ def arvores(img):
         x, y, w, h, area = caixas[i]
         if area > 400 and (x == 0 or x + w >= img.shape[1] - 1 or y == 0):
             fica[rotulos == i] = 1
+    fica = com_casca(img, fica > 0)
     rgba = np.zeros((*img.shape[:2], 4), np.uint8)
-    rgba[fica > 0] = (255, 255, 255, 255)
+    rgba[fica] = (255, 255, 255, 255)
     return rgba
+
+
+def com_casca(img, arvore):
+    """A borda clara do tronco (laranja e amarelo, onde bate o sol) entra na árvore: o teste do
+    céu acima a tomava por nuvem, e o pássaro passava por cima dela, parecendo entrar no tronco.
+    Casca é quente e quase sem azul (as nuvens têm bem mais azul); o meio-tom entre ela e o céu
+    também entra, mas só no pedaço que tem casca de verdade e encosta na árvore. No fim, os
+    buraquinhos de céu de poucos pixels dentro da árvore são tapados."""
+    b, g, r = [img[:, :, i].astype(int) for i in range(3)]
+    casca = (b < 85) & (r > b + 60) & ~arvore
+    meio = (b < 115) & (r > 150) & (r > b + 70) & ~arvore
+    casca[ALTURA_DAS_COPAS:] = False
+    meio[ALTURA_DAS_COPAS:] = False
+    candidata = (casca | meio).astype(np.uint8)
+    _, rotulos = cv2.connectedComponents(candidata, connectivity=8)
+    encosta = cv2.dilate(arvore.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
+    nova = arvore.copy()
+    for i in np.unique(rotulos[encosta & (candidata > 0)]):
+        if i == 0:
+            continue
+        pedaco = rotulos == i
+        if (casca & pedaco).sum() >= 0.5 * pedaco.sum():
+            nova |= pedaco
+    n, rotulos, caixas, _ = cv2.connectedComponentsWithStats((~nova).astype(np.uint8), connectivity=4)
+    for i in range(1, n):
+        if caixas[i][4] < 60:
+            nova[rotulos == i] = True
+    return nova
 
 
 def main():
     img = cv2.imread(FONTE)
+    if len(sys.argv) > 1 and sys.argv[1] == 'arvores':
+        cv2.imwrite(os.path.join(ASSETS, 'tela-inicial-arvores.png'), arvores(img))
+        print('ok (só a máscara)')
+        return
     limpa = limpar(img.copy())
     cv2.imwrite(os.path.join(ASSETS, 'tela-inicial.webp'), limpa, [cv2.IMWRITE_WEBP_QUALITY, 88])
     cv2.imwrite(os.path.join(ASSETS, 'tela-inicial-arvores.png'), arvores(img))
