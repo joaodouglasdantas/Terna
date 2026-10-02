@@ -2,10 +2,13 @@
 // golpes, sem passar pelo servidor. Na mesma rede isso é quase instantâneo; pela internet, entre
 // dois jogadores no Brasil, poupa a ida e a volta até o servidor nos Estados Unidos (que sozinha
 // passa de 100 ms). Quem hospedou oferece a ligação e quem entrou responde; os recados (sinais)
-// vão pelo servidor (rede/partida.ts). Na mesma rede, os caminhos são os endereços da própria
-// rede; pela internet, cada um pergunta o seu endereço de fora a um servidor STUN. Se ela não
-// abrir em ESPERA_MS (o NAT de alguém não deixa, a rede bloqueia) ou cair no meio, tudo continua
-// pelo servidor, como antes.
+// vão pelo servidor (rede/partida.ts). Os caminhos tentados são os endereços da própria rede e,
+// sempre, também o endereço de fora, que cada um pergunta a um servidor STUN. O WebRTC prefere
+// sozinho o da própria rede quando ele funciona; o de fora salva quem o servidor juntou como
+// "mesma rede" por sair pelo mesmo IP, mas está em redes de dentro separadas (o Wi-Fi principal e
+// o de visitantes do mesmo lugar): sem ele, a ligação não abria e tudo ia até o servidor nos EUA.
+// Se ela não abrir em ESPERA_MS (o NAT de alguém não deixa, a rede bloqueia) ou cair no meio, tudo
+// continua pelo servidor, como antes.
 //
 // São dois canais: `jogo`, confiável e em ordem, para os poderes e os golpes (que não podem se
 // perder); e `estado`, sem reenvio e fora de ordem, para o estado, que chega ~30 vezes por segundo:
@@ -15,7 +18,9 @@
 
 import type { Sinal } from '@terna/compartilhado';
 
-const ESPERA_MS = { local: 8000, internet: 12_000 };
+// Na mesma rede, um pouco mais que antes: se a rede de dentro não ligar, sobra tempo para o
+// caminho de fora.
+const ESPERA_MS = { local: 10_000, internet: 12_000 };
 // Os servidores STUN públicos (só dizem a cada um o próprio endereço de fora; nada do jogo passa
 // por eles).
 const STUN: RTCIceServer[] = [
@@ -55,7 +60,7 @@ export function ligarDireto(
   if (typeof RTCPeerConnection === 'undefined') return null;
   let pc: RTCPeerConnection;
   try {
-    pc = new RTCPeerConnection({ iceServers: internet ? STUN : [] });
+    pc = new RTCPeerConnection({ iceServers: STUN });
   } catch {
     return null;
   }
