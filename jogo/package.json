@@ -29,6 +29,7 @@
     "arte:tela-inicial-feixes": "node ferramentas/tela-inicial-sem-feixes.cjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "concurrently": "^10.0.5",
     "sharp": "^0.35.4",
     "typescript": "^7.0.2"

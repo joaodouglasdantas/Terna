@@ -2,6 +2,7 @@
 // principal (atualizar → desenhar) a cada quadro do navegador. Por cima, o ciclo das telas:
 // carregamento → tela inicial → partida → fim → tela inicial de novo.
 
+import './monitor/erros';
 import { CARREGAMENTO_MS, MUNDO } from '@terna/compartilhado';
 import { atualizarAnimais, desenharAnimais, desenharAnimaisNoAr, prepararAnimais } from './entidades/animais';
 import { desenharArmasNaFrente, desenharArmasNoChao, desenharPreviaDoArco, prepararArmas } from './entidades/armas';
