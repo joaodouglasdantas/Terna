@@ -86,7 +86,10 @@ const PES_DAS_CACHOEIRAS = [
   { x: 0.798, y: 0.675, largura: 0.02 },
 ];
 const RIO: Area = { x0: 0.46, x1: 0.8, y0: 0.72, y1: 0.8 };
-const CEU: Area = { x0: 0, x1: 1, y0: 0.06, y1: 0.3 };
+// O bando sai daqui e ainda desce uns 0,1 do quadro (o V aberto e a curva do caminho): o fundo
+// fica bem acima de 0,38, onde a máscara das árvores termina — abaixo dela, as folhas não
+// esconderiam o pássaro.
+const CEU: Area = { x0: 0, x1: 1, y0: 0.06, y1: 0.25 };
 
 // Verdes das copas da arte, para as folhas que caem.
 const VERDES = ['#1f4a18', '#2f5e1a', '#446914', '#6f9424', '#95bb2d'];
@@ -192,8 +195,24 @@ function medir(): void {
 // só as árvores das beiradas (`frente`, pela máscara assets/tela-inicial-arvores.png), que são
 // redesenhadas por cima dos pássaros, com a mesma onda: eles passam por trás delas.
 let recortes: { pedaco: Pedaco; canvas: HTMLCanvasElement; frente: HTMLCanvasElement }[] = [];
+// E as árvores das beiradas fora dos pedaços que balançam (parados): sem elas, o pássaro que
+// descia um pouco mais passava POR CIMA das folhas logo abaixo das copas (as que ficam entre
+// um pedaço e outro), até entrar de novo num pedaço. Os buracos dos pedaços são os mesmos
+// retângulos dos recortes, então as duas camadas se encaixam sem sobrar nem faltar folha.
+let frenteFixa: HTMLCanvasElement | null = null;
 
 function recortar(img: HTMLImageElement, mascara: HTMLImageElement): void {
+  frenteFixa = novoCanvas(img.naturalWidth, img.naturalHeight);
+  const fixa = contexto2d(frenteFixa);
+  fixa.drawImage(img, 0, 0);
+  fixa.globalCompositeOperation = 'destination-in';
+  fixa.drawImage(mascara, 0, 0, img.naturalWidth, img.naturalHeight);
+  fixa.globalCompositeOperation = 'destination-out';
+  for (const { area } of PEDACOS) {
+    const sx = Math.round(area.x0 * img.naturalWidth);
+    const sy = Math.round(area.y0 * img.naturalHeight);
+    fixa.fillRect(sx, sy, Math.round((area.x1 - area.x0) * img.naturalWidth), Math.round((area.y1 - area.y0) * img.naturalHeight));
+  }
   recortes = PEDACOS.map((pedaco) => {
     const { x0, x1, y0, y1 } = pedaco.area;
     const sx = Math.round(x0 * img.naturalWidth);
@@ -582,8 +601,11 @@ function desenhar(tempo: number): void {
       desenharPassaro(c, x, y, up, desenho);
     }
   }
-  // As árvores das beiradas na frente deles.
+  // As árvores das beiradas na frente deles: as paradas e as dos pedaços que balançam.
   c.globalAlpha = 1;
+  // As paradas sem suavizar, como o fundo (image-rendering: pixelated): ficam idênticas a ele e
+  // não "piscam" quando um bando entra.
+  if (bandos.length && frenteFixa) c.drawImage(frenteFixa, 0, 0, largura, altura);
   c.imageSmoothingEnabled = true;
   if (bandos.length && !semMovimento()) mexer(c, tempo, true);
   c.imageSmoothingEnabled = false;
