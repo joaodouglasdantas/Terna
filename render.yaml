@@ -39,3 +39,9 @@ services:
       # endereço do jogo publicado no Cloudflare Pages: https://terna.pages.dev (mais de um, separados por vírgula)
       - key: ORIGENS_PERMITIDAS
         sync: false
+      # A chave do TURN do Cloudflare (painel → Realtime → TURN Server): o servidor de
+      # retransmissão das partidas online quando a ligação direta não abre.
+      - key: TURN_KEY_ID
+        sync: false
+      - key: TURN_KEY_API_TOKEN
+        sync: false

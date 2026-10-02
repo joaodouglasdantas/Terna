@@ -14,6 +14,9 @@ export interface Config {
   // Atrás de um proxy (Render, Cloudflare...): usa o IP real do jogador do X-Forwarded-For
   // (o limite de tentativas de login é por IP).
   confiarProxy: boolean;
+  // A chave do TURN do Cloudflare (painel → Realtime → TURN Server): TURN_KEY_ID e
+  // TURN_KEY_API_TOKEN. Sem as duas, null (as partidas online ficam só com o STUN).
+  turn: { id: string; token: string } | null;
 }
 
 // Pasta do pacote do servidor (onde está o package.json), venha o código de src/ ou de dist/.
@@ -47,6 +50,7 @@ export function lerConfig(env: NodeJS.ProcessEnv = process.env): Config {
       .filter(Boolean),
     diasSessao: numero(env.DIAS_SESSAO, 30),
     confiarProxy: env.CONFIAR_PROXY === '1',
+    turn: env.TURN_KEY_ID && env.TURN_KEY_API_TOKEN ? { id: env.TURN_KEY_ID.trim(), token: env.TURN_KEY_API_TOKEN.trim() } : null,
   };
 }
 

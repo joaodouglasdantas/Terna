@@ -174,13 +174,25 @@ export type MensagemPartidaDoCliente = z.infer<typeof MensagemPartidaDoCliente>;
 export const MotivoFim = z.enum(['tempo', 'oponente-saiu', 'morte']);
 export type MotivoFim = z.infer<typeof MotivoFim>;
 
+// Um servidor de retransmissão (TURN) para a ligação direta, com as credenciais do momento (o
+// servidor do jogo as pede ao Cloudflare e elas vencem sozinhas). O mesmo formato do
+// RTCIceServer do navegador.
+export const ServidorIce = z.object({
+  urls: z.union([z.string(), z.array(z.string()).max(8)]),
+  username: z.string().max(256).optional(),
+  credential: z.string().max(256).optional(),
+});
+export type ServidorIce = z.infer<typeof ServidorIce>;
+
 export const MensagemPartidaDoServidor = z.discriminatedUnion('tipo', [
   // Para quem criou: o código para passar ao outro jogador.
   z.object({ tipo: z.literal('sala-criada'), codigo: CodigoSala }),
   // Os dois estão na sala: cada um escolhe o personagem (e manda `heroi`; até o outro escolher,
   // pode mandar de novo e trocar). `prazoMs`: o tempo para os dois escolherem; acabando antes,
   // ninguém entra no jogo e a sala cai. `direto`: tentem a ligação direta — na mesma rede, ou,
-  // com `internet`, pela internet (com o STUN).
+  // com `internet`, pela internet (com o STUN). `ice`: os servidores de retransmissão (TURN),
+  // para quando a ligação direta não abre (o NAT da operadora não deixa): o jogo passa por um
+  // servidor do Cloudflare perto dos dois, em vez de ir até o servidor do jogo nos EUA.
   z.object({
     tipo: z.literal('escolher'),
     lado: Lado,
@@ -188,6 +200,7 @@ export const MensagemPartidaDoServidor = z.discriminatedUnion('tipo', [
     prazoMs: z.number().int().positive(),
     direto: z.boolean().optional(),
     internet: z.boolean().optional(),
+    ice: z.array(ServidorIce).max(8).optional(),
   }),
   // O personagem que o outro escolheu (a cada escolha e troca dele): fica bloqueado para quem
   // recebe. Volta também para quem pediu um personagem que o outro já tinha (os dois clicaram

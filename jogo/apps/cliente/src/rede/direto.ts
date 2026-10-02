@@ -16,7 +16,7 @@
 // depois de um mais novo, é jogado fora pelo número que vai na frente. O ping também vai por ele: a
 // cada segundo um eco, que o outro devolve na hora — é o atraso que a partida usa e mostra.
 
-import type { Sinal } from '@terna/compartilhado';
+import type { ServidorIce, Sinal } from '@terna/compartilhado';
 
 // Na mesma rede, um pouco mais que antes: se a rede de dentro não ligar, sobra tempo para o
 // caminho de fora.
@@ -56,11 +56,14 @@ export function ligarDireto(
   internet: boolean,
   mandarSinal: (sinal: Sinal) => void,
   aoReceber: (texto: string) => void,
+  // Os servidores de retransmissão (TURN) que o servidor do jogo mandou: o último recurso, quando
+  // nenhum caminho direto abre (o WebRTC só passa por eles se precisar).
+  turn: ServidorIce[] = [],
 ): LigacaoDireta | null {
   if (typeof RTCPeerConnection === 'undefined') return null;
   let pc: RTCPeerConnection;
   try {
-    pc = new RTCPeerConnection({ iceServers: STUN });
+    pc = new RTCPeerConnection({ iceServers: [...STUN, ...turn] });
   } catch {
     return null;
   }

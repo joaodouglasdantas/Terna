@@ -4,6 +4,7 @@ import { criarApp } from './app';
 import { apagarSessoesVencidas } from './auth/sessoes';
 import { abrirBanco } from './banco/conexao';
 import { carregarArquivoEnv, lerConfig } from './config';
+import { criarTurn } from './partida/turn';
 
 carregarArquivoEnv();
 const config = lerConfig();
@@ -11,16 +12,21 @@ const conexao = await abrirBanco({ url: config.bancoUrl, pasta: config.pastaBanc
 await conexao.migrar();
 await apagarSessoesVencidas(conexao.banco);
 
-const app = await criarApp({
+// O TURN pede as credenciais ao Cloudflare antes de a primeira partida precisar delas.
+let app: Awaited<ReturnType<typeof criarApp>> | null = null;
+const turn = criarTurn(config.turn, { registro: { warn: (objeto, mensagem) => app?.log.warn(objeto, mensagem) } });
+app = await criarApp({
   banco: conexao.banco,
   origens: config.origens,
   diasSessao: config.diasSessao,
   confiarProxy: config.confiarProxy,
   logger: { level: process.env.LOG ?? 'info' },
+  turn,
 });
 
 const encerrar = async (): Promise<void> => {
-  await app.close();
+  turn.parar();
+  await app?.close();
   await conexao.fechar();
   process.exit(0);
 };

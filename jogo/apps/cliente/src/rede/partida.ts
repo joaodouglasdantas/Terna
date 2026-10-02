@@ -24,6 +24,7 @@ import {
   type PartidaNaRede,
   type PedidoPartida,
   type PoderUsado,
+  type ServidorIce,
 } from '@terna/compartilhado';
 import { ligarDireto, type LigacaoDireta } from './direto';
 import { BASE_API } from './endereco';
@@ -147,6 +148,7 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
   // Quem hospedou oferece a ligação; quem entrou espera a oferta. Na revanche, a que ainda está de
   // pé continua; a que não abriu (ou caiu) é tentada de novo. `pelaInternet`: a sala é com código.
   let pelaInternet = false;
+  let turn: ServidorIce[] = []; // os servidores de retransmissão, se o servidor do jogo mandou
   const ligar = (oferece: boolean): void => {
     if (ligacao && !ligacao.morta()) return;
     ligacao?.fechar();
@@ -161,6 +163,7 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
         const ida = ligacao?.ping();
         entregar(m.tipo === 'estado' && ida ? { ...m, atraso: Math.min(5000, Math.round(ida / 2)) } : m);
       },
+      turn,
     );
   };
   // A ida e volta até o outro: direto, a da ligação; pelo servidor, a sua até ele mais a dele.
@@ -182,6 +185,7 @@ export function conectarPartida(pedido: PedidoPartida): ConexaoPartida {
     }
     if (mensagem.tipo === 'escolher' && mensagem.direto) {
       pelaInternet = mensagem.internet === true;
+      turn = mensagem.ice ?? [];
       ligar(mensagem.lado === 'anfitriao');
     }
     if (mensagem.tipo === 'sinal') {

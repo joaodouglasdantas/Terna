@@ -20,6 +20,7 @@ import {
   type MensagemPartidaDoServidor,
   type MotivoFim,
   type PartidaNaRede,
+  type ServidorIce,
 } from '@terna/compartilhado';
 import type { Conexao } from '../tempo-real/sala';
 
@@ -77,6 +78,9 @@ export interface OpcoesSalas {
   // Das quedas de arma: até a primeira tentativa e o sorteio (de 0 a 1) de qual, onde e quando.
   primeiraArmaMs: number;
   aleatorio: () => number;
+  // Os servidores de retransmissão (TURN) do momento, para a ligação direta que não abre
+  // (turn.ts); null: sem eles, só o STUN.
+  ice: () => ServidorIce[] | null;
 }
 
 export function codigoAleatorio(): string {
@@ -93,6 +97,7 @@ const PADRAO: OpcoesSalas = {
   gerarCodigo: codigoAleatorio,
   primeiraArmaMs: QUEDA_DE_ARMAS.primeira * 1000,
   aleatorio: Math.random,
+  ice: () => null,
 };
 
 // As armas da sala: as que estão no chão (pelo número) e a que cada um tem na mão.
@@ -209,8 +214,14 @@ export class Salas {
     sala.revanche = { anfitriao: false, convidado: false };
     clearTimeout(sala.timer);
     sala.timer = setTimeout(() => this.acabouAEscolha(sala), this.opcoes.escolhaMaxMs);
-    // Os dois tentam a ligação direta (quem hospedou começa); pela internet, com o STUN.
-    const direto = sala.rede !== null ? { direto: true } : { direto: true, internet: true };
+    // Os dois tentam a ligação direta (quem hospedou começa); pela internet, com o STUN. Com o
+    // TURN, se ela não abrir direto, passa pelo servidor de retransmissão perto dos dois.
+    const ice = this.opcoes.ice();
+    const direto = {
+      direto: true,
+      ...(sala.rede === null ? { internet: true } : {}),
+      ...(ice ? { ice } : {}),
+    };
     const prazoMs = this.opcoes.escolhaMaxMs;
     this.mandar(sala.anfitriao.conexao, { tipo: 'escolher', lado: 'anfitriao', oponente: convidado.nome, prazoMs, ...direto });
     this.mandar(convidado.conexao, { tipo: 'escolher', lado: 'convidado', oponente: sala.anfitriao.nome, prazoMs, ...direto });

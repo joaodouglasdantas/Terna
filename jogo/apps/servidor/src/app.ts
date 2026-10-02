@@ -6,6 +6,8 @@ import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastif
 import type { Banco } from './banco/conexao';
 import { ipDoPedido } from './http';
 import { rotaPartida } from './partida/rota';
+import { Salas } from './partida/salas';
+import type { Turn } from './partida/turn';
 import { rotasContas } from './rotas/contas';
 import { rotasRanking } from './rotas/ranking';
 import { rotasSaves } from './rotas/saves';
@@ -19,6 +21,8 @@ export interface OpcoesApp {
   // Tentativas de criar conta / entrar por minuto, por IP.
   tentativasPorMinuto?: number;
   logger?: FastifyServerOptions['logger'];
+  // O TURN do Cloudflare (partida/turn.ts), para as partidas online; sem ele, só o STUN.
+  turn?: Turn;
 }
 
 // Monta o servidor sem abrir porta: o index.ts chama listen, os testes usam inject.
@@ -29,6 +33,7 @@ export async function criarApp({
   confiarProxy = false,
   tentativasPorMinuto = 10,
   logger = false,
+  turn,
 }: OpcoesApp): Promise<FastifyInstance> {
   const app = Fastify({ logger, bodyLimit: 256 * 1024, trustProxy: confiarProxy });
 
@@ -69,7 +74,7 @@ export async function criarApp({
       rotasSaves(api, banco);
       rotasRanking(api, banco);
       rotaTempoReal(api, banco);
-      rotaPartida(api, { confiarProxy });
+      rotaPartida(api, { confiarProxy, salas: new Salas(turn ? { ice: turn.servidores } : {}) });
     },
     { prefix: '/api' },
   );
