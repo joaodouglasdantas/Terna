@@ -364,6 +364,7 @@ interface Camadas {
   chao: HTMLCanvasElement;
   tempo: number;
   luz: { x: number; y: number };
+  base: number; // a linha do chão (na tela) em que a camada do chão foi pintada
   largura: number;
   altura: number;
 }
@@ -411,54 +412,71 @@ function pintarLuzNoChao(tela: HTMLCanvasElement, feixes: Feixe[], luz: Luz, cor
   ctx.globalCompositeOperation = 'source-over';
 }
 
-// Os raios, a luz que eles jogam na cena, as poças e o brilho na grama e a poeira. `chao`: a linha
-// da grama na tela; `camX`: a câmera (o orvalho fica preso no mapa).
+// Um pedaço da tela com o seu chão: a tela inteira, ou cada metade dela dividida. Cada metade tem
+// a sua câmera, e com ela a sua linha da grama (`chao`, na tela) e o seu `camX` (o orvalho fica
+// preso no mapa daquela metade).
+export interface VistaDoChao {
+  x0: number;
+  largura: number;
+  chao: number;
+  camX: number;
+}
+
+// Os raios, a luz que eles jogam na cena, as poças e o brilho na grama e a poeira. O sol e os
+// fachos são da tela (iguais nas duas metades); o que fica no chão — a luz deitada na grama e o
+// orvalho — é pintado em cada vista com o chão e a câmera dela. A primeira vista é a que os
+// feixes do quadro usaram (prepararRaios).
 export function desenharRaios(
   ctx: CanvasRenderingContext2D,
   luz: Luz,
   tempo: number,
   largura: number,
   altura: number,
-  chao: number,
-  camX = 0,
+  vistas: VistaDoChao[],
 ): void {
-  if (!quadro || quadro.tempo !== tempo) prepararRaios(luz, tempo, largura, chao);
+  const base = vistas[0].chao;
+  if (!quadro || quadro.tempo !== tempo) prepararRaios(luz, tempo, largura, base);
   const { feixes, forca } = quadro!;
   if (forca < 0.02) return;
   const cor = corDoFacho(luz);
   if (!camadas || camadas.largura !== largura || camadas.altura !== altura) {
     const w = largura + 2 * MARGEM;
     const h = altura + 2 * MARGEM;
-    camadas = { aquece: novoCanvas(w, h), facho: novoCanvas(w, h), chao: novoCanvas(w, h), tempo: -Infinity, luz: { x: luz.x, y: luz.y }, largura, altura };
+    camadas = { aquece: novoCanvas(w, h), facho: novoCanvas(w, h), chao: novoCanvas(w, h), tempo: -Infinity, luz: { x: luz.x, y: luz.y }, base, largura, altura };
   }
   if (Math.abs(tempo - camadas.tempo) >= 1 / REFAZER) {
     // As camadas são pintadas com o sol e o chão de agora; entre uma refeita e outra, andam junto
     // com o sol (o chão anda junto com ele na tela: os dois descem com a câmera).
-    pintarCamadas(camadas, feixes, luz, cor, forca, chao);
+    pintarCamadas(camadas, feixes, luz, cor, forca, base);
     camadas.tempo = tempo;
     camadas.luz = { x: luz.x, y: luz.y };
+    camadas.base = base;
   }
   const dx = Math.round(luz.x - camadas.luz.x) - MARGEM;
   const dy = Math.round(luz.y - camadas.luz.y) - MARGEM;
-  ctx.save();
-  // Os fachos param na grama (a terra embaixo não pega sol); as poças ficam na linha dela.
-  ctx.beginPath();
-  ctx.rect(0, 0, largura, chao + CHAO.ate);
-  ctx.clip();
-  // A cena embaixo do facho clareia e esquenta (as copas, a grama, quem estiver ali)...
-  ctx.globalCompositeOperation = 'soft-light';
-  ctx.drawImage(camadas.aquece, dx, dy);
-  // ...e o próprio facho aparece no ar.
-  ctx.globalCompositeOperation = 'screen';
-  ctx.drawImage(camadas.facho, dx, dy);
-  // A luz deitada na grama: clareia e esquenta a própria grama, e só um quase nada brilha.
-  ctx.globalCompositeOperation = 'soft-light';
-  ctx.drawImage(camadas.chao, dx, dy);
-  ctx.globalCompositeOperation = 'screen';
-  ctx.globalAlpha = RAIOS.brilhoNoChao / RAIOS.poca;
-  ctx.drawImage(camadas.chao, dx, dy);
-  ctx.globalAlpha = 1;
-  pintarOrvalho(ctx, feixes, luz, tempo, Math.min(1, forca), chao, camX);
-  pintarPoeira(ctx, feixes, luz, tempo, Math.min(1, 1.1 * forca), largura, chao);
-  ctx.restore();
+  for (const v of vistas) {
+    ctx.save();
+    // Os fachos param na grama (a terra embaixo não pega sol); as poças ficam na linha dela.
+    ctx.beginPath();
+    ctx.rect(v.x0, 0, v.largura, v.chao + CHAO.ate);
+    ctx.clip();
+    // A cena embaixo do facho clareia e esquenta (as copas, a grama, quem estiver ali)...
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.drawImage(camadas.aquece, dx, dy);
+    // ...e o próprio facho aparece no ar.
+    ctx.globalCompositeOperation = 'screen';
+    ctx.drawImage(camadas.facho, dx, dy);
+    // A luz deitada na grama desta vista (a camada foi pintada no chão da primeira): clareia e
+    // esquenta a própria grama, e só um quase nada brilha.
+    const noChaoDaVista = Math.round(v.chao - camadas.base) - MARGEM;
+    ctx.globalCompositeOperation = 'soft-light';
+    ctx.drawImage(camadas.chao, dx, noChaoDaVista);
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = RAIOS.brilhoNoChao / RAIOS.poca;
+    ctx.drawImage(camadas.chao, dx, noChaoDaVista);
+    ctx.globalAlpha = 1;
+    pintarOrvalho(ctx, feixes, luz, tempo, Math.min(1, forca), v.chao, v.camX);
+    pintarPoeira(ctx, feixes, luz, tempo, Math.min(1, 1.1 * forca), largura, v.chao);
+    ctx.restore();
+  }
 }

@@ -402,7 +402,20 @@ function desenhar(tempo: number): void {
   } else {
     desenharVista(tempo, luz, esquerda, altos.esquerda, 0, LARGURA);
   }
-  desenharLuz(ctx, sol, LARGURA, ALTURA, tempo, Y_CHAO + altos.esquerda, esquerda);
+  // A luz do sol é da tela; a que deita no chão, de cada metade (a sua câmera e a sua grama).
+  desenharLuz(
+    ctx,
+    sol,
+    LARGURA,
+    ALTURA,
+    tempo,
+    dividida
+      ? [
+          { x0: 0, largura: METADE, chao: Y_CHAO + altos.esquerda, camX: esquerda },
+          { x0: METADE, largura: METADE, chao: Y_CHAO + altos.direita, camX: direita },
+        ]
+      : [{ x0: 0, largura: LARGURA, chao: Y_CHAO + altos.esquerda, camX: esquerda }],
+  );
   const p = partida;
   if (!p) return;
   // Os nomes vêm depois da luz, para o sol não tingir o azul e o vermelho.

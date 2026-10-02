@@ -9,7 +9,7 @@ import { sortear, suavizar } from '../motor/matematica';
 import { paisagemViva } from './agua';
 import { criarCeu, desenharCirros, desenharSerraDeLonge } from './ceu';
 import { graduarImagem, type Graduacao } from './cor';
-import { acompanharNuvens, avisarCobertura, desenharRaios, luzDoRaio, solLivre, sombraDaNuvem } from './raios';
+import { acompanharNuvens, avisarCobertura, desenharRaios, luzDoRaio, solLivre, sombraDaNuvem, type VistaDoChao } from './raios';
 import type { Luz, Paleta, Recorte } from '../motor/tipos';
 
 // Quanto cada camada anda quando a câmera anda 1px: as distantes andam menos (paralaxe).
@@ -804,8 +804,8 @@ export function desenharVegetacao(
 // Última camada, em coordenadas de tela: calor em volta do sol, o lado longe dele um pouco
 // mais escuro, um tom alaranjado quando ele está baixo, a vinheta nos cantos e os raios de sol
 // (raios.ts), que também clareiam o que está embaixo deles. Uma nuvem na frente do sol apaga o
-// calor e os raios aos poucos e escurece a cena um tanto. Tudo bem de leve. `chao`: a linha da
-// grama na tela.
+// calor e os raios aos poucos e escurece a cena um tanto. Tudo bem de leve. `vistas`: a tela
+// inteira ou as duas metades da tela dividida, cada uma com a sua linha da grama e a sua câmera.
 //
 // O calor e o tom do entardecer vão numa camada (soft-light), e o lado escuro, a sombra da nuvem e
 // a vinheta noutra (multiply): cada uma é pintada à parte e só refeita quando o sol anda um pixel
@@ -825,8 +825,7 @@ export function desenharLuz(
   largura: number,
   altura: number,
   tempo = 0,
-  chao = altura,
-  camX = 0,
+  vistas: VistaDoChao[] = [{ x0: 0, largura, chao: altura, camX: 0 }],
 ): void {
   acompanharNuvens(tempo);
   const calorForca = LUZ.calor * luz.forca * solLivre();
@@ -878,5 +877,5 @@ export function desenharLuz(
   ctx.drawImage(camadas.escura, 0, 0);
   ctx.restore();
 
-  desenharRaios(ctx, luz, tempo, largura, altura, chao, camX);
+  desenharRaios(ctx, luz, tempo, largura, altura, vistas);
 }
