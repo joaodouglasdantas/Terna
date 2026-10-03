@@ -592,7 +592,7 @@ function desenhar(tempo: number): void {
   c.imageSmoothingEnabled = true;
   if (!semMovimento()) mexer(c, tempo);
   c.imageSmoothingEnabled = false;
-  desenharConversa(c, largura, altura, tempo);
+  desenharConversa(c, largura, altura);
 
   // Os pássaros, lá longe no céu.
   c.globalAlpha = 0.92;

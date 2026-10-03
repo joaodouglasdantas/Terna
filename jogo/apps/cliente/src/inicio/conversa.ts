@@ -1,7 +1,6 @@
 // A Leslie e o Grow na tela inicial: sentados de costas na grama, na beira do barranco, vendo o
 // pôr do sol (cena.ts os desenha por cima da arte do fundo, só na tela inicial). De vez em quando
-// um vira a cabeça para o outro e fala (um balãozinho com reticências que vão aparecendo, a cabeça
-// balançando um pouco); às vezes o outro vira também e responde; depois os dois voltam a olhar o
+// um vira a cabeça para o outro e fala (um balãozinho com reticências que vão aparecendo); às vezes o outro vira também e responde; depois os dois voltam a olhar o
 // sol. Os quadros (de costas, virado para a esquerda e para a direita) e a contraluz do sol estão
 // prontos em assets/conversa.png (ferramentas/gerar-conversa.py).
 
@@ -16,8 +15,8 @@ type Jeito = 'costas' | 'esquerda' | 'direita';
 // Onde cada um senta (fração do quadro: o meio do corpo e a grama embaixo dele) e para que lado
 // fica o outro.
 const LUGARES = {
-  leslie: { x: 0.652, y: 0.888, outro: 'direita' as const },
-  grow: { x: 0.697, y: 0.888, outro: 'esquerda' as const },
+  leslie: { x: 0.65, y: 0.888, outro: 'direita' as const },
+  grow: { x: 0.699, y: 0.888, outro: 'esquerda' as const },
 };
 type Quem = keyof typeof LUGARES;
 
@@ -70,11 +69,13 @@ export function atualizarConversa(dt: number, naTela: boolean): void {
   }
 }
 
-// Desenha os dois na tela da cena (`largura` × `altura`, o quadro da arte), com `tempo` em s.
-export function desenharConversa(c: CanvasRenderingContext2D, largura: number, altura: number, tempo: number): void {
+// Desenha os dois na tela da cena (`largura` × `altura`, o quadro da arte).
+export function desenharConversa(c: CanvasRenderingContext2D, largura: number, altura: number): void {
   if (!folha || visivel <= 0) return;
   const passo = passos[noPasso];
-  const u = Math.max(2, Math.round(altura / 240)); // um pixel do desenho
+  // Um pixel do desenho: grande o bastante para eles ficarem do tamanho de gente perto da tocha e do
+  // baú do cenário (sentados, mais altos que a tocha).
+  const u = Math.max(2, Math.round(altura / 225));
   c.save();
   c.imageSmoothingEnabled = false;
   c.globalAlpha = visivel;
@@ -84,9 +85,7 @@ export function desenharConversa(c: CanvasRenderingContext2D, largura: number, a
     const i = ORDEM.indexOf(`${quem}-${jeito}`);
     const x = Math.round(lugar.x * largura - (QUADRO * u) / 2);
     const chao = Math.round(lugar.y * altura);
-    // Falando, a cabeça balança (o corpo sobe um pixel no ritmo da fala).
     const falando = passo.fala === quem;
-    const sobe = falando && Math.sin(tempo * 14) > 0.2 ? u : 0;
     // A sombra na grama.
     c.globalAlpha = visivel * 0.35;
     c.fillStyle = '#0d0a14';
@@ -94,7 +93,7 @@ export function desenharConversa(c: CanvasRenderingContext2D, largura: number, a
     c.ellipse(lugar.x * largura, chao - u, 8 * u, 2 * u, 0, 0, Math.PI * 2);
     c.fill();
     c.globalAlpha = visivel;
-    c.drawImage(folha, i * QUADRO, 0, QUADRO, QUADRO, x, chao - QUADRO * u - sobe, QUADRO * u, QUADRO * u);
+    c.drawImage(folha, i * QUADRO, 0, QUADRO, QUADRO, x, chao - QUADRO * u, QUADRO * u, QUADRO * u);
     if (falando) desenharBalao(c, lugar.x * largura + (lugar.outro === 'direita' ? 4 : -4) * u, chao - 34 * u, u, tempoNoPasso);
   }
   c.restore();
