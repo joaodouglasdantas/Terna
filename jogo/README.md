@@ -26,7 +26,7 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 | Comando | O que faz |
 |---|---|
 | `npm run dev` | servidor + cliente, recarregando ao salvar |
-| `npm run dev:cliente` | só o jogo (sem servidor, o jogo roda igual; só a parte online não) |
+| `npm run dev:cliente` | só o jogo (precisa de um servidor no ar: o Terna é online, sem ele para na tela de carregamento) |
 | `npm run typecheck` | confere os tipos de todos os pacotes |
 | `npm test` | testes (o servidor testa contra um banco novo na memória) |
 | `npm run build` | gera `apps/cliente/dist/` (site estático) e `apps/servidor/dist/` |
@@ -161,8 +161,9 @@ jogo/
   (o servidor vai precisar deles para validar o que os jogadores fazem no multiplayer).
 - **PGlite em dev, Postgres em produção.** É o mesmo Postgres dos dois lados, então as
   migrações e as consultas são as mesmas; só muda o `DATABASE_URL`.
-- **Cliente independente.** O jogo roda sem servidor. A parte online (`rede/`, `save/`) é
-  opcional e o save local continua funcionando sem conta.
+- **Jogo online, com conta.** O jogo precisa do servidor: a tela de carregamento confere que ele
+  está no ar (sem ele, fica no "Tentar de novo") e a conta é obrigatória (entrar ou criar, com o
+  código no e-mail). As partidas sozinho e o treino rodam no navegador; o servidor guarda a conta.
 
 ## Banco de dados
 

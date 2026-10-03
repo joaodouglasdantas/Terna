@@ -11,7 +11,7 @@ const CHAVE = 'terna:sessao';
 
 const Guardada = z.object({ token: z.string(), jogador: Jogador });
 
-// Quem está na conta agora (null: ninguém, ou offline).
+// Quem está na conta agora (null: ninguém).
 let atual: Jogador | null = null;
 
 export function contaAtual(): Jogador | null {

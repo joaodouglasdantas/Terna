@@ -1,6 +1,6 @@
 // Ponto de entrada do jogo: carrega as folhas de sprite, monta o mundo e roda o laço
 // principal (atualizar → desenhar) a cada quadro do navegador. Por cima, o ciclo das telas:
-// carregamento → conta (entrar ou criar; com o servidor fora do ar, pula) → tela inicial →
+// carregamento → conta (entrar ou criar) → tela inicial →
 // partida → fim → tela inicial de novo. Quem acabou de criar a conta cai antes no treino, com o
 // tutorial (ou aperta "Já sei jogar").
 
@@ -608,7 +608,7 @@ async function principal(): Promise<void> {
   vigiarJanela(() => menusDaPartida?.abrirMenu());
   // A música das telas (começa no primeiro clique ou tecla: o navegador não deixa antes).
   tocarMusica('telas');
-  const { cenario, herois, online } = await carregar({
+  const { cenario, herois } = await carregar({
     carregarCenario: carregarFolhaCenario,
     carregarHerois,
   });
@@ -624,26 +624,27 @@ async function principal(): Promise<void> {
   prepararRamos();
   requestAnimationFrame(loop);
 
-  // A conta: com o servidor no ar, é preciso estar nela (a sessão guardada deste navegador vale;
-  // senão, a tela de entrar ou criar). Offline, o jogo segue com o apelido, como antes.
-  let conta: Jogador | null = online ? await retomarSessao() : null;
+  // A conta: o Terna é online e é preciso estar nela (a sessão guardada deste navegador vale;
+  // senão, a tela de entrar ou criar).
+  let conta: Jogador | null = await retomarSessao();
   // O primeiro treino, logo depois de criar a conta (null: apertou "Já sei jogar").
   let primeiroTreino: Escolha | null = null;
-  const entrarNaConta = async (): Promise<void> => {
+  const entrarNaConta = async (): Promise<Jogador> => {
     const entrou = await telaConta();
     conta = entrou.jogador;
-    if (!entrou.nova) return;
+    if (!entrou.nova) return entrou.jogador;
     const r = await telaSelecao(undefined, TEXTOS_DO_PRIMEIRO_TREINO);
     if (r.tipo === 'escolheu') primeiroTreino = { modo: 'treino', nome: entrou.jogador.nome.slice(0, 12), heroi: r.heroi };
+    return entrou.jogador;
   };
 
   // A sala da revanche caindo na escolha (o outro saiu, o tempo de escolher acabou), a tela
   // inicial diz por quê.
   let aviso: string | undefined;
   for (;;) {
-    if (online && !conta) await entrarNaConta();
+    const dentro: Jogador = conta ?? (await entrarNaConta());
     const primeiraVez = primeiroTreino !== null;
-    const escolhido: Escolha | typeof SAIU_DA_CONTA = primeiroTreino ?? (await escolherModo(online, aviso, conta));
+    const escolhido: Escolha | typeof SAIU_DA_CONTA = primeiroTreino ?? (await escolherModo(dentro, aviso));
     primeiroTreino = null;
     aviso = undefined;
     if (escolhido === SAIU_DA_CONTA) {

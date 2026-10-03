@@ -3,12 +3,11 @@
 // o nome e os modos de jogo. São páginas comuns por cima do canvas: a logo é uma imagem grande
 // e o texto precisa ficar nítido, o que o canvas de 480×270 ampliado não daria.
 
-import { Apelido, type Heroi, type Jogador } from '@terna/compartilhado';
+import type { Heroi, Jogador } from '@terna/compartilhado';
 import logoSimplesUrl from '../assets/logo-simples.webp';
 import logoUrl from '../assets/logo.webp';
 import { carregarDecodificada } from '../motor/imagens';
 import { checarBanco, checarServidor } from '../rede/saude';
-import { guardarNome, lerNome } from '../save/nome';
 import { VERSAO } from '../versao';
 import { anexarCena, carregarArteDaCena } from './cena';
 import { botao, digitandoEm, elemento, mostrarTela, sairComEsmaecer } from './dom';
@@ -93,9 +92,11 @@ function carregarArte<T>(carregador: () => Promise<T>, guardar: (valor: T) => vo
   );
 }
 
-// A tela de carregamento. Devolve o que foi carregado e se dá para jogar online, quando a pessoa
+// A tela de carregamento. Devolve o que foi carregado quando tudo deu certo — a arte e o servidor:
+// o Terna é um jogo online (sem o servidor não há conta nem partida), então não há como seguir sem
+// ele; caindo, a tela fica com o aviso e o "Tentar de novo".
 // pode seguir (sozinha, se tudo deu certo; com um clique, se algo falhou).
-export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; herois: H; online: boolean }> {
+export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; herois: H }> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-carregando');
     const barra = elemento('div', 'inicio-barra');
@@ -113,7 +114,7 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
     mostrarTela(tela);
     // Pronto: o carregamento esmaece até o escuro e a tela inicial aparece dele (cruzando as duas,
     // a logo pequena e a grande ficavam uma por cima da outra).
-    const concluir = (fim: { cenario: C; herois: H; online: boolean }): void => void sairComEsmaecer(tela).then(() => resolver(fim));
+    const concluir = (fim: { cenario: C; herois: H }): void => void sairComEsmaecer(tela).then(() => resolver(fim));
 
     let cenario: C | undefined;
     let herois: H | undefined;
@@ -181,21 +182,17 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
       barra.setAttribute('aria-valuetext', 'Tudo pronto');
       await esperar(PAUSA_PRONTO);
       // As três primeiras etapas são a arte: chegando aqui, todas carregaram.
-      concluir({ cenario: cenario as C, herois: herois as H, online: true });
+      concluir({ cenario: cenario as C, herois: herois as H });
     };
 
     const falhou = (falha: Falha): void => {
       tela.dataset.estado = 'falhou';
       const tentarDeNovo = botao('Tentar de novo', 'inicio-botao inicio-botao-claro', () => void rodar());
-      if (falha === 'rede' && cenario !== undefined && herois !== undefined && logoPronta) {
-        // Só o online falhou: o jogo roda sozinho, então dá para seguir sem ele.
-        const [c, h] = [cenario, herois];
-        frase.textContent = 'O mundo online não respondeu';
-        aviso.textContent = 'Dá para jogar mesmo assim, mas sem salvar na conta nem jogar com outras pessoas.';
-        acoes.append(
-          botao('Jogar offline', 'inicio-botao', () => concluir({ cenario: c, herois: h, online: false })),
-          tentarDeNovo,
-        );
+      if (falha === 'rede') {
+        // Sem o servidor não há conta nem partida: só tentar de novo.
+        frase.textContent = 'Sem conexão com o mundo do Terna';
+        aviso.textContent = 'O Terna é um jogo online. Confira sua internet e tente de novo.';
+        acoes.append(tentarDeNovo);
       } else {
         frase.textContent = 'As imagens do jogo não carregaram';
         aviso.textContent = 'Sem elas não dá para abrir o jogo. Confira a conexão e tente de novo.';
@@ -244,16 +241,14 @@ function atalho(texto: string, icone: string[]): HTMLButtonElement {
   return b;
 }
 
-// A tela inicial: a logo (viva, com partículas), o nome e os modos de jogo, com as árvores da
-// frente subindo nas beiradas. Termina quando a pessoa escolhe um modo e o personagem —
+// A tela inicial: a logo (viva, com partículas), quem está na conta e os modos de jogo, com as
+// árvores da frente subindo nas beiradas. Termina quando a pessoa escolhe um modo e o personagem —
 // Singleplayer, depois da seleção de personagem; Multiplayer, depois de criar ou entrar numa sala
-// e dos dois escolherem (as telas deles voltam para cá se ela desistir). Sem conexão com o
-// servidor, o Multiplayer fica apagado.
+// e dos dois escolherem (as telas deles voltam para cá se ela desistir) — ou sai da conta
+// (SAIU_DA_CONTA). O nome nas partidas é o da conta (que já segue as regras do apelido).
 // `aviso`: a sala da partida online caiu (o outro saiu, o tempo de escolher acabou, a rede caiu):
 // aparece em cima do nome e some sozinho, esmaecendo (antes, se a pessoa abrir outra tela).
-// `conta`: dentro da conta, o nome é o dela (no lugar do campo, com o botão de sair da conta, que
-// termina a tela com SAIU_DA_CONTA). Sem conta (offline), o campo do apelido, como antes.
-export function escolherModo(online: boolean, aviso = '', conta: Jogador | null = null): Promise<Escolha | typeof SAIU_DA_CONTA> {
+export function escolherModo(conta: Jogador, aviso = ''): Promise<Escolha | typeof SAIU_DA_CONTA> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-titulo-tela');
     const avisoDaSala = elemento('p', 'inicio-sala-caiu');
@@ -273,57 +268,20 @@ export function escolherModo(online: boolean, aviso = '', conta: Jogador | null 
     };
     mostrarAviso(aviso);
 
-    const campo = elemento('label', 'inicio-campo');
-    const rotulo = elemento('span', 'inicio-rotulo', 'Seu nome');
-    const entrada = elemento('input', 'inicio-entrada');
-    entrada.type = 'text';
-    entrada.maxLength = 12;
-    entrada.setAttribute('autocomplete', 'nickname');
-    entrada.spellcheck = false;
-    entrada.placeholder = 'Como te chamam?';
-    entrada.value = lerNome();
-    const erroNome = elemento('p', 'inicio-erro');
-    erroNome.id = 'inicio-erro-nome';
-    erroNome.setAttribute('aria-live', 'polite');
-    campo.append(rotulo, entrada);
-    entrada.addEventListener('input', () => {
-      erroNome.textContent = '';
-      entrada.removeAttribute('aria-invalid');
-    });
+    const nome = conta.nome.slice(0, 12);
 
-    // Com conta: o nome dela no lugar do campo, e o botão de sair da conta.
+    // Quem está na conta, e o botão de sair dela.
     const faixaDaConta = elemento('div', 'inicio-conta-faixa');
-    if (conta) {
-      const quem = elemento('p', 'inicio-conta-quem');
-      quem.append('Jogando como ', elemento('strong', '', conta.nome));
-      // A conta oficial do jogo: tudo liberado para testar.
-      if (conta.mestre) quem.append(elemento('span', 'inicio-conta-selo', 'Mestre'));
-      const sair = botao('Sair da conta', 'inicio-link', () => {
-        window.removeEventListener('keydown', aoTeclar);
-        mostrarAviso('');
-        void sairComEsmaecer(tela).then(() => resolver(SAIU_DA_CONTA));
-      });
-      faixaDaConta.append(quem, sair);
-    }
-
-    // O nome vale para os dois modos: sem nome válido, avisa e volta para o campo. Com conta, é o
-    // nome dela (que já segue as regras do apelido).
-    const nomeValido = (): string | null => {
-      if (conta) return conta.nome.slice(0, 12);
-      const nome = Apelido.safeParse(entrada.value);
-      if (nome.success) {
-        guardarNome(nome.data);
-        return nome.data;
-      }
-      const motivo = nome.error.issues[0]?.message ?? 'nome inválido';
-      erroNome.textContent = entrada.value.trim()
-        ? motivo.charAt(0).toUpperCase() + motivo.slice(1)
-        : 'Escreva seu nome para jogar';
-      entrada.setAttribute('aria-invalid', 'true');
-      entrada.setAttribute('aria-describedby', erroNome.id);
-      entrada.focus();
-      return null;
-    };
+    const quem = elemento('p', 'inicio-conta-quem');
+    quem.append('Jogando como ', elemento('strong', '', conta.nome));
+    // A conta oficial do jogo: tudo liberado para testar.
+    if (conta.mestre) quem.append(elemento('span', 'inicio-conta-selo', 'Mestre'));
+    const sair = botao('Sair da conta', 'inicio-link', () => {
+      window.removeEventListener('keydown', aoTeclar);
+      mostrarAviso('');
+      void sairComEsmaecer(tela).then(() => resolver(SAIU_DA_CONTA));
+    });
+    faixaDaConta.append(quem, sair);
 
     // Desistiu numa das telas seguintes (ou a sala caiu: `aviso`): a tela inicial volta como estava.
     const voltarParaCa = (foco: HTMLElement, aviso = ''): void => {
@@ -336,19 +294,15 @@ export function escolherModo(online: boolean, aviso = '', conta: Jogador | null 
     };
 
     const solo = botao('Singleplayer', 'inicio-botao inicio-jogar', () => {
-      const nome = nomeValido();
-      if (!nome) return;
       mostrarAviso('');
       window.removeEventListener('keydown', aoTeclar);
-      void telaSelecao(undefined, undefined, conta?.mestre).then((r) => {
+      void telaSelecao(undefined, undefined, conta.mestre).then((r) => {
         if (r.tipo === 'escolheu') resolver({ modo: 'solo', nome, heroi: r.heroi });
         else voltarParaCa(solo);
       });
     });
 
     const multiplayer = botao('Multiplayer', 'inicio-botao inicio-multiplayer', () => {
-      const nome = nomeValido();
-      if (!nome) return;
       window.removeEventListener('keydown', aoTeclar);
       mostrarAviso('');
       void telaMultiplayer(nome).then((fim) => {
@@ -356,13 +310,8 @@ export function escolherModo(online: boolean, aviso = '', conta: Jogador | null 
         voltarParaCa(multiplayer, fim.aviso);
       });
     });
-    if (!online) {
-      multiplayer.disabled = true;
-      multiplayer.setAttribute('aria-label', 'Multiplayer, sem conexão com o servidor');
-      multiplayer.append(elemento('span', 'inicio-etiqueta', 'Offline'));
-    }
 
-    // Os atalhos do canto de baixo: os personagens, o mapa e a música.
+    // Os atalhos do canto de baixo: o treino, os personagens, o mapa e a música.
     const abrirAoClicar = (b: HTMLButtonElement, abrirTela: () => Promise<void>): HTMLButtonElement => {
       b.addEventListener('click', () => {
         window.removeEventListener('keydown', aoTeclar);
@@ -374,8 +323,6 @@ export function escolherModo(online: boolean, aviso = '', conta: Jogador | null 
     // O treino: escolhe a Leslie ou o Grow e cai na partida de treino, com o tutorial.
     const treino = atalho('Treinamento', ICONE_TREINO);
     treino.addEventListener('click', () => {
-      const nome = nomeValido();
-      if (!nome) return;
       window.removeEventListener('keydown', aoTeclar);
       mostrarAviso('');
       void telaSelecao(undefined, TEXTOS_DO_TREINO).then((r) => {
@@ -388,7 +335,7 @@ export function escolherModo(online: boolean, aviso = '', conta: Jogador | null 
     const atalhos = elemento('div', 'inicio-atalhos');
     atalhos.append(treino, personagens, mapa, botaoDaMusica('inicio-botao inicio-botao-claro inicio-atalho'));
 
-    // Enter joga sozinho (também de dentro do campo de nome); Espaço só fora do campo.
+    // Enter ou Espaço jogam sozinho.
     const aoTeclar = (evento: KeyboardEvent): void => {
       if (evento.code === 'Enter' || (evento.code === 'Space' && !digitandoEm(evento))) {
         // O próprio botão (ou o link da opinião) já responde.
@@ -400,8 +347,7 @@ export function escolherModo(online: boolean, aviso = '', conta: Jogador | null 
     window.addEventListener('keydown', aoTeclar);
 
     const modos = elemento('div', 'inicio-modos');
-    if (conta) modos.append(avisoDaSala, faixaDaConta, solo, multiplayer);
-    else modos.append(avisoDaSala, campo, erroNome, solo, multiplayer);
+    modos.append(avisoDaSala, faixaDaConta, solo, multiplayer);
     const logo = logoViva();
     // O formulário de opinião, no canto de baixo à direita, em cima da versão.
     const opiniao = botaoDaOpiniao('inicio-botao inicio-atalho inicio-opiniao-canto');
@@ -409,8 +355,7 @@ export function escolherModo(online: boolean, aviso = '', conta: Jogador | null 
     anexarCena(tela, true);
     mostrarTela(tela);
     logo.ligar();
-    // Quem não tem nome começa no campo. Quem já tem não começa com foco em nada: o contorno
-    // do foco no Singleplayer parecia um botão já escolhido. O Enter joga do mesmo jeito.
-    if (!conta && !entrada.value) entrada.focus();
+    // Sem foco inicial em nada: o contorno do foco no Singleplayer parecia um botão já escolhido.
+    // O Enter joga do mesmo jeito.
   });
 }

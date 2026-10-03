@@ -1,7 +1,6 @@
 // A tela da conta, antes da tela inicial: entrar com e-mail e senha, criar conta, o código que
-// chega no e-mail e o "esqueci a senha". Com o servidor no ar, a conta é obrigatória (sem ele, o
-// jogo segue offline com o apelido, como antes: main.ts). Termina com a pessoa dentro da conta;
-// `nova` diz se ela acabou de confirmar o cadastro (aí vem o tutorial).
+// chega no e-mail e o "esqueci a senha". O Terna é online e a conta é obrigatória. Termina com a
+// pessoa dentro da conta; `nova` diz se ela acabou de confirmar o cadastro (aí vem o tutorial).
 //
 // Criar conta: nome, e-mail, senha e a senha de novo → o servidor manda um código de 6 números →
 // digitado o código, a conta está pronta e já entra. Entrar com um cadastro que nunca confirmou o
