@@ -1,3 +1,4 @@
+import { DIAS_ENTRE_TROCAS_DE_NOME } from '@terna/compartilhado';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { z } from 'zod';
 import type { Banco } from './banco/conexao';
@@ -34,11 +35,28 @@ export function ipDoPedido(request: FastifyRequest, confiarProxy: boolean): stri
   return typeof borda === 'string' && borda ? borda : (request.ip ?? request.socket?.remoteAddress ?? '');
 }
 
-// O que vai para o jogo sobre o jogador. Mestre: o e-mail está na lista de mestres e já foi
-// confirmado (o código chegou na caixa dele; ninguém vira mestre só digitando o e-mail).
+// A conta dona do jogo: o e-mail está na lista de mestres e já foi confirmado (o código chegou na
+// caixa dele; ninguém vira dono só digitando o e-mail).
+export const ehDono = (j: JogadorAutenticado, mestres: ReadonlySet<string>): boolean =>
+  Boolean(j.email && j.emailConfirmadoEm && mestres.has(j.email));
+
+// Mestre: a conta dona com o modo mestre ligado (tudo liberado, sem prazos).
+export const ehMestre = (j: JogadorAutenticado, mestres: ReadonlySet<string>): boolean => ehDono(j, mestres) && j.modoMestre;
+
+// Quando o nome pode ser trocado de novo (null: já pode). O mestre não tem prazo.
+export function nomeLivreEm(j: JogadorAutenticado, mestres: ReadonlySet<string>, agora = new Date()): Date | null {
+  if (ehMestre(j, mestres) || !j.nomeTrocadoEm) return null;
+  const livre = new Date(j.nomeTrocadoEm.getTime() + DIAS_ENTRE_TROCAS_DE_NOME * 24 * 60 * 60 * 1000);
+  return livre > agora ? livre : null;
+}
+
+// O que vai para o jogo sobre o jogador.
 export const jogadorPublico = (j: JogadorAutenticado, mestres: ReadonlySet<string> = new Set()) => ({
   id: j.id,
   nome: j.nome,
   criadoEm: j.criadoEm.toISOString(),
-  mestre: Boolean(j.email && j.emailConfirmadoEm && mestres.has(j.email)),
+  mestre: ehMestre(j, mestres),
+  dono: ehDono(j, mestres),
+  icone: j.icone,
+  nomeLivreEm: nomeLivreEm(j, mestres)?.toISOString() ?? null,
 });

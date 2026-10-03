@@ -57,6 +57,14 @@ export function guardarSessao(sessao: Sessao, lembrar = true): void {
   }
 }
 
+// A conta mudou (o perfil: nome, ícone, modo mestre): guarda a nova no mesmo lugar, com o mesmo
+// token.
+export function atualizarConta(jogador: Jogador): void {
+  const lida = lerGuardada();
+  if (lida) guardarSessao({ token: lida.guardada.token, expiraEm: '', jogador }, lida.lembrar);
+  atual = jogador;
+}
+
 export function esquecerSessao(): void {
   definirToken(null);
   atual = null;

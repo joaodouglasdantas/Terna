@@ -118,6 +118,10 @@ testar — o Anjo na escolha de personagem (sozinho) e, nas partidas que não s�
 digitando o e-mail: o código precisa chegar nele. Para trocar ou acrescentar contas mestre, a
 variável `EMAILS_MESTRE` do servidor (separados por vírgula).
 
+No **Perfil** (botão no canto de cima da tela inicial), a conta dona pode **desligar o modo mestre**
+para testar como uma conta comum (com o prazo de 30 dias para trocar o nome e sem o Anjo nem os
+atalhos) e ligar de novo quando quiser.
+
 Pronto: abra o endereço do jogo.
 
 ---

@@ -3,7 +3,7 @@
 // versionados em @terna/compartilhado.
 
 import type { DadosSave } from '@terna/compartilhado';
-import { index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 const criadoEm = () => timestamp({ withTimezone: true }).notNull().defaultNow();
 
@@ -17,6 +17,12 @@ export const jogadores = pgTable('jogadores', {
   // Quando o código do e-mail foi conferido. Sem isso a conta não entra (o cadastro ficou pela
   // metade). As contas de antes da confirmação valem como confirmadas (migração 0001).
   emailConfirmadoEm: timestamp({ withTimezone: true }),
+  // O perfil: o ícone (um dos ICONES de @terna/compartilhado), quando o nome foi trocado pela
+  // última vez (a regra dos DIAS_ENTRE_TROCAS_DE_NOME) e se o modo mestre está ligado (só vale
+  // para a conta dona, a de EMAILS_MESTRE; ela pode desligar para jogar como uma conta comum).
+  icone: text().notNull().default('flor-de-chapeu'),
+  nomeTrocadoEm: timestamp({ withTimezone: true }),
+  modoMestre: boolean().notNull().default(true),
   criadoEm: criadoEm(),
 });
 

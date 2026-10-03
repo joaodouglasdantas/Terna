@@ -12,6 +12,7 @@ import {
   type DadosSave,
   type Entrar,
   type EnviarPontuacao,
+  type IdIcone,
   type TrocarSenha,
 } from '@terna/compartilhado';
 import { z } from 'zod';
@@ -85,6 +86,10 @@ export const api = {
     }
   },
   eu: (): Promise<Jogador> => pedir('GET', '/eu', Jogador),
+  // O perfil: devolvem a conta como ficou.
+  trocarNome: (nome: string): Promise<Jogador> => pedir('PUT', '/eu/nome', Jogador, { nome }),
+  trocarIcone: (icone: IdIcone): Promise<Jogador> => pedir('PUT', '/eu/icone', Jogador, { icone }),
+  modoMestre: (ligado: boolean): Promise<Jogador> => pedir('PUT', '/eu/mestre', Jogador, { ligado }),
   // Só o jogo em casa (servidor sem e-mail de verdade): o último código mandado para o e-mail.
   codigoDeTeste: (email: string): Promise<string> =>
     pedir('GET', `/teste/codigo?email=${encodeURIComponent(email)}`, z.object({ codigo: z.string() })).then((r) => r.codigo),

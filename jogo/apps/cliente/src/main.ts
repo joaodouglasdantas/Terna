@@ -77,7 +77,7 @@ import {
   type FimDaPartida,
   type Partida,
 } from './partida';
-import { retomarSessao, sairDaConta, souMestre } from './save/sessao';
+import { contaAtual, retomarSessao, sairDaConta, souMestre } from './save/sessao';
 import { tocarMusica } from './som/musica';
 
 const canvas = document.getElementById('jogo');
@@ -642,7 +642,8 @@ async function principal(): Promise<void> {
   // inicial diz por quê.
   let aviso: string | undefined;
   for (;;) {
-    const dentro: Jogador = conta ?? (await entrarNaConta());
+    // A conta como está agora (o perfil pode ter trocado o nome ou o modo mestre).
+    const dentro: Jogador = (conta && contaAtual()) ?? conta ?? (await entrarNaConta());
     const primeiraVez = primeiroTreino !== null;
     const escolhido: Escolha | typeof SAIU_DA_CONTA = primeiroTreino ?? (await escolherModo(dentro, aviso));
     primeiroTreino = null;

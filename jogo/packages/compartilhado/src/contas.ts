@@ -56,12 +56,31 @@ export type CodigoEnviado = z.infer<typeof CodigoEnviado>;
 // Entrar com a conta ainda sem o e-mail confirmado responde 403 com isto (e manda um código).
 export const ERRO_EMAIL_NAO_CONFIRMADO = 'confirme seu e-mail para entrar: mandamos um código para ele';
 
-// `mestre`: a conta oficial do jogo (EMAILS_MESTRE no servidor), com tudo liberado para testar.
+// Os ícones de perfil. `comum`: qualquer conta pode usar. A arte fica no jogo
+// (apps/cliente/src/assets/icones/<id>.webp).
+export const ICONES = [
+  { id: 'flor-de-chapeu', nome: 'Flor de Chapéu', tipo: 'comum' },
+  { id: 'golem-do-ninho', nome: 'Golem do Ninho', tipo: 'comum' },
+] as const;
+export type IdIcone = (typeof ICONES)[number]['id'];
+export const IdIcone = z.enum(ICONES.map((i) => i.id) as [IdIcone, ...IdIcone[]], 'esse ícone não existe');
+export const ICONE_PADRAO: IdIcone = 'flor-de-chapeu';
+
+// A regra do nome: depois de trocar, só dá para trocar de novo depois destes dias (a conta mestre
+// não tem prazo).
+export const DIAS_ENTRE_TROCAS_DE_NOME = 30;
+
+// `dono`: a conta oficial do jogo (EMAILS_MESTRE no servidor). `mestre`: o modo mestre ligado,
+// com tudo liberado para testar — o dono pode desligar para jogar como uma conta comum.
+// `nomeLivreEm`: quando o nome pode ser trocado de novo (null: já pode).
 export const Jogador = z.object({
   id: z.string(),
   nome: z.string(),
   criadoEm: z.string(),
   mestre: z.boolean().default(false),
+  dono: z.boolean().default(false),
+  icone: IdIcone.catch(ICONE_PADRAO).default(ICONE_PADRAO),
+  nomeLivreEm: z.string().nullable().default(null),
 });
 export type Jogador = z.infer<typeof Jogador>;
 
@@ -73,6 +92,15 @@ export const Sessao = z.object({
   jogador: Jogador,
 });
 export type Sessao = z.infer<typeof Sessao>;
+
+// O perfil: trocar o nome (respeitando o prazo), o ícone e ligar ou desligar o modo mestre (só o
+// dono).
+export const TrocarNome = z.object({ nome: NomeJogador });
+export type TrocarNome = z.infer<typeof TrocarNome>;
+export const TrocarIcone = z.object({ icone: IdIcone });
+export type TrocarIcone = z.infer<typeof TrocarIcone>;
+export const ModoMestre = z.object({ ligado: z.boolean() });
+export type ModoMestre = z.infer<typeof ModoMestre>;
 
 export const Erro = z.object({ erro: z.string() });
 export type Erro = z.infer<typeof Erro>;

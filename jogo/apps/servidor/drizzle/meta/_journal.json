@@ -15,6 +15,13 @@
       "when": 1791043855816,
       "tag": "0001_email_confirmado",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791069123540,
+      "tag": "0002_perfil",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import logoSimplesUrl from '../assets/logo-simples.webp';
 import logoUrl from '../assets/logo.webp';
 import { carregarDecodificada } from '../motor/imagens';
 import { checarBanco, checarServidor } from '../rede/saude';
+import { contaAtual, souMestre } from '../save/sessao';
 import { VERSAO } from '../versao';
 import { carregarArteDaCaverna } from './caverna';
 import { anexarCena, carregarArteDaCena } from './cena';
@@ -17,6 +18,7 @@ import { telaMapa } from './mapa';
 import { botaoDaMusica } from './musica';
 import { telaMultiplayer, type EscolhaOnline } from './multiplayer';
 import { botaoDaOpiniao } from './opiniao';
+import { criarPerfil } from './perfil';
 import { telaPersonagens } from './personagens';
 import { TEXTOS_DO_TREINO, telaSelecao } from './selecao';
 import { carregarArteDaTemporada } from './temporada';
@@ -244,13 +246,13 @@ function atalho(texto: string, icone: string[]): HTMLButtonElement {
   return b;
 }
 
-// A tela inicial: a logo (viva, com partículas), quem está na conta e os modos de jogo, com as
-// árvores da frente subindo nas beiradas. Termina quando a pessoa escolhe um modo e o personagem —
-// Singleplayer, depois da seleção de personagem; Multiplayer, depois de criar ou entrar numa sala
+// A tela inicial: a logo (viva, com partículas), o perfil da conta (perfil.ts) e os modos de
+// jogo, com as árvores da frente subindo nas beiradas. Termina quando a pessoa escolhe um modo e
+// o personagem — Singleplayer, depois da seleção de personagem; Multiplayer, depois de criar ou entrar numa sala
 // e dos dois escolherem (as telas deles voltam para cá se ela desistir) — ou sai da conta
 // (SAIU_DA_CONTA). O nome nas partidas é o da conta (que já segue as regras do apelido).
 // `aviso`: a sala da partida online caiu (o outro saiu, o tempo de escolher acabou, a rede caiu):
-// aparece em cima do nome e some sozinho, esmaecendo (antes, se a pessoa abrir outra tela).
+// aparece em cima dos botões e some sozinho, esmaecendo (antes, se a pessoa abrir outra tela).
 export function escolherModo(conta: Jogador, aviso = ''): Promise<Escolha | typeof SAIU_DA_CONTA> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-titulo-tela');
@@ -271,20 +273,23 @@ export function escolherModo(conta: Jogador, aviso = ''): Promise<Escolha | type
     };
     mostrarAviso(aviso);
 
-    const nome = conta.nome.slice(0, 12);
+    // O nome nas partidas é o da conta como está agora (o perfil pode trocar).
+    const nomeAgora = (): string => (contaAtual() ?? conta).nome.slice(0, 12);
 
-    // Quem está na conta, e o botão de sair dela.
-    const faixaDaConta = elemento('div', 'inicio-conta-faixa');
-    const quem = elemento('p', 'inicio-conta-quem');
-    quem.append('Jogando como ', elemento('strong', '', conta.nome));
-    // A conta oficial do jogo: tudo liberado para testar.
-    if (conta.mestre) quem.append(elemento('span', 'inicio-conta-selo', 'Mestre'));
-    const sair = botao('Sair da conta', 'inicio-link', () => {
-      window.removeEventListener('keydown', aoTeclar);
-      mostrarAviso('');
-      void sairComEsmaecer(tela).then(() => resolver(SAIU_DA_CONTA));
+    // O perfil, no canto de cima: o ícone, o nome e, no painel, trocar o ícone e o nome, o modo
+    // mestre (a conta dona) e sair da conta.
+    const perfil = criarPerfil({
+      aoSair: () => {
+        window.removeEventListener('keydown', aoTeclar);
+        mostrarAviso('');
+        void sairComEsmaecer(tela).then(() => resolver(SAIU_DA_CONTA));
+      },
+      aoAbrir: () => {
+        window.removeEventListener('keydown', aoTeclar);
+        mostrarAviso('');
+      },
+      aoFechar: () => window.addEventListener('keydown', aoTeclar),
     });
-    faixaDaConta.append(quem, sair);
 
     // Desistiu numa das telas seguintes (ou a sala caiu: `aviso`): a tela inicial volta como estava.
     const voltarParaCa = (foco: HTMLElement, aviso = ''): void => {
@@ -299,8 +304,8 @@ export function escolherModo(conta: Jogador, aviso = ''): Promise<Escolha | type
     const solo = botao('Singleplayer', 'inicio-botao inicio-jogar', () => {
       mostrarAviso('');
       window.removeEventListener('keydown', aoTeclar);
-      void telaSelecao(undefined, undefined, conta.mestre).then((r) => {
-        if (r.tipo === 'escolheu') resolver({ modo: 'solo', nome, heroi: r.heroi });
+      void telaSelecao(undefined, undefined, souMestre()).then((r) => {
+        if (r.tipo === 'escolheu') resolver({ modo: 'solo', nome: nomeAgora(), heroi: r.heroi });
         else voltarParaCa(solo);
       });
     });
@@ -308,7 +313,7 @@ export function escolherModo(conta: Jogador, aviso = ''): Promise<Escolha | type
     const multiplayer = botao('Multiplayer', 'inicio-botao inicio-multiplayer', () => {
       window.removeEventListener('keydown', aoTeclar);
       mostrarAviso('');
-      void telaMultiplayer(nome).then((fim) => {
+      void telaMultiplayer(nomeAgora()).then((fim) => {
         if (fim.tipo === 'jogar') return resolver(fim.escolha);
         voltarParaCa(multiplayer, fim.aviso);
       });
@@ -329,7 +334,7 @@ export function escolherModo(conta: Jogador, aviso = ''): Promise<Escolha | type
       window.removeEventListener('keydown', aoTeclar);
       mostrarAviso('');
       void telaSelecao(undefined, TEXTOS_DO_TREINO).then((r) => {
-        if (r.tipo === 'escolheu') resolver({ modo: 'treino', nome, heroi: r.heroi });
+        if (r.tipo === 'escolheu') resolver({ modo: 'treino', nome: nomeAgora(), heroi: r.heroi });
         else voltarParaCa(treino);
       });
     });
@@ -350,11 +355,11 @@ export function escolherModo(conta: Jogador, aviso = ''): Promise<Escolha | type
     window.addEventListener('keydown', aoTeclar);
 
     const modos = elemento('div', 'inicio-modos');
-    modos.append(avisoDaSala, faixaDaConta, solo, multiplayer);
+    modos.append(avisoDaSala, solo, multiplayer);
     const logo = logoViva();
     // O formulário de opinião, no canto de baixo à direita, em cima da versão.
     const opiniao = botaoDaOpiniao('inicio-botao inicio-atalho inicio-opiniao-canto');
-    tela.append(logo.palco, modos, elemento('p', 'inicio-versao', VERSAO), atalhos, opiniao);
+    tela.append(logo.palco, modos, elemento('p', 'inicio-versao', VERSAO), atalhos, opiniao, perfil.botao, perfil.painel);
     anexarCena(tela, true);
     mostrarTela(tela);
     logo.ligar();

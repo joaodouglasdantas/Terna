@@ -1,4 +1,14 @@
-import { ConfirmarEmail, CriarConta, ERRO_EMAIL_NAO_CONFIRMADO, Entrar, PedirCodigo, TrocarSenha } from '@terna/compartilhado';
+import {
+  ConfirmarEmail,
+  CriarConta,
+  ERRO_EMAIL_NAO_CONFIRMADO,
+  Entrar,
+  ModoMestre,
+  PedirCodigo,
+  TrocarIcone,
+  TrocarNome,
+  TrocarSenha,
+} from '@terna/compartilhado';
 import { and, eq, ne, or } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import {
@@ -16,7 +26,7 @@ import type { Banco } from '../banco/conexao';
 import { jogadores, sessoes } from '../banco/schema';
 import type { Correio } from '../email/correio';
 import { emailDoCodigo } from '../email/modelos';
-import { exigirJogador, jogadorPublico, validar } from '../http';
+import { ehDono, exigirJogador, jogadorPublico, nomeLivreEm, validar } from '../http';
 
 // Contas e sessões. Criar conta é em duas etapas: o cadastro (nome, e-mail e senha) manda um
 // código de 6 números para o e-mail, e a conta só entra depois de o código voltar
@@ -29,6 +39,10 @@ import { exigirJogador, jogadorPublico, validar } from '../http';
 //   POST /senha/esqueci     { email }                → 200 { email, reenviarEm }
 //   POST /senha/trocar      { email, codigo, senha } → 200 sessão
 //   DELETE /sessoes, GET /eu
+//   PUT /eu/nome    { nome }    → 200 jogador (409: o nome é de outro, ou o prazo de trocar não
+//                                 passou — DIAS_ENTRE_TROCAS_DE_NOME, menos para o mestre)
+//   PUT /eu/icone   { icone }   → 200 jogador
+//   PUT /eu/mestre  { ligado }  → 200 jogador (só a conta dona; 403 para as outras)
 //   GET /teste/codigo?email=...  → { codigo } — só com `codigosNaTela` (o servidor em casa, sem
 //                                  e-mail de verdade): a tela do código mostra o código
 
@@ -211,6 +225,52 @@ export function rotasContas(app: FastifyInstance, banco: Banco, opcoes: OpcoesCo
     const jogador = await exigirJogador(banco, request, reply);
     if (!jogador) return;
     return reply.send(publico(jogador));
+  });
+
+  // O perfil.
+  app.put('/eu/nome', LIMITE, async (request, reply) => {
+    const jogador = await exigirJogador(banco, request, reply);
+    if (!jogador) return;
+    const dados = validar(TrocarNome, request.body, reply);
+    if (!dados) return;
+    if (dados.nome === jogador.nome) return reply.send(publico(jogador));
+    const livre = nomeLivreEm(jogador, mestres);
+    if (livre) {
+      const dias = Math.ceil((livre.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+      return reply.code(409).send({ erro: `você poderá trocar o nome de novo em ${dias} ${dias === 1 ? 'dia' : 'dias'}` });
+    }
+    const nomeNormalizado = dados.nome.toLowerCase();
+    const [outro] = await banco
+      .select({ id: jogadores.id })
+      .from(jogadores)
+      .where(and(eq(jogadores.nomeNormalizado, nomeNormalizado), ne(jogadores.id, jogador.id)))
+      .limit(1);
+    if (outro) return reply.code(409).send({ erro: 'esse nome já está em uso' });
+    const [atualizado] = await banco
+      .update(jogadores)
+      .set({ nome: dados.nome, nomeNormalizado, nomeTrocadoEm: new Date() })
+      .where(eq(jogadores.id, jogador.id))
+      .returning();
+    return reply.send(publico(atualizado));
+  });
+
+  app.put('/eu/icone', LIMITE, async (request, reply) => {
+    const jogador = await exigirJogador(banco, request, reply);
+    if (!jogador) return;
+    const dados = validar(TrocarIcone, request.body, reply);
+    if (!dados) return;
+    const [atualizado] = await banco.update(jogadores).set({ icone: dados.icone }).where(eq(jogadores.id, jogador.id)).returning();
+    return reply.send(publico(atualizado));
+  });
+
+  app.put('/eu/mestre', LIMITE, async (request, reply) => {
+    const jogador = await exigirJogador(banco, request, reply);
+    if (!jogador) return;
+    const dados = validar(ModoMestre, request.body, reply);
+    if (!dados) return;
+    if (!ehDono(jogador, mestres)) return reply.code(403).send({ erro: 'só a conta dona do jogo tem o modo mestre' });
+    const [atualizado] = await banco.update(jogadores).set({ modoMestre: dados.ligado }).where(eq(jogadores.id, jogador.id)).returning();
+    return reply.send(publico(atualizado));
   });
 
   // O jogo rodando em casa, sem e-mail de verdade: o último código mandado para o e-mail, para a

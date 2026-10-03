@@ -2319,24 +2319,317 @@ a.inicio-botao {
 }
 
 /* Na tela inicial, com conta: o nome dela no lugar do campo, e o sair da conta. */
-.inicio-conta-faixa {
+/* ---- perfil (perfil.ts), na tela inicial ---- */
+
+/* O botão do canto de cima: o ícone num quadro de pixel, "Perfil" e o nome. */
+.inicio-perfil-botao {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.35rem 0.8rem 0.35rem 0.35rem;
+  font: inherit;
+  color: var(--tinta);
+  text-align: left;
+  background: linear-gradient(to bottom, rgba(90, 58, 26, 0.45), rgba(0, 0, 0, 0) 2.5rem), rgba(26, 16, 10, 0.88);
+  border: 3px solid var(--marrom);
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px rgba(239, 220, 162, 0.22), 0 6px 18px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.inicio-perfil-botao:hover,
+.inicio-perfil-botao:focus-visible {
+  border-color: #c9a55a;
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.inicio-perfil-icone,
+.inicio-perfil-icone-grande,
+.inicio-perfil-opcao-img {
+  display: block;
+  aspect-ratio: 1;
+  object-fit: cover;
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 2px #c9a55a, 0 0 0 4px var(--contorno);
+  background: #1a100a;
+}
+
+.inicio-perfil-icone {
+  width: 2.9rem;
+}
+
+.inicio-perfil-texto {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.inicio-perfil-rotulo {
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--marrom-claro);
+}
+
+.inicio-perfil-nome {
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+  color: var(--verde-claro);
+}
+
+.inicio-perfil-botao .inicio-conta-selo {
+  margin-left: 0;
+}
+
+/* O painel: um véu escuro por cima da tela e a caixa no meio. */
+.inicio-perfil {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  background: rgba(8, 5, 3, 0.62);
+  animation: inicio-entra 0.2s ease backwards;
+}
+
+.inicio-perfil[hidden] {
+  display: none;
+}
+
+.inicio-perfil-caixa {
+  position: relative;
+  width: min(30rem, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  gap: 0.85rem;
+  text-align: left;
+  scrollbar-width: none;
+  background: linear-gradient(to bottom, rgba(90, 58, 26, 0.35), rgba(0, 0, 0, 0) 4rem), rgb(26, 16, 10);
+}
+
+.inicio-perfil-titulo {
+  margin: 0;
+  text-align: center;
+}
+
+.inicio-perfil-fechar {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.55rem;
+  width: 2rem;
+  height: 2rem;
+  font: inherit;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--marrom-claro);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.inicio-perfil-fechar:hover,
+.inicio-perfil-fechar:focus-visible {
+  color: var(--tinta);
+  outline: none;
+}
+
+.inicio-perfil-topo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.inicio-perfil-icone-grande {
+  width: 6rem;
+  flex: none;
+}
+
+.inicio-perfil-quem {
+  min-width: 0;
+}
+
+.inicio-perfil-nome-grande {
+  margin: 0;
+  font-size: 1.7rem;
+  letter-spacing: 0.04em;
+  color: var(--verde-claro);
+  overflow-wrap: anywhere;
+}
+
+.inicio-perfil-tipo {
+  margin: 0.2rem 0 0;
+  font-size: 0.95rem;
+  color: var(--marrom-claro);
+}
+
+.inicio-perfil-tipo .inicio-conta-selo {
+  margin: 0 0.35rem 0 0;
+}
+
+.inicio-perfil-secao {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-top: 0.7rem;
+  border-top: 2px solid rgba(201, 165, 90, 0.25);
+}
+
+.inicio-perfil-secao[hidden] {
+  display: none;
+}
+
+.inicio-perfil-secao-titulo {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: normal;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--marrom-claro);
+}
+
+/* Os ícones para escolher: o escolhido com a moldura verde. */
+.inicio-perfil-icones {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  gap: 0.7rem;
+}
+
+.inicio-perfil-opcao {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.1rem;
-}
-
-.inicio-conta-quem {
-  margin: 0;
-  font-size: 1.1rem;
-  letter-spacing: 0.06em;
+  gap: 0.35rem;
+  padding: 0.5rem 0.4rem 0.45rem;
+  font: inherit;
   color: var(--tinta);
-  text-shadow: 0 0 4px #000, 0 1px 3px #000;
+  background: rgba(0, 0, 0, 0.28);
+  border: 3px solid transparent;
+  cursor: pointer;
 }
 
-.inicio-conta-quem strong {
-  font-weight: normal;
-  color: var(--verde-claro);
+.inicio-perfil-opcao:hover,
+.inicio-perfil-opcao:focus-visible {
+  border-color: #c9a55a;
+  outline: none;
+}
+
+.inicio-perfil-opcao-escolhida,
+.inicio-perfil-opcao-escolhida:hover {
+  border-color: var(--verde);
+  background: rgba(127, 214, 107, 0.12);
+}
+
+.inicio-perfil-opcao-img {
+  width: 100%;
+}
+
+.inicio-perfil-opcao-nome {
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.inicio-perfil-tag {
+  position: absolute;
+  top: 0.3rem;
+  left: 0.3rem;
+  padding: 0 0.3rem;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 2px var(--contorno);
+}
+
+.inicio-perfil-tag-comum {
+  color: #2a1a06;
+  background: #d9cbb0;
+}
+
+/* O nome: o campo e o salvar lado a lado. */
+.inicio-perfil-form-nome {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.inicio-perfil-campo {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.5rem;
+  font-size: 1.15rem;
+}
+
+.inicio-perfil-campo:disabled {
+  color: var(--marrom-claro);
+  border-color: #6b5636;
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.inicio-perfil-salvar.inicio-botao {
+  flex: none;
+  min-width: 0;
+  padding: 0.3rem 1rem;
+  font-size: 1rem;
+}
+
+.inicio-perfil-salvar.inicio-botao:disabled {
+  opacity: 0.45;
+  filter: grayscale(0.8);
+  cursor: default;
+  transform: none;
+}
+
+.inicio-perfil-regra {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: var(--marrom-claro);
+}
+
+/* O modo mestre: a chave e a explicação. */
+.inicio-perfil-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.inicio-perfil-chave {
+  flex: none;
+  min-width: 6.5rem;
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--marrom-claro);
+  background: rgba(0, 0, 0, 0.35);
+  border: 3px solid #6b5636;
+  box-shadow: 0 0 0 2px var(--contorno);
+  cursor: pointer;
+}
+
+.inicio-perfil-chave-ligada {
+  color: #2a1a06;
+  background: #ffd966;
+  border-color: #fff0b0;
+}
+
+.inicio-perfil-chave:focus-visible {
+  outline: 2px solid var(--tinta);
+  outline-offset: 2px;
+}
+
+.inicio-perfil-sair.inicio-link {
+  align-self: center;
+  margin-top: 0.2rem;
+  color: #ff9aa2;
 }
 
 /* ---- tutorial (tutorial.ts), por cima da partida de treino ---- */

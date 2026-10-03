@@ -301,6 +301,83 @@ describe('conta mestre e o código na tela (jogo em casa)', () => {
   });
 });
 
+describe('perfil', () => {
+  it('troca o ícone (só os que existem)', async () => {
+    const token = await criarConta(app, 'icones');
+    const eu = await app.inject({ method: 'GET', url: '/api/eu', headers: autorizado(token) });
+    expect(eu.json().icone).toBe('flor-de-chapeu');
+    const trocou = await app.inject({ method: 'PUT', url: '/api/eu/icone', headers: autorizado(token), payload: { icone: 'golem-do-ninho' } });
+    expect(trocou.statusCode).toBe(200);
+    expect(trocou.json().icone).toBe('golem-do-ninho');
+    const inventado = await app.inject({ method: 'PUT', url: '/api/eu/icone', headers: autorizado(token), payload: { icone: 'dragao' } });
+    expect(inventado.statusCode).toBe(400);
+    expect((await app.inject({ method: 'PUT', url: '/api/eu/icone', payload: { icone: 'golem-do-ninho' } })).statusCode).toBe(401);
+  });
+
+  it('troca o nome uma vez e espera 30 dias para a próxima; nome de outro não pode', async () => {
+    const token = await criarConta(app, 'nomeum');
+    await criarConta(app, 'ocupado');
+    const deOutro = await app.inject({ method: 'PUT', url: '/api/eu/nome', headers: autorizado(token), payload: { nome: 'OCUPADO' } });
+    expect(deOutro.statusCode).toBe(409);
+    expect(deOutro.json().erro).toMatch(/em uso/);
+    const invalido = await app.inject({ method: 'PUT', url: '/api/eu/nome', headers: autorizado(token), payload: { nome: 'a b' } });
+    expect(invalido.statusCode).toBe(400);
+    const trocou = await app.inject({ method: 'PUT', url: '/api/eu/nome', headers: autorizado(token), payload: { nome: 'nomedois' } });
+    expect(trocou.statusCode).toBe(200);
+    expect(trocou.json().nome).toBe('nomedois');
+    const livre = new Date(trocou.json().nomeLivreEm).getTime();
+    expect(livre - Date.now()).toBeGreaterThan(29 * 24 * 3600 * 1000);
+    const deNovo = await app.inject({ method: 'PUT', url: '/api/eu/nome', headers: autorizado(token), payload: { nome: 'nometres' } });
+    expect(deNovo.statusCode).toBe(409);
+    expect(deNovo.json().erro).toMatch(/30 dias/);
+    // Passados os 30 dias, troca de novo.
+    await conexao.banco
+      .update(jogadores)
+      .set({ nomeTrocadoEm: new Date(Date.now() - 31 * 24 * 3600 * 1000) })
+      .where(eq(jogadores.nomeNormalizado, 'nomedois'));
+    const depois = await app.inject({ method: 'PUT', url: '/api/eu/nome', headers: autorizado(token), payload: { nome: 'nometres' } });
+    expect(depois.statusCode).toBe(200);
+    // O nome antigo ficou livre para outra conta.
+    expect((await app.inject({ method: 'POST', url: '/api/contas', payload: { nome: 'nomeum', email: 'outro-nomeum@exemplo.com', senha: 'senha-boa-123' } })).statusCode).toBe(201);
+  });
+
+  it('o mestre troca o nome sem prazo; desligando o modo mestre, vale a regra de todo mundo', async () => {
+    const terminal = correioDoTerminal({ warn: () => undefined });
+    const comMestre = await criarApp({
+      banco: conexao.banco,
+      origens: [],
+      diasSessao: 30,
+      tentativasPorMinuto: 1000,
+      correio: terminal,
+      mestres: new Set(['dona-perfil@exemplo.com']),
+      codigosNaTela: true,
+    });
+    const email = 'dona-perfil@exemplo.com';
+    await comMestre.inject({ method: 'POST', url: '/api/contas', payload: { nome: 'donaum', email, senha: 'senha-boa-123' } });
+    const codigo = (await comMestre.inject({ method: 'GET', url: `/api/teste/codigo?email=${email}` })).json().codigo;
+    const token = (await comMestre.inject({ method: 'POST', url: '/api/contas/confirmar', payload: { email, codigo } })).json().token;
+    const pedir = (url: string, payload: unknown) => comMestre.inject({ method: 'PUT', url, headers: autorizado(token), payload });
+
+    expect((await pedir('/api/eu/nome', { nome: 'donadois' })).statusCode).toBe(200);
+    const semPrazo = await pedir('/api/eu/nome', { nome: 'donatres' });
+    expect(semPrazo.statusCode).toBe(200);
+    expect(semPrazo.json()).toMatchObject({ mestre: true, dono: true, nomeLivreEm: null });
+
+    const desligado = await pedir('/api/eu/mestre', { ligado: false });
+    expect(desligado.json()).toMatchObject({ mestre: false, dono: true });
+    expect(desligado.json().nomeLivreEm).not.toBeNull();
+    expect((await pedir('/api/eu/nome', { nome: 'donaquatro' })).statusCode).toBe(409);
+    const religado = await pedir('/api/eu/mestre', { ligado: true });
+    expect(religado.json()).toMatchObject({ mestre: true, nomeLivreEm: null });
+
+    // Uma conta comum não liga o modo mestre.
+    const comum = await criarConta(app, 'semmestre');
+    const tentou = await app.inject({ method: 'PUT', url: '/api/eu/mestre', headers: autorizado(comum), payload: { ligado: true } });
+    expect(tentou.statusCode).toBe(403);
+    await comMestre.close();
+  });
+});
+
 describe('limite de tentativas', () => {
   it('barra quem tenta entrar muitas vezes seguidas', async () => {
     const limitado = await criarApp({ banco: conexao.banco, origens: [], diasSessao: 30, tentativasPorMinuto: 2 });
