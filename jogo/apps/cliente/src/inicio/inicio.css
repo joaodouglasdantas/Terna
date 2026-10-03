@@ -2208,10 +2208,11 @@ a.inicio-botao {
 }
 
 /* A caixa da logo, do tamanho dela, flutuando; por cima, a luz da caverna (caverna.ts), recortada
-   no desenho da logo. */
+   no desenho da logo. Embaixo, um espaço vazio antes da caixa (onde ficava o lema). */
 .inicio-conta-logo-caixa {
   position: relative;
   flex: none;
+  margin-bottom: 1.6rem;
   animation: inicio-flutua 4.5s ease-in-out infinite;
 }
 
@@ -2610,7 +2611,7 @@ a.inicio-botao {
   }
 }
 
-/* ---- conta: a tela inteira (a logo, o lema, os heróis dos lados) e as peças dos campos ---- */
+/* ---- conta: a tela inteira (a logo, as tochas dos lados) e as peças dos campos ---- */
 
 .inicio-conta-centro {
   display: flex;
@@ -2618,15 +2619,6 @@ a.inicio-botao {
   align-items: center;
   gap: 0.35rem;
   width: 100%;
-}
-
-.inicio-conta-lema {
-  margin: 0 0 0.3rem;
-  font-size: 1rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--marrom-claro);
-  text-shadow: 0 2px 0 #000, 0 0 10px #000;
 }
 
 /* As tochas (tocha.ts): grandes, nascendo do chão no fim da tela, uma de cada lado da caixa,
@@ -2792,10 +2784,10 @@ a.inicio-botao {
   }
 }
 
-/* Baixa: o lema sai. */
+/* Baixa: o espaço vazio embaixo da logo sai. */
 @container (max-height: 640px) {
-  .inicio-conta-lema {
-    display: none;
+  .inicio-conta-logo-caixa {
+    margin-bottom: 0;
   }
 }
 
@@ -3086,9 +3078,10 @@ a.inicio-botao {
   pointer-events: none;
 }
 
-/* As vistas com muitos campos (criar conta, senha nova): sem o lema e com a logo menor. */
-.inicio-conta-longa .inicio-conta-lema {
-  display: none;
+/* As vistas com muitos campos (criar conta, senha nova): sem o espaço embaixo da logo e com a
+   logo menor. */
+.inicio-conta-longa .inicio-conta-logo-caixa {
+  margin-bottom: 0;
 }
 
 .inicio-conta-longa .inicio-conta-logo {

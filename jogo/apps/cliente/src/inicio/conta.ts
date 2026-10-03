@@ -228,14 +228,13 @@ export function telaConta(aviso = ''): Promise<Entrou> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-multi-tela inicio-conta-tela');
     const logo = imagemDaLogo('inicio-conta-logo');
-    const lema = elemento('p', 'inicio-conta-lema', 'A Floresta da Divisa te espera');
     const caixa = elemento('div', 'inicio-caixa inicio-conta-caixa');
     const centro = elemento('div', 'inicio-conta-centro');
     // A logo numa caixa do tamanho dela, flutuando: a caverna pinta por cima a luz do ambiente
     // (a escuridão, o fogo das tochas e o cristal), só onde há logo.
     const caixaDaLogo = elemento('div', 'inicio-conta-logo-caixa');
     caixaDaLogo.append(logo);
-    centro.append(caixaDaLogo, lema, caixa);
+    centro.append(caixaDaLogo, caixa);
     // As tochas sobem do chão e, chegando, o fogo acende.
     const tochas = [criarTocha('esquerda'), criarTocha('direita')];
     const atalhos = elemento('div', 'inicio-atalhos');
@@ -313,7 +312,7 @@ export function telaConta(aviso = ''): Promise<Entrou> {
       enviar: (pronto: (erro?: string) => void) => void;
       depois?: HTMLElement[];
       voltarPara?: (() => void) | null;
-      longa?: boolean; // muitos campos: a logo encolhe e o lema sai, para caber sem rolar
+      longa?: boolean; // muitos campos: a logo encolhe e o espaço embaixo dela sai, para caber sem rolar
     }): { erro: HTMLParagraphElement; form: HTMLFormElement } => {
       pararRelogios();
       tela.classList.toggle('inicio-conta-longa', Boolean(opcoes.longa));

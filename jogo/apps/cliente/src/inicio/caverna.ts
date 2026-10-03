@@ -10,8 +10,9 @@
 // Depois que a caverna chega, ela escurece: só ficam acesas as luzes — o fogo das duas tochas
 // (que ilumina a pedra em volta e tremula com ele), o cristal da logo (dourado, pulsando), a lua
 // da boca da caverna e a cachoeira, e um brilho fraco nos cogumelos. A logo também entra na luz
-// da caverna: escurece junto, o alto fica dourado com o cristal, as beiradas viradas para as
-// tochas pegam o laranja tremulando e o lado da boca da caverna um azul fraco.
+// da caverna: escurece junto, o alto fica dourado com o cristal, a parte de baixo pega o laranja
+// das tochas lá embaixo (cada metade tremulando com a tocha do seu lado) e o lado da boca da
+// caverna um azul fraco.
 //
 // As camadas, de baixo para cima: a arte (com os pedaços que mexem e as folhas), o corpo das
 // tochas, a escuridão (com os buracos das luzes), a cor das luzes (somando luz), os pontos de luz
@@ -453,6 +454,13 @@ export function criarCaverna(tochas: Tocha[], logo: HTMLElement): Caverna {
       const oy = r.top - caixa.top;
       const naLogo = (pt: Ponto): Ponto => ({ x: pt.x - ox, y: pt.y - oy });
       const meioDoCristal = { x: lw * CRISTAL.x, y: lh * CRISTAL.y };
+      // A luz de cada tocha bate na logo de baixo, do lado dela: o centro fica logo abaixo da
+      // borda de baixo, puxado para o lado da tocha (a da esquerda acende a metade esquerda e
+      // tremula com o fogo dela; a da direita, a outra).
+      const deBaixo = (fogo: Ponto): Ponto => {
+        const p = naLogo(fogo);
+        return { x: Math.max(lw * 0.05, Math.min(lw * 0.95, p.x)), y: lh * 1.08 };
+      };
       // A sombra: a logo escurece com a caverna, menos perto do cristal e do lado das tochas.
       const s = contexto2d(sombraDaLogo);
       s.clearRect(0, 0, lw, lh);
@@ -462,10 +470,7 @@ export function criarCaverna(tochas: Tocha[], logo: HTMLElement): Caverna {
         s.fillRect(0, 0, lw, lh);
         s.globalCompositeOperation = 'destination-out';
         mancha(s, meioDoCristal, lh * 0.6, [0, 0, 0], 0.9 * pulso);
-        for (const f of fogos) {
-          const p = naLogo(f.onde);
-          mancha(s, p, Math.hypot(p.x - lw / 2, p.y - lh / 2) * 1.05, [0, 0, 0], 0.6 * f.forca);
-        }
+        for (const f of fogos) mancha(s, deBaixo(f.onde), lw * 0.78, [0, 0, 0], 0.85 * f.forca, 0.9);
         s.globalCompositeOperation = 'source-over';
       }
       // A cor: dourado do cristal no alto, laranja das tochas nas beiradas, azul da lua.
@@ -473,10 +478,7 @@ export function criarCaverna(tochas: Tocha[], logo: HTMLElement): Caverna {
       k2.clearRect(0, 0, lw, lh);
       if (escurecer > 0) {
         mancha(k2, meioDoCristal, lh * 0.5, [255, 196, 80], 0.5 * pulso * escurecer);
-        for (const f of fogos) {
-          const p = naLogo(f.onde);
-          mancha(k2, p, Math.hypot(p.x - lw / 2, p.y - lh / 2) * 1.02, [255, 140, 50], 0.38 * f.forca * escurecer);
-        }
+        for (const f of fogos) mancha(k2, deBaixo(f.onde), lw * 0.78, [255, 138, 46], 0.95 * f.forca * escurecer, 0.9);
         const lua = naLogo(boca);
         mancha(k2, lua, Math.hypot(lua.x - lw / 2, lua.y - lh / 2) * 1.1, [90, 140, 255], 0.14 * escurecer);
         // De tempos em tempos, um brilho de quatro pontas na ponta do cristal.
