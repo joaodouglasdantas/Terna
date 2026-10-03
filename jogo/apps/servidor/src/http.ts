@@ -34,4 +34,11 @@ export function ipDoPedido(request: FastifyRequest, confiarProxy: boolean): stri
   return typeof borda === 'string' && borda ? borda : (request.ip ?? request.socket?.remoteAddress ?? '');
 }
 
-export const jogadorPublico = (j: JogadorAutenticado) => ({ id: j.id, nome: j.nome, criadoEm: j.criadoEm.toISOString() });
+// O que vai para o jogo sobre o jogador. Mestre: o e-mail está na lista de mestres e já foi
+// confirmado (o código chegou na caixa dele; ninguém vira mestre só digitando o e-mail).
+export const jogadorPublico = (j: JogadorAutenticado, mestres: ReadonlySet<string> = new Set()) => ({
+  id: j.id,
+  nome: j.nome,
+  criadoEm: j.criadoEm.toISOString(),
+  mestre: Boolean(j.email && j.emailConfirmadoEm && mestres.has(j.email)),
+});

@@ -102,7 +102,21 @@ cartão e sem domínio próprio).
    (olhe também o spam na primeira vez).
 
 Sem essas duas variáveis o servidor não manda e-mail: o código aparece só no log do Render. Em casa
-(`npm run dev`) é assim que se testa: o código aparece no terminal do servidor.
+(`npm run dev`) é assim que se testa: o código aparece no terminal do servidor **e na própria tela
+do código**, numa faixa amarela com o botão "Usar" (só com o servidor em casa, sem `DATABASE_URL`
+e sem o Brevo; no site publicado essa faixa não existe).
+
+Para receber o e-mail de verdade testando em casa, crie `jogo/apps/servidor/.env` (copie o
+`.env.exemplo`) com `BREVO_API_KEY` e `EMAIL_REMETENTE` preenchidos e suba o servidor de novo.
+
+### Conta mestre
+
+A conta do e-mail oficial do jogo, **ternaofcl@gmail.com**, é mestre: depois de confirmar o e-mail
+(no cadastro normal), ela aparece com o selo **Mestre** na tela inicial e tem tudo liberado para
+testar — o Anjo na escolha de personagem (sozinho) e, nas partidas que não são online, os atalhos
+**K** (energia cheia), **L** (recargas zeradas) e **H** (vida cheia). Ninguém vira mestre só
+digitando o e-mail: o código precisa chegar nele. Para trocar ou acrescentar contas mestre, a
+variável `EMAILS_MESTRE` do servidor (separados por vírgula).
 
 Pronto: abra o endereço do jogo.
 

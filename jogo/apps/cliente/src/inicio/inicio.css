@@ -2206,14 +2206,15 @@ a.inicio-botao {
 
 .inicio-conta-logo {
   flex: none;
-  height: clamp(4.5rem, 19cqh, 11rem);
+  height: clamp(4rem, 16cqh, 9.5rem);
   width: auto;
   filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
   user-select: none;
 }
 
 .inicio-conta-caixa {
-  width: min(24rem, 100%);
+  flex: none;
+  width: min(25rem, 100%);
   gap: 0.65rem;
   padding: 1.2rem 1.5rem;
 }
@@ -2579,4 +2580,413 @@ a.inicio-botao {
   .tut-feito .tut-titulo {
     animation: none;
   }
+}
+
+/* ---- conta: a tela inteira (a logo, o lema, os heróis dos lados) e as peças dos campos ---- */
+
+.inicio-conta-centro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.inicio-conta-lema {
+  margin: 0 0 0.3rem;
+  font-size: 1rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--marrom-claro);
+  text-shadow: 0 2px 0 #000, 0 0 10px #000;
+}
+
+/* As tochas (tocha.ts): grandes, nascendo do chão no fim da tela, uma de cada lado da caixa,
+   com o brilho quente atrás do fogo. Sobem ao abrir a tela; o fogo acende quando chegam. */
+.inicio-tocha {
+  position: absolute;
+  bottom: 0;
+  z-index: 0;
+  height: clamp(260px, 66cqh, 640px);
+  aspect-ratio: 34 / 156;
+  pointer-events: none;
+  animation: inicio-tocha-sobe 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.inicio-conta-tochas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* A borda de dentro de cada tocha fica a 4rem da caixa (12.5rem é metade da largura dela). */
+.inicio-tocha-esquerda {
+  left: calc(50% - 12.5rem - 4rem);
+  translate: -100% 0;
+}
+
+.inicio-tocha-direita {
+  left: calc(50% + 12.5rem + 4rem);
+}
+
+.inicio-tocha-arte {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.6));
+}
+
+/* O brilho: um círculo quente e macio em volta do fogo (a opacidade tremula pelo tocha.ts). */
+.inicio-tocha-luz {
+  position: absolute;
+  left: 50%;
+  top: 28%;
+  width: 520%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(255, 170, 70, 0.42) 0%, rgba(255, 120, 40, 0.18) 32%, rgba(255, 100, 30, 0) 66%);
+  mix-blend-mode: screen;
+  opacity: 0;
+}
+
+@keyframes inicio-tocha-sobe {
+  from {
+    transform: translateY(105%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Os campos e a caixa ficam por cima das tochas. */
+.inicio-conta-centro {
+  position: relative;
+  z-index: 1;
+}
+
+/* Janela estreita: as tochas sairiam por cima da caixa; ficam de fora. */
+@container (max-width: 820px) {
+  .inicio-tocha {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inicio-tocha {
+    animation: none;
+  }
+}
+
+/* Baixa: o lema sai. */
+@container (max-height: 640px) {
+  .inicio-conta-lema {
+    display: none;
+  }
+}
+
+/* As abas Entrar / Criar conta, no alto da caixa. */
+.inicio-conta-abas {
+  display: flex;
+  margin: -0.3rem -0.3rem 0.15rem;
+  border-bottom: 3px solid #4e3a22;
+}
+
+.inicio-conta-aba {
+  flex: 1;
+  padding: 0.45rem 0.5rem 0.55rem;
+  font: inherit;
+  font-size: 1.15rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--suave);
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -3px;
+  cursor: pointer;
+}
+
+.inicio-conta-aba:hover {
+  color: var(--tinta);
+}
+
+.inicio-conta-aba[aria-selected='true'] {
+  color: var(--tinta);
+  border-bottom-color: var(--verde);
+  text-shadow: 0 2px 0 var(--marrom-escuro);
+  cursor: default;
+}
+
+.inicio-conta-aba:focus-visible {
+  outline: 2px solid var(--verde);
+  outline-offset: -2px;
+}
+
+.inicio-conta-principal {
+  margin-top: 0.15rem;
+}
+
+/* O rótulo do campo e, do outro lado, o contador ou o "Esqueci a senha". */
+.inicio-campo-cabeca {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.inicio-campo-contador {
+  font-size: 0.85rem;
+  color: var(--suave);
+}
+
+.inicio-link.inicio-conta-esqueci {
+  padding: 0;
+  font-size: 0.88rem;
+}
+
+.inicio-campo-dica:empty {
+  display: none;
+}
+
+/* A senha com o olho dentro do campo, na direita. */
+.inicio-senha {
+  position: relative;
+  display: flex;
+}
+
+.inicio-senha .inicio-entrada {
+  flex: 1;
+  width: 100%;
+  padding-right: 3.2rem;
+}
+
+.inicio-olho {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  transform: translateY(-50%);
+  width: 2.3rem;
+  height: 1.9rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--marrom-claro);
+  background: rgba(255, 250, 240, 0.07);
+  border: none;
+  cursor: pointer;
+}
+
+.inicio-olho:hover {
+  color: var(--tinta);
+  background: rgba(255, 250, 240, 0.14);
+}
+
+.inicio-olho[aria-pressed='true'] {
+  color: var(--verde-claro);
+}
+
+.inicio-olho:focus-visible {
+  outline: 2px solid var(--verde);
+  outline-offset: 1px;
+}
+
+.inicio-olho-icone {
+  width: 1.45rem;
+  height: auto;
+  fill: currentColor;
+  shape-rendering: crispEdges;
+}
+
+/* Caps Lock ligado digitando a senha. */
+.inicio-campo-caps-aviso {
+  display: none;
+  font-size: 0.85rem;
+  color: #ffd966;
+}
+
+.inicio-campo-caps .inicio-campo-caps-aviso {
+  display: block;
+}
+
+/* A senha repetida: verde batendo, vermelha não. */
+.inicio-campo[data-bate='true'] .inicio-campo-dica {
+  color: var(--verde-claro);
+}
+
+.inicio-campo[data-bate='false'] .inicio-campo-dica {
+  color: #ffb3ba;
+}
+
+.inicio-campo[data-bate='false'] .inicio-entrada {
+  border-color: var(--vermelho);
+}
+
+/* A força da senha nova: três barrinhas e o nome. */
+.inicio-forca {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.inicio-forca[hidden] {
+  display: none;
+}
+
+.inicio-forca-barra {
+  flex: 1;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 2px var(--contorno);
+}
+
+.inicio-forca[data-forca='1'] .inicio-forca-cheia {
+  background: var(--vermelho);
+}
+
+.inicio-forca[data-forca='2'] .inicio-forca-cheia {
+  background: #ffc93c;
+}
+
+.inicio-forca[data-forca='3'] .inicio-forca-cheia {
+  background: var(--verde);
+}
+
+.inicio-forca-nome {
+  min-width: 6.8em;
+  font-size: 0.85rem;
+  text-align: right;
+  color: var(--suave);
+}
+
+/* Manter conectado: a caixinha de marcar em pixel. */
+.inicio-marcar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.95rem;
+  color: var(--suave);
+  cursor: pointer;
+  user-select: none;
+}
+
+.inicio-marcar input {
+  appearance: none;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  background: rgba(22, 14, 8, 0.92);
+  border: 2px solid #c9a55a;
+  box-shadow: 0 0 0 2px var(--contorno);
+  cursor: pointer;
+}
+
+.inicio-marcar input:checked {
+  background: var(--verde);
+  border-color: var(--verde-claro);
+}
+
+.inicio-marcar input:checked::after {
+  content: '';
+  width: 0.3rem;
+  height: 0.6rem;
+  margin-top: -0.15rem;
+  border: solid #10240f;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+
+.inicio-marcar input:focus-visible {
+  outline: 2px solid var(--verde);
+  outline-offset: 2px;
+}
+
+.inicio-marcar:hover {
+  color: var(--tinta);
+}
+
+/* O código no jogo em casa: a faixa amarela em cima do campo, com o código e o "Usar". */
+.inicio-conta-teste {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  text-align: left;
+  color: #ffe9a8;
+  background: rgba(255, 217, 102, 0.12);
+  box-shadow: 0 0 0 2px var(--contorno), inset 0 0 0 2px rgba(255, 217, 102, 0.55);
+}
+
+.inicio-conta-teste[hidden] {
+  display: none;
+}
+
+.inicio-conta-teste strong {
+  font-weight: normal;
+  letter-spacing: 0.15em;
+  color: #fff;
+}
+
+.inicio-conta-teste-texto {
+  flex: 1;
+}
+
+.inicio-botao.inicio-conta-teste-usar {
+  flex: none;
+  min-width: 0;
+  min-height: 0;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.95rem;
+}
+
+/* A conta mestre (a oficial do jogo): o selo dourado ao lado do nome na tela inicial. */
+.inicio-conta-selo {
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  vertical-align: 0.1em;
+  color: #2a1a06;
+  text-shadow: none;
+  background: #ffd966;
+  box-shadow: 0 0 0 2px var(--contorno);
+}
+
+/* A conta mestre fora do online: a linha dos atalhos de teste, no canto de baixo à esquerda. */
+#hud .hud-mestre {
+  position: absolute;
+  left: 1.4cqw;
+  bottom: 2.2cqh;
+  margin: 0;
+  padding: 0.25em 0.6em;
+  font-size: clamp(10px, 1.05cqw, 16px);
+  letter-spacing: 0.08em;
+  color: #2a1a06;
+  background: rgba(255, 217, 102, 0.9);
+  box-shadow: 0 0 0 2px var(--contorno);
+  pointer-events: none;
+}
+
+/* As vistas com muitos campos (criar conta, senha nova): sem o lema e com a logo menor. */
+.inicio-conta-longa .inicio-conta-lema {
+  display: none;
+}
+
+.inicio-conta-longa .inicio-conta-logo {
+  height: clamp(3.5rem, 11cqh, 7rem);
+}
+
+.inicio-conta-longa .inicio-conta-caixa {
+  gap: 0.55rem;
+}
+
+.inicio-conta-longa .inicio-conta-form {
+  gap: 0.6rem;
 }

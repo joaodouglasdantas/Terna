@@ -23,6 +23,10 @@ export interface Config {
   brevo: { chave: string; remetente: string; nomeRemetente: string } | null;
   // O endereço do jogo publicado: a logo dos e-mails vem de lá (URL_DO_JOGO).
   urlDoJogo: string;
+  // As contas mestre (EMAILS_MESTRE, separados por vírgula): a oficial do jogo, com tudo liberado.
+  mestres: Set<string>;
+  // O servidor em casa (sem DATABASE_URL) e sem o Brevo: o jogo mostra o código na tela.
+  codigosNaTela: boolean;
 }
 
 // Pasta do pacote do servidor (onde está o package.json), venha o código de src/ ou de dist/.
@@ -35,6 +39,9 @@ function raizDoPacote(): string {
   }
   return pasta;
 }
+
+// A conta oficial do jogo: mestre sempre, a não ser que EMAILS_MESTRE diga outra coisa.
+export const EMAIL_OFICIAL = 'ternaofcl@gmail.com';
 
 export function lerConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const raiz = raizDoPacote();
@@ -62,6 +69,13 @@ export function lerConfig(env: NodeJS.ProcessEnv = process.env): Config {
         ? { chave: env.BREVO_API_KEY.trim(), remetente: env.EMAIL_REMETENTE.trim(), nomeRemetente: env.NOME_REMETENTE?.trim() || 'Terna' }
         : null,
     urlDoJogo: (env.URL_DO_JOGO || 'https://terna.pages.dev').trim(),
+    mestres: new Set(
+      (env.EMAILS_MESTRE || EMAIL_OFICIAL)
+        .split(',')
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean),
+    ),
+    codigosNaTela: !env.DATABASE_URL && !(env.BREVO_API_KEY && env.EMAIL_REMETENTE),
   };
 }
 

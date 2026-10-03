@@ -56,10 +56,12 @@ export type CodigoEnviado = z.infer<typeof CodigoEnviado>;
 // Entrar com a conta ainda sem o e-mail confirmado responde 403 com isto (e manda um código).
 export const ERRO_EMAIL_NAO_CONFIRMADO = 'confirme seu e-mail para entrar: mandamos um código para ele';
 
+// `mestre`: a conta oficial do jogo (EMAILS_MESTRE no servidor), com tudo liberado para testar.
 export const Jogador = z.object({
   id: z.string(),
   nome: z.string(),
   criadoEm: z.string(),
+  mestre: z.boolean().default(false),
 });
 export type Jogador = z.infer<typeof Jogador>;
 

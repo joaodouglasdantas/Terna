@@ -29,25 +29,32 @@ import { exigirJogador, jogadorPublico, validar } from '../http';
 //   POST /senha/esqueci     { email }                → 200 { email, reenviarEm }
 //   POST /senha/trocar      { email, codigo, senha } → 200 sessão
 //   DELETE /sessoes, GET /eu
+//   GET /teste/codigo?email=...  → { codigo } — só com `codigosNaTela` (o servidor em casa, sem
+//                                  e-mail de verdade): a tela do código mostra o código
 
 export interface OpcoesContas {
   diasSessao: number;
   tentativasPorMinuto: number;
   correio: Correio;
   urlDoJogo: string;
+  // Os e-mails das contas mestre (em minúsculas).
+  mestres?: ReadonlySet<string>;
+  // Liga /teste/codigo: só no servidor em casa (PGlite) e sem o Brevo. Nunca em produção.
+  codigosNaTela?: boolean;
 }
 
 type Jogador = typeof jogadores.$inferSelect;
 
 export function rotasContas(app: FastifyInstance, banco: Banco, opcoes: OpcoesContas): void {
-  const { diasSessao, tentativasPorMinuto, correio, urlDoJogo } = opcoes;
+  const { diasSessao, tentativasPorMinuto, correio, urlDoJogo, mestres = new Set<string>(), codigosNaTela = false } = opcoes;
+  const publico = (jogador: Jogador) => jogadorPublico(jogador, mestres);
   // Poucas tentativas por minuto, por IP: segura quem tenta adivinhar senha ou código e quem
   // quer usar o jogo para encher a caixa de e-mail dos outros.
   const LIMITE = { config: { rateLimit: { max: tentativasPorMinuto, timeWindow: '1 minute' } } };
 
   const sessaoDe = async (jogador: Jogador) => {
     const sessao = await criarSessao(banco, jogador.id, diasSessao);
-    return { token: sessao.token, expiraEm: sessao.expiraEm.toISOString(), jogador: jogadorPublico(jogador) };
+    return { token: sessao.token, expiraEm: sessao.expiraEm.toISOString(), jogador: publico(jogador) };
   };
 
   // Manda um código novo, se já passou o tempo desde o último (senão, não manda: o de antes
@@ -59,7 +66,7 @@ export function rotasContas(app: FastifyInstance, banco: Banco, opcoes: OpcoesCo
     const codigo = await novoCodigo(banco, jogador.id, motivo);
     const email = emailDoCodigo({ nome: jogador.nome, codigo, motivo, urlDoJogo });
     try {
-      await correio.enviar({ para: jogador.email ?? '', nomePara: jogador.nome, ...email });
+      await correio.enviar({ para: jogador.email ?? '', nomePara: jogador.nome, codigo, ...email });
     } catch (erro) {
       await apagarCodigo(banco, jogador.id, motivo);
       throw erro;
@@ -203,6 +210,19 @@ export function rotasContas(app: FastifyInstance, banco: Banco, opcoes: OpcoesCo
   app.get('/eu', async (request, reply) => {
     const jogador = await exigirJogador(banco, request, reply);
     if (!jogador) return;
-    return reply.send(jogadorPublico(jogador));
+    return reply.send(publico(jogador));
   });
+
+  // O jogo rodando em casa, sem e-mail de verdade: o último código mandado para o e-mail, para a
+  // tela do código mostrar (em vez de procurar no terminal do servidor).
+  if (codigosNaTela && correio.ultimoCodigo) {
+    const ultimoCodigo = correio.ultimoCodigo;
+    app.get('/teste/codigo', async (request, reply) => {
+      const dados = validar(PedirCodigo, request.query, reply);
+      if (!dados) return;
+      const codigo = ultimoCodigo(dados.email);
+      if (!codigo) return reply.code(404).send({ erro: 'nenhum código mandado para esse e-mail' });
+      return reply.send({ codigo });
+    });
+  }
 }

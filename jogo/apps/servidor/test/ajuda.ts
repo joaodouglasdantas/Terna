@@ -33,7 +33,7 @@ export async function criarConta(app: FastifyInstance, nome: string, senha = 'se
   const email = emailDe(nome);
   const cadastro = await app.inject({ method: 'POST', url: '/api/contas', payload: { nome, email, senha } });
   if (cadastro.statusCode !== 201) throw new Error(`criar conta: ${cadastro.statusCode} ${cadastro.body}`);
-  const codigo = correio.ultimoCodigo(email);
+  const codigo = correio.codigoDe(email);
   const confirmada = await app.inject({ method: 'POST', url: '/api/contas/confirmar', payload: { email, codigo } });
   if (confirmada.statusCode !== 200) throw new Error(`confirmar: ${confirmada.statusCode} ${confirmada.body}`);
   return confirmada.json().token;

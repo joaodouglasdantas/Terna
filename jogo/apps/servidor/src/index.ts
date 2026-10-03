@@ -28,6 +28,8 @@ app = await criarApp({
   // Sem a chave do Brevo, os códigos aparecem aqui no terminal em vez de ir por e-mail.
   correio: config.brevo ? correioBrevo(config.brevo) : correioDoTerminal(),
   urlDoJogo: config.urlDoJogo,
+  mestres: config.mestres,
+  codigosNaTela: config.codigosNaTela,
 });
 
 const encerrar = async (): Promise<void> => {
@@ -42,3 +44,4 @@ process.once('SIGTERM', encerrar);
 await app.listen({ port: config.porta, host: config.host });
 app.log.info(`banco: ${conexao.tipo === 'pglite' ? `PGlite em ${config.pastaBanco}` : 'Postgres'}`);
 if (!config.brevo) app.log.warn('sem BREVO_API_KEY e EMAIL_REMETENTE: os códigos de e-mail vão aparecer aqui no terminal');
+if (config.codigosNaTela) app.log.warn('modo de teste em casa: a tela do código do jogo mostra o código (sem e-mail de verdade)');

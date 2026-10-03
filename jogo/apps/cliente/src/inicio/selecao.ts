@@ -102,9 +102,8 @@ interface Cartao {
   dono: HTMLSpanElement; // a etiqueta de quem está com ele: "Você" ou o nome do outro
 }
 
-function montarCartao(heroi: Heroi, aoEscolher: () => void): Cartao {
+function montarCartao(heroi: Heroi, liberado: boolean, aoEscolher: () => void): Cartao {
   const sobre = SOBRE_HEROI[heroi];
-  const liberado = LIBERADO[heroi];
   const cartao = elemento('button', `inicio-cartao${liberado ? '' : ' inicio-cartao-bloqueado'}`);
   cartao.type = 'button';
   cartao.setAttribute('role', 'radio');
@@ -147,18 +146,19 @@ function montarCartao(heroi: Heroi, aoEscolher: () => void): Cartao {
 }
 
 // Desenha o sprite do cartão: parado de frente; o escolhido, correndo sem sair do lugar.
-function desenharSprite(c: Cartao, escolhido: boolean, tempo: number): void {
+function desenharSprite(c: Cartao, escolhido: boolean, tempo: number, liberado: boolean): void {
   const ctx = contexto2d(c.sprite);
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, c.sprite.width, c.sprite.height);
   const sprites = spritesDo(c.heroi);
-  const quadros = escolhido && LIBERADO[c.heroi] ? sprites.andando : sprites.parado;
+  const quadros = escolhido && liberado ? sprites.andando : sprites.parado;
   const { imagem, eixo } = quadros[Math.floor(tempo / QUADRO_CORRENDO) % quadros.length];
   ctx.drawImage(imagem, Math.round(c.sprite.width / 2 - eixo), c.sprite.height - 1 - imagem.height);
 }
 
 // `textos`: sozinho, os textos de outra escolha (o treino); o 'voltou' é o botão de voltar dela.
-export function telaSelecao(sala?: SalaNaSelecao, textos?: TextosDaSelecao): Promise<ResultadoSelecao> {
+// `todos`: a conta mestre, sozinho — os personagens ainda guardados (o Anjo) também ficam livres.
+export function telaSelecao(sala?: SalaNaSelecao, textos?: TextosDaSelecao, todos = false): Promise<ResultadoSelecao> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-selecao-tela');
     const titulo = elemento('h1', 'inicio-titulo', textos?.titulo ?? 'Escolha o personagem');
@@ -178,7 +178,8 @@ export function telaSelecao(sala?: SalaNaSelecao, textos?: TextosDaSelecao): Pro
     estado.setAttribute('aria-live', 'polite');
     const acoes = elemento('div', 'inicio-acoes');
 
-    const liberados = HEROIS.filter((h) => LIBERADO[h]);
+    const livre = (h: Heroi): boolean => LIBERADO[h] || (todos && !sala);
+    const liberados = HEROIS.filter(livre);
     let escolhido: Heroi | null = null; // nenhum até a pessoa clicar num
     let confirmado = false;
     let doOutro: Heroi | null = null; // o que o outro escolheu: bloqueado para você
@@ -187,7 +188,7 @@ export function telaSelecao(sala?: SalaNaSelecao, textos?: TextosDaSelecao): Pro
     const nome = (heroi: Heroi): string => SOBRE_HEROI[heroi].nome;
     const livres = (): Heroi[] => liberados.filter((h) => h !== doOutro);
 
-    const cartoes = liberados.map((heroi) => montarCartao(heroi, () => escolher(heroi, true)));
+    const cartoes = liberados.map((heroi) => montarCartao(heroi, true, () => escolher(heroi, true)));
     grade.append(...cartoes.map((c) => c.elemento));
 
     // Pinta os cartões: o seu destacado (com "Você" depois de apertar Jogar) e o do outro com o
@@ -196,7 +197,7 @@ export function telaSelecao(sala?: SalaNaSelecao, textos?: TextosDaSelecao): Pro
       jogar.disabled = confirmado || !escolhido || escolhido === doOutro;
       jogar.classList.toggle('inicio-jogar-pronto', confirmado);
       for (const c of cartoes) {
-        if (!LIBERADO[c.heroi]) continue;
+        if (!livre(c.heroi)) continue;
         const meu = c.heroi === escolhido;
         const dele = c.heroi === doOutro;
         c.elemento.classList.toggle('inicio-cartao-escolhido', meu);
@@ -215,7 +216,7 @@ export function telaSelecao(sala?: SalaNaSelecao, textos?: TextosDaSelecao): Pro
 
     // `clicou`: foi a pessoa (e não a tela se ajeitando): o do outro avisa por que não dá.
     const escolher = (heroi: Heroi, clicou = false): void => {
-      if (!LIBERADO[heroi]) return;
+      if (!livre(heroi)) return;
       if (heroi === doOutro) {
         if (clicou && sala) estado.textContent = `${nome(heroi)} já é de ${sala.oponente} nesta partida.`;
         return;
@@ -329,7 +330,7 @@ export function telaSelecao(sala?: SalaNaSelecao, textos?: TextosDaSelecao): Pro
         if (prazo.textContent !== texto) prazo.textContent = texto;
         prazo.classList.toggle('inicio-selecao-prazo-fim', falta <= 10_000);
       }
-      for (const c of cartoes) desenharSprite(c, c.heroi === escolhido, agora / 1000);
+      for (const c of cartoes) desenharSprite(c, c.heroi === escolhido, agora / 1000, livre(c.heroi));
       requestAnimationFrame(animar);
     };
     requestAnimationFrame(animar);

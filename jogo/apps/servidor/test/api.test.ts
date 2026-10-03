@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { criarApp } from '../src/app';
+import { correioDoTerminal } from '../src/email/correio';
 import { ERRO_EMAIL_NAO_CONFIRMADO } from '@terna/compartilhado';
 import { apagarCodigosEcadastrosVencidos } from '../src/auth/codigos';
 import { apagarSessoesVencidas } from '../src/auth/sessoes';
@@ -57,7 +58,7 @@ describe('contas e sessões', () => {
     // O e-mail chegou, bonito e com o código no texto e no HTML.
     const mensagem = correio.caixa.findLast((m) => m.para === 'douglas@exemplo.com');
     expect(mensagem?.assunto).toMatch(/código/i);
-    const codigo = correio.ultimoCodigo('douglas@exemplo.com');
+    const codigo = correio.codigoDe('douglas@exemplo.com');
     expect(mensagem?.html).toContain('Douglas');
     expect(mensagem?.html).toContain(`>${codigo[0]}</td>`);
 
@@ -117,7 +118,7 @@ describe('contas e sessões', () => {
   it('código errado conta tentativa; errando demais, precisa pedir outro', async () => {
     const email = 'teimoso@exemplo.com';
     await app.inject({ method: 'POST', url: '/api/contas', payload: { nome: 'teimoso', email, senha: 'senha-boa-123' } });
-    const certo = correio.ultimoCodigo(email);
+    const certo = correio.codigoDe(email);
     const errado = certo === '000000' ? '111111' : '000000';
     const tentar = (codigo: string) => app.inject({ method: 'POST', url: '/api/contas/confirmar', payload: { email, codigo } });
     for (let i = 0; i < 4; i++) {
@@ -133,7 +134,7 @@ describe('contas e sessões', () => {
   it('código vencido não confirma', async () => {
     const email = 'atrasado@exemplo.com';
     await app.inject({ method: 'POST', url: '/api/contas', payload: { nome: 'atrasado', email, senha: 'senha-boa-123' } });
-    const codigo = correio.ultimoCodigo(email);
+    const codigo = correio.codigoDe(email);
     await conexao.banco.update(codigosEmail).set({ expiraEm: new Date(Date.now() - 1000) });
     const r = await app.inject({ method: 'POST', url: '/api/contas/confirmar', payload: { email, codigo } });
     expect(r.statusCode).toBe(400);
@@ -151,12 +152,12 @@ describe('contas e sessões', () => {
     expect(enviados()).toBe(1); // ainda vale o de antes: nada novo
 
     // Passou o minuto: sai outro código, e o de antes deixa de valer.
-    const primeiro = correio.ultimoCodigo(email);
+    const primeiro = correio.codigoDe(email);
     await conexao.banco.update(codigosEmail).set({ criadoEm: new Date(Date.now() - 61_000) });
     const depois = await app.inject({ method: 'POST', url: '/api/contas/reenviar', payload: { email } });
     expect(depois.json().reenviarEm).toBe(60);
     expect(enviados()).toBe(2);
-    const segundo = correio.ultimoCodigo(email);
+    const segundo = correio.codigoDe(email);
     if (primeiro !== segundo) {
       const velho = await app.inject({ method: 'POST', url: '/api/contas/confirmar', payload: { email, codigo: primeiro } });
       expect(velho.statusCode).toBe(400);
@@ -171,7 +172,7 @@ describe('contas e sessões', () => {
     await conexao.banco.update(codigosEmail).set({ criadoEm: new Date(Date.now() - 61_000) });
     const deNovo = await app.inject({ method: 'POST', url: '/api/contas', payload: { nome: 'decidido', email, senha: 'segunda-senha' } });
     expect(deNovo.statusCode).toBe(201);
-    const confirmada = await app.inject({ method: 'POST', url: '/api/contas/confirmar', payload: { email, codigo: correio.ultimoCodigo(email) } });
+    const confirmada = await app.inject({ method: 'POST', url: '/api/contas/confirmar', payload: { email, codigo: correio.codigoDe(email) } });
     expect(confirmada.json().jogador.nome).toBe('decidido');
     const entrar = (senha: string) => app.inject({ method: 'POST', url: '/api/sessoes', payload: { login: email, senha } });
     expect((await entrar('primeira-senha')).statusCode).toBe(401);
@@ -185,7 +186,7 @@ describe('contas e sessões', () => {
     expect(pedido.statusCode).toBe(200);
     const mensagem = correio.caixa.findLast((m) => m.para === email);
     expect(mensagem?.assunto).toMatch(/senha/i);
-    const codigo = correio.ultimoCodigo(email);
+    const codigo = correio.codigoDe(email);
 
     // O código do cadastro não serve para a senha (e vice-versa).
     const troca = await app.inject({ method: 'POST', url: '/api/senha/trocar', payload: { email, codigo, senha: 'senha-nova-2' } });
@@ -230,7 +231,7 @@ describe('contas e sessões', () => {
     // Com o correio de volta, o reenvio sai sem esperar o minuto.
     const reenvio = await app.inject({ method: 'POST', url: '/api/contas/reenviar', payload: { email } });
     expect(reenvio.json().reenviarEm).toBe(60);
-    expect(correio.ultimoCodigo(email)).toMatch(/^\d{6}$/);
+    expect(correio.codigoDe(email)).toMatch(/^\d{6}$/);
   });
 
   it('apaga sessões vencidas', async () => {
@@ -259,8 +260,44 @@ describe('contas e sessões', () => {
     expect(linhas).not.toContain('senha-secreta-9');
     expect(JSON.stringify(await conexao.banco.query.sessoes.findMany())).not.toContain(token);
     await app.inject({ method: 'POST', url: '/api/senha/esqueci', payload: { email: emailDe('segredo') } });
-    const codigo = correio.ultimoCodigo(emailDe('segredo'));
+    const codigo = correio.codigoDe(emailDe('segredo'));
     expect(JSON.stringify(await conexao.banco.query.codigosEmail.findMany())).not.toContain(codigo);
+  });
+});
+
+describe('conta mestre e o código na tela (jogo em casa)', () => {
+  it('o e-mail oficial vira mestre só depois de confirmado; os outros não', async () => {
+    const terminal = correioDoTerminal({ warn: () => undefined });
+    const comMestre = await criarApp({
+      banco: conexao.banco,
+      origens: [],
+      diasSessao: 30,
+      tentativasPorMinuto: 1000,
+      correio: terminal,
+      mestres: new Set(['dono@exemplo.com']),
+      codigosNaTela: true,
+    });
+    const email = 'dono@exemplo.com';
+    await comMestre.inject({ method: 'POST', url: '/api/contas', payload: { nome: 'dono', email, senha: 'senha-boa-123' } });
+    // O código aparece na rota de teste (é o que a tela do código mostra em casa).
+    const visto = await comMestre.inject({ method: 'GET', url: `/api/teste/codigo?email=${encodeURIComponent(email)}` });
+    expect(visto.statusCode).toBe(200);
+    const confirmada = await comMestre.inject({ method: 'POST', url: '/api/contas/confirmar', payload: { email, codigo: visto.json().codigo } });
+    expect(confirmada.json().jogador.mestre).toBe(true);
+    const eu = await comMestre.inject({ method: 'GET', url: '/api/eu', headers: autorizado(confirmada.json().token) });
+    expect(eu.json().mestre).toBe(true);
+
+    await comMestre.inject({ method: 'POST', url: '/api/contas', payload: { nome: 'comum', email: 'comum@exemplo.com', senha: 'senha-boa-123' } });
+    const codigo = (await comMestre.inject({ method: 'GET', url: '/api/teste/codigo?email=comum@exemplo.com' })).json().codigo;
+    const comum = await comMestre.inject({ method: 'POST', url: '/api/contas/confirmar', payload: { email: 'comum@exemplo.com', codigo } });
+    expect(comum.json().jogador.mestre).toBe(false);
+    await comMestre.close();
+  });
+
+  it('a rota do código não existe fora do modo de casa', async () => {
+    const r = await app.inject({ method: 'GET', url: '/api/teste/codigo?email=douglas@exemplo.com' });
+    expect(r.statusCode).toBe(404);
+    expect(r.json().erro).not.toBe('nenhum código mandado para esse e-mail');
   });
 });
 

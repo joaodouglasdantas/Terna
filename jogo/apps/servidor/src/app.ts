@@ -28,6 +28,9 @@ export interface OpcoesApp {
   correio?: Correio;
   // O jogo publicado, para a logo dos e-mails.
   urlDoJogo?: string;
+  // As contas mestre e a rota que mostra o código no jogo em casa (rotas/contas.ts).
+  mestres?: ReadonlySet<string>;
+  codigosNaTela?: boolean;
 }
 
 // Monta o servidor sem abrir porta: o index.ts chama listen, os testes usam inject.
@@ -41,6 +44,8 @@ export async function criarApp({
   turn,
   correio,
   urlDoJogo = 'https://terna.pages.dev',
+  mestres,
+  codigosNaTela = false,
 }: OpcoesApp): Promise<FastifyInstance> {
   const app = Fastify({ logger, bodyLimit: 256 * 1024, trustProxy: confiarProxy });
 
@@ -82,6 +87,8 @@ export async function criarApp({
         tentativasPorMinuto,
         correio: correio ?? correioDoTerminal(),
         urlDoJogo,
+        mestres,
+        codigosNaTela,
       });
       rotasSaves(api, banco);
       rotasRanking(api, banco);

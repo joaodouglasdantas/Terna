@@ -11,11 +11,14 @@ export interface Mensagem {
   assunto: string;
   html: string;
   texto: string;
+  codigo?: string; // o código que vai no texto (o correio do terminal o lembra para a tela de teste)
 }
 
 export interface Correio {
   readonly tipo: 'brevo' | 'terminal' | 'teste';
   enviar(mensagem: Mensagem): Promise<void>;
+  // Só o do terminal: o último código mandado para cada e-mail (o jogo em casa o mostra na tela).
+  ultimoCodigo?(para: string): string | undefined;
 }
 
 export interface ConfigBrevo {
@@ -58,9 +61,12 @@ export interface Registro {
 // Sem chave do Brevo: mostra no terminal para quem ia e o texto (com o código), com as quebras de
 // linha de verdade (o log do servidor as escaparia).
 export function correioDoTerminal(registro: Registro = { warn: (o, m) => console.warn(`\n${m}\n`) }): Correio {
+  const ultimos = new Map<string, string>();
   return {
     tipo: 'terminal',
-    async enviar({ para, assunto, texto }) {
+    ultimoCodigo: (para) => ultimos.get(para),
+    async enviar({ para, assunto, texto, codigo }) {
+      if (codigo) ultimos.set(para, codigo);
       const linha = '-'.repeat(60);
       registro.warn({ para, assunto }, `${linha}\nE-MAIL NÃO ENVIADO (falta BREVO_API_KEY): para ${para}\nAssunto: ${assunto}\n\n${texto}\n${linha}`);
     },
@@ -68,7 +74,7 @@ export function correioDoTerminal(registro: Registro = { warn: (o, m) => console
 }
 
 // Para os testes: guarda as mensagens em vez de mandar.
-export function correioDeTeste(): Correio & { caixa: Mensagem[]; ultimoCodigo(para: string): string } {
+export function correioDeTeste(): Correio & { caixa: Mensagem[]; codigoDe(para: string): string } {
   const caixa: Mensagem[] = [];
   return {
     tipo: 'teste',
@@ -76,7 +82,7 @@ export function correioDeTeste(): Correio & { caixa: Mensagem[]; ultimoCodigo(pa
     async enviar(mensagem) {
       caixa.push(mensagem);
     },
-    ultimoCodigo(para) {
+    codigoDe(para) {
       const mensagem = caixa.findLast((m) => m.para === para);
       const codigo = mensagem?.texto.match(/\b\d{6}\b/)?.[0];
       if (!codigo) throw new Error(`nenhum código mandado para ${para}`);

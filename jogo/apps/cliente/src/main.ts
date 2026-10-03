@@ -5,7 +5,7 @@
 // tutorial (ou aperta "Já sei jogar").
 
 import './monitor/erros';
-import { CARREGAMENTO_MS, MUNDO, type Jogador } from '@terna/compartilhado';
+import { CARREGAMENTO_MS, ENERGIA_PIXY, MUNDO, VIDA_MAXIMA, type Jogador } from '@terna/compartilhado';
 import { atualizarAnimais, desenharAnimais, desenharAnimaisNoAr, prepararAnimais } from './entidades/animais';
 import { desenharArmasNaFrente, desenharArmasNoChao, desenharPreviaDoArco, prepararArmas } from './entidades/armas';
 import {
@@ -77,7 +77,7 @@ import {
   type FimDaPartida,
   type Partida,
 } from './partida';
-import { retomarSessao, sairDaConta } from './save/sessao';
+import { retomarSessao, sairDaConta, souMestre } from './save/sessao';
 import { tocarMusica } from './som/musica';
 
 const canvas = document.getElementById('jogo');
@@ -168,7 +168,23 @@ window.addEventListener('keydown', (evento) => {
   if (evento.code === 'KeyE' && !evento.repeat && partida) mouse.descartar = true;
   // Um toque rápido em R (apertar e soltar entre dois quadros) não se perde.
   if (evento.code === 'KeyR' && !evento.repeat) toqueR = true;
+  if (!evento.repeat) atalhoDoMestre(evento.code);
 });
+
+// A conta mestre (a oficial do jogo), nas partidas que não são online: atalhos para testar.
+// K enche a energia, L zera as recargas (poderes, golem e anjo) e H enche a vida.
+const ATALHOS_DO_MESTRE = 'MESTRE · K energia · L recargas · H vida';
+function atalhoDoMestre(codigo: string): void {
+  const p = partida;
+  if (!p || p.online || p.menuAberto || !souMestre()) return;
+  const j = p.jogador;
+  if (codigo === 'KeyK') j.energia = ENERGIA_PIXY.maxima;
+  else if (codigo === 'KeyL') {
+    j.poderes.recarga.fill(0);
+    j.golem.recarga = 0;
+    j.anjo.recarga = 0;
+  } else if (codigo === 'KeyH') j.vida = VIDA_MAXIMA;
+}
 window.addEventListener('keyup', (evento) => {
   teclas[evento.code] = false;
 });
@@ -514,6 +530,7 @@ function jogar(escolha: Escolha, primeiraVez = false): Promise<SalaNaSelecao | '
       clearTimeout(esperaDoFim);
       tutorial?.remover();
       tutorial = null;
+      dicaDoMestre?.remove();
       encerrarPartida(partida, typeof proxima !== 'object');
       void fecharCortina().then(() => {
         partida = null;
@@ -559,6 +576,13 @@ function jogar(escolha: Escolha, primeiraVez = false): Promise<SalaNaSelecao | '
     soltarTeclas();
     partida = nova;
     bordas = criarBordas();
+    // A conta mestre fora do online: a lembrança dos atalhos de teste no canto.
+    const dicaDoMestre = souMestre() && escolha.modo !== 'online' ? document.createElement('p') : null;
+    if (dicaDoMestre) {
+      dicaDoMestre.className = 'hud-mestre';
+      dicaDoMestre.textContent = ATALHOS_DO_MESTRE;
+      document.getElementById('hud')?.append(dicaDoMestre);
+    }
     if (escolha.modo === 'treino') {
       tutorial = iniciarTutorial({
         heroi: escolha.heroi,
@@ -645,7 +669,7 @@ async function principal(): Promise<void> {
       // Jogar de novo: a escolha de personagem outra vez — sozinho, contra outra CPU sorteada;
       // online, na mesma sala, e os dois escolhendo começa outra rodada. Voltando, o menu.
       if (revanche === 'sozinho' && atual.modo === 'solo') {
-        const r = await telaSelecao();
+        const r = await telaSelecao(undefined, undefined, souMestre());
         if (r.tipo === 'escolheu') escolha = { modo: 'solo', nome: atual.nome, heroi: r.heroi };
       } else if (revanche && revanche !== 'sozinho' && atual.modo === 'online') {
         const r = await telaSelecao(revanche);

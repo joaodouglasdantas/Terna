@@ -85,6 +85,9 @@ export const api = {
     }
   },
   eu: (): Promise<Jogador> => pedir('GET', '/eu', Jogador),
+  // Só o jogo em casa (servidor sem e-mail de verdade): o último código mandado para o e-mail.
+  codigoDeTeste: (email: string): Promise<string> =>
+    pedir('GET', `/teste/codigo?email=${encodeURIComponent(email)}`, z.object({ codigo: z.string() })).then((r) => r.codigo),
   listarSaves: (): Promise<Save[]> => pedir('GET', '/saves', z.array(Save)),
   carregarSave: (slot: number): Promise<Save> => pedir('GET', `/saves/${slot}`, Save),
   gravarSave: (slot: number, dados: DadosSave): Promise<Save> => pedir('PUT', `/saves/${slot}`, Save, dados),

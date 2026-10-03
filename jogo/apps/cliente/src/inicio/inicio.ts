@@ -296,6 +296,8 @@ export function escolherModo(online: boolean, aviso = '', conta: Jogador | null 
     if (conta) {
       const quem = elemento('p', 'inicio-conta-quem');
       quem.append('Jogando como ', elemento('strong', '', conta.nome));
+      // A conta oficial do jogo: tudo liberado para testar.
+      if (conta.mestre) quem.append(elemento('span', 'inicio-conta-selo', 'Mestre'));
       const sair = botao('Sair da conta', 'inicio-link', () => {
         window.removeEventListener('keydown', aoTeclar);
         mostrarAviso('');
@@ -338,7 +340,7 @@ export function escolherModo(online: boolean, aviso = '', conta: Jogador | null 
       if (!nome) return;
       mostrarAviso('');
       window.removeEventListener('keydown', aoTeclar);
-      void telaSelecao().then((r) => {
+      void telaSelecao(undefined, undefined, conta?.mestre).then((r) => {
         if (r.tipo === 'escolheu') resolver({ modo: 'solo', nome, heroi: r.heroi });
         else voltarParaCa(solo);
       });
