@@ -8,9 +8,41 @@ import { carregarArquivoEnv, lerConfig } from './config';
 import { correioBrevo, correioDoTerminal } from './email/correio';
 import { criarTurn } from './partida/turn';
 
+// O banco local (PGlite) não abrindo quase sempre é a pasta dele estragada: o servidor fechou no
+// meio de uma escrita (a janela do terminal fechada, o computador desligado) ou o OneDrive mexeu
+// nos arquivos enquanto ele escrevia. Ela só guarda as contas de teste deste computador: em vez do
+// erro do WebAssembly, o servidor diz o que fazer.
+async function abrirBancoOuExplicar(): Promise<Awaited<ReturnType<typeof abrirBanco>>> {
+  try {
+    return await abrirBanco({ url: config.bancoUrl, pasta: config.pastaBanco, pastaMigracoes: config.pastaMigracoes });
+  } catch (erro) {
+    if (config.bancoUrl) throw erro; // o Postgres de verdade: o erro dele já diz o que é
+    const linha = '='.repeat(72);
+    console.error(
+      [
+        '',
+        linha,
+        'O banco local do servidor não abriu.',
+        `Pasta: ${config.pastaBanco}`,
+        '',
+        'Ele provavelmente ficou estragado: o servidor fechou no meio de uma escrita, ou o',
+        'OneDrive mexeu nos arquivos dele. Esse banco só guarda as contas de teste deste',
+        'computador. Para começar um banco novo:',
+        '  1. feche o servidor (e qualquer outra janela do jogo rodando);',
+        '  2. renomeie a pasta acima, por exemplo para "banco-velho" (ou apague);',
+        '  3. rode o jogo de novo: o servidor cria um banco novo, vazio.',
+        linha,
+        '',
+      ].join('\n'),
+    );
+    console.error(erro);
+    process.exit(1);
+  }
+}
+
 carregarArquivoEnv();
 const config = lerConfig();
-const conexao = await abrirBanco({ url: config.bancoUrl, pasta: config.pastaBanco, pastaMigracoes: config.pastaMigracoes });
+const conexao = await abrirBancoOuExplicar();
 await conexao.migrar();
 await apagarSessoesVencidas(conexao.banco);
 await apagarCodigosEcadastrosVencidos(conexao.banco);
