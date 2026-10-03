@@ -231,14 +231,18 @@ export function telaConta(aviso = ''): Promise<Entrou> {
     const lema = elemento('p', 'inicio-conta-lema', 'A Floresta da Divisa te espera');
     const caixa = elemento('div', 'inicio-caixa inicio-conta-caixa');
     const centro = elemento('div', 'inicio-conta-centro');
-    centro.append(logo, lema, caixa);
+    // A logo numa caixa do tamanho dela, flutuando: a caverna pinta por cima a luz do ambiente
+    // (a escuridão, o fogo das tochas e o cristal), só onde há logo.
+    const caixaDaLogo = elemento('div', 'inicio-conta-logo-caixa');
+    caixaDaLogo.append(logo);
+    centro.append(caixaDaLogo, lema, caixa);
     // As tochas sobem do chão e, chegando, o fogo acende.
     const tochas = [criarTocha('esquerda'), criarTocha('direita')];
     const atalhos = elemento('div', 'inicio-atalhos');
     atalhos.append(botaoDaMusica('inicio-botao inicio-botao-claro inicio-atalho'));
     // O fundo é a caverna (caverna.ts), com as tochas dentro dela: ela escurece e ficam as luzes
     // do fogo e do cristal da logo. A floresta dos menus sai daqui (volta na tela inicial).
-    const caverna = criarCaverna(tochas, logo);
+    const caverna = criarCaverna(tochas, caixaDaLogo);
     tela.append(caverna.el, centro, atalhos, elemento('p', 'inicio-versao', VERSAO));
     esconderCena();
     mostrarTela(tela);

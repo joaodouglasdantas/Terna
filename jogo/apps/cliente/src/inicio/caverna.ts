@@ -9,16 +9,19 @@
 //   caem folhas do musgo.
 // Depois que a caverna chega, ela escurece: só ficam acesas as luzes — o fogo das duas tochas
 // (que ilumina a pedra em volta e tremula com ele), o cristal da logo (dourado, pulsando), a lua
-// da boca da caverna e a cachoeira, e um brilho fraco nos cogumelos.
+// da boca da caverna e a cachoeira, e um brilho fraco nos cogumelos. A logo também entra na luz
+// da caverna: escurece junto, o alto fica dourado com o cristal, as beiradas viradas para as
+// tochas pegam o laranja tremulando e o lado da boca da caverna um azul fraco.
 //
 // As camadas, de baixo para cima: a arte (com os pedaços que mexem e as folhas), o corpo das
 // tochas, a escuridão (com os buracos das luzes), a cor das luzes (somando luz), os pontos de luz
 // (vagalumes, poeira, espuma, gotas, brilhos) e o fogo das tochas.
 
+import logoUrl from '../assets/logo.webp';
 import urlCaverna from '../assets/tela-conta-caverna.webp';
 import { carregarDecodificada, contexto2d, novoCanvas, umaVez } from '../motor/imagens';
 import { elemento } from './dom';
-import { cair, desenharHalo, desenharFolha, folhaPronta, inclinacao, type Folha as DesenhoDeFolha, type Queda } from './efeitos';
+import { cair, desenharBrilho, desenharHalo, desenharFolha, folhaPronta, inclinacao, type Folha as DesenhoDeFolha, type Queda } from './efeitos';
 import { MEIO_DO_FOGO, type Tocha } from './tocha';
 
 type Area = { x0: number; x1: number; y0: number; y1: number };
@@ -167,8 +170,9 @@ function recortar(img: HTMLImageElement): { pedaco: Pedaco; canvas: HTMLCanvasEl
   });
 }
 
-// `tochas`: as duas tochas (o corpo vai por baixo da escuridão e o fogo por cima). `logo`: a
-// logo da tela (a luz do cristal sai dela).
+// `tochas`: as duas tochas (o corpo vai por baixo da escuridão e o fogo por cima). `logo`: a caixa
+// da logo da tela, do tamanho da imagem (a luz do cristal sai dela, e a luz da caverna é pintada
+// por cima dela, recortada no desenho da logo).
 export function criarCaverna(tochas: Tocha[], logo: HTMLElement): Caverna {
   const el = elemento('div', 'inicio-caverna');
   el.setAttribute('aria-hidden', 'true');
@@ -181,6 +185,17 @@ export function criarCaverna(tochas: Tocha[], logo: HTMLElement): Caverna {
   const cores = elemento('canvas', 'inicio-caverna-luzes');
   const pontos = elemento('canvas', 'inicio-caverna-pontos');
   el.append(arte, ...tochas.map((t) => t.el), escuro, cores, pontos, ...tochas.map((t) => t.fogo));
+  // A luz na logo: a sombra (por cima, normal) e a cor (somando luz), as duas recortadas pela
+  // própria imagem da logo (máscara).
+  const sombraDaLogo = elemento('canvas', 'inicio-conta-logo-luz');
+  const corDaLogo = elemento('canvas', 'inicio-conta-logo-luz inicio-conta-logo-cor');
+  for (const c of [sombraDaLogo, corDaLogo]) {
+    c.style.maskImage = `url("${logoUrl}")`;
+    c.style.webkitMaskImage = `url("${logoUrl}")`;
+  }
+  logo.append(sombraDaLogo, corDaLogo);
+  let proximoBrilho = 2.5; // s até o próximo brilho de quatro pontas no cristal
+  let brilhoDoCristal = 0; // de 1 a 0 enquanto brilha
 
   let recortes: { pedaco: Pedaco; canvas: HTMLCanvasElement }[] = [];
   carregarArteDaCaverna().then(
@@ -423,6 +438,56 @@ export function criarCaverna(tochas: Tocha[], logo: HTMLElement): Caverna {
     mancha(k, boca, altura * 0.24, [90, 140, 255], 0.16 * escurecer);
     for (const c of COGUMELOS) mancha(k, fracao(c), altura * 0.03, [255, 90, 40], 0.18 * (0.8 + 0.2 * Math.sin(tempo * 2 + c.x * 40)) * escurecer);
 
+    // A luz na logo, na medida dela (as luzes em volta, levadas para a caixa da logo).
+    const r = logo.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) {
+      const lw = Math.round(r.width);
+      const lh = Math.round(r.height);
+      for (const c of [sombraDaLogo, corDaLogo]) {
+        if (c.width !== lw || c.height !== lh) {
+          c.width = lw;
+          c.height = lh;
+        }
+      }
+      const ox = r.left - caixa.left;
+      const oy = r.top - caixa.top;
+      const naLogo = (pt: Ponto): Ponto => ({ x: pt.x - ox, y: pt.y - oy });
+      const meioDoCristal = { x: lw * CRISTAL.x, y: lh * CRISTAL.y };
+      // A sombra: a logo escurece com a caverna, menos perto do cristal e do lado das tochas.
+      const s = contexto2d(sombraDaLogo);
+      s.clearRect(0, 0, lw, lh);
+      if (escurecer > 0) {
+        s.globalCompositeOperation = 'source-over';
+        s.fillStyle = `rgba(4, 6, 14, ${(0.55 * escurecer).toFixed(3)})`;
+        s.fillRect(0, 0, lw, lh);
+        s.globalCompositeOperation = 'destination-out';
+        mancha(s, meioDoCristal, lh * 0.6, [0, 0, 0], 0.9 * pulso);
+        for (const f of fogos) {
+          const p = naLogo(f.onde);
+          mancha(s, p, Math.hypot(p.x - lw / 2, p.y - lh / 2) * 1.05, [0, 0, 0], 0.6 * f.forca);
+        }
+        s.globalCompositeOperation = 'source-over';
+      }
+      // A cor: dourado do cristal no alto, laranja das tochas nas beiradas, azul da lua.
+      const k2 = contexto2d(corDaLogo);
+      k2.clearRect(0, 0, lw, lh);
+      if (escurecer > 0) {
+        mancha(k2, meioDoCristal, lh * 0.5, [255, 196, 80], 0.5 * pulso * escurecer);
+        for (const f of fogos) {
+          const p = naLogo(f.onde);
+          mancha(k2, p, Math.hypot(p.x - lw / 2, p.y - lh / 2) * 1.02, [255, 140, 50], 0.38 * f.forca * escurecer);
+        }
+        const lua = naLogo(boca);
+        mancha(k2, lua, Math.hypot(lua.x - lw / 2, lua.y - lh / 2) * 1.1, [90, 140, 255], 0.14 * escurecer);
+        // De tempos em tempos, um brilho de quatro pontas na ponta do cristal.
+        if (brilhoDoCristal > 0) {
+          const q = Math.max(2, Math.round(lh / 90));
+          desenharBrilho(k2, meioDoCristal.x, lh * 0.04, q, brilhoDoCristal, '#fff6d0', escurecer);
+          k2.globalAlpha = 1;
+        }
+      }
+    }
+
     // Os pontos de luz, por cima da escuridão.
     const p = contexto2d(pontos);
     p.clearRect(0, 0, largura, altura);
@@ -495,6 +560,12 @@ export function criarCaverna(tochas: Tocha[], logo: HTMLElement): Caverna {
       if (largura === 0 || altura === 0) return;
       tempo += dt;
       if (!semMovimento()) {
+        proximoBrilho -= dt;
+        brilhoDoCristal = Math.max(0, brilhoDoCristal - dt * 1.6);
+        if (proximoBrilho <= 0) {
+          proximoBrilho = sortear(3, 6);
+          brilhoDoCristal = 1;
+        }
         soltar(dt);
         atualizar(dt);
         const k = 1 - Math.exp(-SEGUE * dt);

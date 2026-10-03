@@ -2207,7 +2207,32 @@ a.inicio-botao {
   background: none;
 }
 
+/* A caixa da logo, do tamanho dela, flutuando; por cima, a luz da caverna (caverna.ts), recortada
+   no desenho da logo. */
+.inicio-conta-logo-caixa {
+  position: relative;
+  flex: none;
+  animation: inicio-flutua 4.5s ease-in-out infinite;
+}
+
+.inicio-conta-logo-luz {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+}
+
+.inicio-conta-logo-cor {
+  mix-blend-mode: screen;
+}
+
 .inicio-conta-logo {
+  display: block;
   flex: none;
   height: clamp(4rem, 16cqh, 9.5rem);
   width: auto;
@@ -2761,7 +2786,8 @@ a.inicio-botao {
 
 @media (prefers-reduced-motion: reduce) {
   .inicio-tocha,
-  .inicio-caverna {
+  .inicio-caverna,
+  .inicio-conta-logo-caixa {
     animation: none;
   }
 }
