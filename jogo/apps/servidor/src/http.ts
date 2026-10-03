@@ -53,10 +53,13 @@ export function nomeLivreEm(j: JogadorAutenticado, mestres: ReadonlySet<string>,
 // O que vai para o jogo sobre o jogador.
 export const jogadorPublico = (j: JogadorAutenticado, mestres: ReadonlySet<string> = new Set()) => ({
   id: j.id,
+  codigo: j.codigo,
   nome: j.nome,
   criadoEm: j.criadoEm.toISOString(),
   mestre: ehMestre(j, mestres),
   dono: ehDono(j, mestres),
   icone: j.icone,
   nomeLivreEm: nomeLivreEm(j, mestres)?.toISOString() ?? null,
+  // Nunca trocou: a primeira troca é grátis (não espera os dias da regra).
+  primeiraTrocaDeNome: j.nomeTrocadoEm === null,
 });

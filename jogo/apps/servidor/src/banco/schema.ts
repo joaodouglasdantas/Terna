@@ -2,7 +2,16 @@
 // Só vai para o banco o que é do jogador; os dados do jogo (animais, itens...) ficam
 // versionados em @terna/compartilhado.
 
+// O código do jogador: 8 letras e números (sem os que se confundem: 0/O, 1/I/L), mostrado como
+// XXXX-XXXX. Sorteado ao criar a conta; a coluna é única.
+const LETRAS_DO_CODIGO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+export function gerarCodigoDoJogador(): string {
+  const letras = Array.from({ length: 8 }, () => LETRAS_DO_CODIGO[randomInt(LETRAS_DO_CODIGO.length)]).join('');
+  return `${letras.slice(0, 4)}-${letras.slice(4)}`;
+}
+
 import type { DadosSave } from '@terna/compartilhado';
+import { randomInt } from 'node:crypto';
 import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 const criadoEm = () => timestamp({ withTimezone: true }).notNull().defaultNow();
@@ -21,6 +30,9 @@ export const jogadores = pgTable('jogadores', {
   // última vez (a regra dos DIAS_ENTRE_TROCAS_DE_NOME) e se o modo mestre está ligado (só vale
   // para a conta dona, a de EMAILS_MESTRE; ela pode desligar para jogar como uma conta comum).
   icone: text().notNull().default('flor-de-chapeu'),
+  // O código do jogador: único, para identificar a conta (aparece no perfil). As contas de antes
+  // dele ganharam um na migração 0003.
+  codigo: text().notNull().unique().$defaultFn(gerarCodigoDoJogador),
   nomeTrocadoEm: timestamp({ withTimezone: true }),
   modoMestre: boolean().notNull().default(true),
   criadoEm: criadoEm(),

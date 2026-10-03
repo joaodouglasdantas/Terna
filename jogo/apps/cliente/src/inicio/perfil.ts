@@ -2,8 +2,10 @@
 // painel do perfil por cima da tela. No painel:
 // - o ícone: os ícones de perfil (ICONES de @terna/compartilhado; hoje, os comuns), o escolhido
 //   marcado — clicou, trocou;
-// - o nome: troca respeitando a regra (DIAS_ENTRE_TROCAS_DE_NOME entre uma troca e outra; o
-//   servidor diz quando fica livre de novo) — a conta mestre troca quando quiser;
+// - o código do jogador (único, para identificar a conta), com o botão de copiar;
+// - o nome: a primeira troca é grátis (na hora: quem escolheu o nome no cadastro não espera); as
+//   outras respeitam a regra (DIAS_ENTRE_TROCAS_DE_NOME entre uma e outra; o servidor diz quando
+//   fica livre de novo) — a conta mestre troca quando quiser;
 // - o modo mestre, só na conta dona do jogo: desligado, ela joga como uma conta comum (com os
 //   prazos e sem os atalhos de teste), para testar o que todo mundo vê;
 // - sair da conta.
@@ -83,9 +85,25 @@ export function criarPerfil(opcoes: { aoSair: () => void; aoAbrir?: () => void; 
   iconeGrande.draggable = false;
   const nomeGrande = elemento('p', 'inicio-perfil-nome-grande');
   const tipoDaConta = elemento('p', 'inicio-perfil-tipo');
+  // O código do jogador, com o botão de copiar.
+  const linhaDoCodigo = elemento('p', 'inicio-perfil-codigo');
+  const codigo = elemento('span', 'inicio-perfil-codigo-valor');
+  const copiar = botao('Copiar', 'inicio-perfil-copiar', () => {
+    const texto = conta()?.codigo;
+    if (!texto) return;
+    void navigator.clipboard
+      ?.writeText(texto)
+      .then(() => {
+        copiar.textContent = 'Copiado!';
+        window.setTimeout(() => (copiar.textContent = 'Copiar'), 1500);
+      })
+      .catch(() => undefined);
+  });
+  copiar.setAttribute('aria-label', 'Copiar o código do jogador');
+  linhaDoCodigo.append(elemento('span', 'inicio-perfil-codigo-rotulo', 'Código'), codigo, copiar);
   const topo = elemento('div', 'inicio-perfil-topo');
   const quem = elemento('div', 'inicio-perfil-quem');
-  quem.append(nomeGrande, tipoDaConta);
+  quem.append(nomeGrande, tipoDaConta, linhaDoCodigo);
   topo.append(iconeGrande, quem);
 
   // O ícone.
@@ -209,6 +227,8 @@ export function criarPerfil(opcoes: { aoSair: () => void; aoAbrir?: () => void; 
     iconeGrande.src = url;
     nomeDoBotao.textContent = atual.nome;
     nomeGrande.textContent = atual.nome;
+    codigo.textContent = atual.codigo ? `#${atual.codigo}` : '';
+    linhaDoCodigo.hidden = !atual.codigo;
     seloDoBotao.hidden = !atual.mestre;
     tipoDaConta.replaceChildren();
     if (atual.mestre) tipoDaConta.append(elemento('span', 'inicio-conta-selo', 'Mestre'), ' tudo liberado, sem prazos');
@@ -225,6 +245,9 @@ export function criarPerfil(opcoes: { aoSair: () => void; aoAbrir?: () => void; 
     campoNome.disabled = travado;
     salvarNome.disabled = travado || campoNome.value.trim() === atual.nome;
     if (atual.mestre) regraDoNome.textContent = 'Conta mestre: troque quando quiser.';
+    else if (atual.primeiraTrocaDeNome) {
+      regraDoNome.textContent = `A primeira troca é grátis: pode trocar agora. Depois, só a cada ${DIAS_ENTRE_TROCAS_DE_NOME} dias.`;
+    }
     else if (travado && atual.nomeLivreEm) {
       const { dias, dia } = prazo(atual.nomeLivreEm);
       regraDoNome.textContent = `Você poderá trocar de novo em ${dias} ${dias === 1 ? 'dia' : 'dias'} (dia ${dia}).`;

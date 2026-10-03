@@ -393,7 +393,7 @@ export function telaConta(aviso = ''): Promise<Entrou> {
       const nome = campo('Nome de jogador', 'text', 'nickname', { maxLength: 12, placeholder: 'Como te chamam?' });
       const contador = elemento('span', 'inicio-campo-contador', '0/12');
       nome.rotulo.querySelector('.inicio-campo-cabeca')?.append(contador);
-      nome.aviso.textContent = 'Aparece em cima do seu personagem na partida.';
+      nome.aviso.textContent = 'Aparece em cima do seu personagem. A primeira troca depois é grátis.';
       nome.entrada.addEventListener('input', () => (contador.textContent = `${nome.entrada.value.length}/12`));
       const email = campo('E-mail', 'email', 'email', { placeholder: 'voce@exemplo.com', value: emailInicial, maxLength: 254 });
       const senha = campoDeSenha('Senha', 'new-password', 'Pelo menos 8 caracteres');

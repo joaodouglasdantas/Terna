@@ -306,6 +306,11 @@ describe('perfil', () => {
     const token = await criarConta(app, 'icones');
     const eu = await app.inject({ method: 'GET', url: '/api/eu', headers: autorizado(token) });
     expect(eu.json().icone).toBe('flor-de-chapeu');
+    // O código do jogador: único, no formato XXXX-XXXX.
+    expect(eu.json().codigo).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    const outra = await criarConta(app, 'icones2');
+    const codigoDaOutra = (await app.inject({ method: 'GET', url: '/api/eu', headers: autorizado(outra) })).json().codigo;
+    expect(codigoDaOutra).not.toBe(eu.json().codigo);
     const trocou = await app.inject({ method: 'PUT', url: '/api/eu/icone', headers: autorizado(token), payload: { icone: 'golem-do-ninho' } });
     expect(trocou.statusCode).toBe(200);
     expect(trocou.json().icone).toBe('golem-do-ninho');
@@ -322,8 +327,12 @@ describe('perfil', () => {
     expect(deOutro.json().erro).toMatch(/em uso/);
     const invalido = await app.inject({ method: 'PUT', url: '/api/eu/nome', headers: autorizado(token), payload: { nome: 'a b' } });
     expect(invalido.statusCode).toBe(400);
+    // A primeira troca é grátis: na hora, sem esperar.
+    const antes = await app.inject({ method: 'GET', url: '/api/eu', headers: autorizado(token) });
+    expect(antes.json()).toMatchObject({ primeiraTrocaDeNome: true, nomeLivreEm: null });
     const trocou = await app.inject({ method: 'PUT', url: '/api/eu/nome', headers: autorizado(token), payload: { nome: 'nomedois' } });
     expect(trocou.statusCode).toBe(200);
+    expect(trocou.json().primeiraTrocaDeNome).toBe(false);
     expect(trocou.json().nome).toBe('nomedois');
     const livre = new Date(trocou.json().nomeLivreEm).getTime();
     expect(livre - Date.now()).toBeGreaterThan(29 * 24 * 3600 * 1000);
@@ -356,7 +365,7 @@ describe('perfil', () => {
     await comMestre.inject({ method: 'POST', url: '/api/contas', payload: { nome: 'donaum', email, senha: 'senha-boa-123' } });
     const codigo = (await comMestre.inject({ method: 'GET', url: `/api/teste/codigo?email=${email}` })).json().codigo;
     const token = (await comMestre.inject({ method: 'POST', url: '/api/contas/confirmar', payload: { email, codigo } })).json().token;
-    const pedir = (url: string, payload: unknown) => comMestre.inject({ method: 'PUT', url, headers: autorizado(token), payload });
+    const pedir = (url: string, payload: Record<string, unknown>) => comMestre.inject({ method: 'PUT', url, headers: autorizado(token), payload });
 
     expect((await pedir('/api/eu/nome', { nome: 'donadois' })).statusCode).toBe(200);
     const semPrazo = await pedir('/api/eu/nome', { nome: 'donatres' });

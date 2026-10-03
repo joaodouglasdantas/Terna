@@ -72,15 +72,19 @@ export const DIAS_ENTRE_TROCAS_DE_NOME = 30;
 
 // `dono`: a conta oficial do jogo (EMAILS_MESTRE no servidor). `mestre`: o modo mestre ligado,
 // com tudo liberado para testar — o dono pode desligar para jogar como uma conta comum.
-// `nomeLivreEm`: quando o nome pode ser trocado de novo (null: já pode).
+// `nomeLivreEm`: quando o nome pode ser trocado de novo (null: já pode). `primeiraTrocaDeNome`:
+// a troca grátis de quem nunca trocou (a primeira não espera os 30 dias). `codigo`: o código único
+// do jogador.
 export const Jogador = z.object({
   id: z.string(),
+  codigo: z.string().default(''),
   nome: z.string(),
   criadoEm: z.string(),
   mestre: z.boolean().default(false),
   dono: z.boolean().default(false),
   icone: IdIcone.catch(ICONE_PADRAO).default(ICONE_PADRAO),
   nomeLivreEm: z.string().nullable().default(null),
+  primeiraTrocaDeNome: z.boolean().default(false),
 });
 export type Jogador = z.infer<typeof Jogador>;
 
