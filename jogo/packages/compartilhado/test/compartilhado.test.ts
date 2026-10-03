@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   Apelido,
+  CodigoEmail,
   CodigoSala,
   CriarConta,
   DadosSave,
@@ -18,9 +19,27 @@ import {
 } from '../src';
 
 describe('contas', () => {
+  const email = 'joao@exemplo.com';
   it('aceita um cadastro válido e recusa nome com espaço', () => {
-    expect(CriarConta.safeParse({ nome: 'joao_d', senha: '12345678' }).success).toBe(true);
-    expect(CriarConta.safeParse({ nome: 'joão d', senha: '12345678' }).success).toBe(false);
+    expect(CriarConta.safeParse({ nome: 'joao_d', email, senha: '12345678' }).success).toBe(true);
+    expect(CriarConta.safeParse({ nome: 'joão d', email, senha: '12345678' }).success).toBe(false);
+  });
+
+  it('pede o e-mail, guarda ele em minúsculas e limita o nome ao tamanho do apelido', () => {
+    expect(CriarConta.safeParse({ nome: 'joao_d', senha: '12345678' }).success).toBe(false);
+    expect(CriarConta.safeParse({ nome: 'joao_d', email: 'nao-e-email', senha: '12345678' }).success).toBe(false);
+    expect(CriarConta.parse({ nome: 'joao_d', email: '  Joao@Exemplo.COM ', senha: '12345678' }).email).toBe(email);
+    // O nome da conta vai em cima da cabeça nas partidas: tem de servir de apelido.
+    const nome = CriarConta.parse({ nome: 'abcdefghijkl', email, senha: '12345678' }).nome;
+    expect(Apelido.safeParse(nome).success).toBe(true);
+    expect(CriarConta.safeParse({ nome: 'abcdefghijklm', email, senha: '12345678' }).success).toBe(false);
+  });
+
+  it('o código do e-mail tem 6 números', () => {
+    expect(CodigoEmail.safeParse('012345').success).toBe(true);
+    expect(CodigoEmail.safeParse(' 012345 ').success).toBe(true);
+    expect(CodigoEmail.safeParse('12345').success).toBe(false);
+    expect(CodigoEmail.safeParse('12a456').success).toBe(false);
   });
 });
 

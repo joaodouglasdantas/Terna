@@ -406,7 +406,7 @@ export function bloqueioDosPoderes(p: Personagem): string | null {
   if (!personagemLivre(p)) return 'TRANSFORMANDO';
   if (p.manobra) return 'NO MEIO DO GOLPE';
   if (formaDo(p) === 'golem') return null;
-  if (p.modo !== 'poderes') return 'APERTE R PARA OS PODERES';
+  if (p.modo !== 'poderes') return 'ESCOLHA UM PODER (BOTAO DIREITO)';
   if (poderEscolhido(p.poderes) === 'golem' && p.golem.recarga > 0) return `GOLEM EM RECARGA: ${Math.ceil(p.golem.recarga)}S`;
   const custo = custoDeEnergia(p);
   if (p.energia < custo) return `ENERGIA PIXY: ${Math.floor(p.energia)} DE ${custo}`;
@@ -682,8 +682,43 @@ function controlesDoEncanto(p: Personagem, encanto: Encanto): Controles {
   return { esquerda: dx < -PERTO_DO_DONO, direita: dx > PERTO_DO_DONO, pular: false, transformar: false };
 }
 
-// Apertou R. A Leslie troca o clique esquerdo entre a arma e os poderes (a do outro online chega
-// pela rede, com o estado dele). O Anjo, na forma base, só vira anjo com a barra de energia pixy
+// O poder `i` da lista está carregado: a recarga acabou e há energia pixy para ele (o golem, a
+// recarga da transformação também). Só os carregados podem ser escolhidos.
+export function poderCarregado(p: Personagem, i: number): boolean {
+  const poder = p.poderes.lista[i];
+  if (p.poderes.recarga[i] > 0) return false;
+  if (poder === 'golem' && p.golem.recarga > 0) return false;
+  return p.energia >= custoDeEnergia(p, poder);
+}
+
+// Botão direito: passa para o próximo quadrinho da fileira. Na Leslie e no Grow de gente a fileira
+// é a arma (ou o soco) e os três poderes, e a volta fecha no começo: arma, 1, 2, 3, arma… (a
+// arma na mão no primeiro; os poderes e as imagens deles nos outros). Poder que não está carregado
+// é pulado; se nenhum outro serve, a escolha fica onde está. O Anjo de anjo e o golem não têm
+// arma: passam só pelos poderes carregados. Na forma base do Anjo não há o que escolher.
+export function passarSelecao(p: Personagem): void {
+  const { poderes } = p;
+  const comArma = p.heroi !== 'anjo' && formaDo(p) === 'base';
+  if (p.heroi === 'anjo' && formaDo(p) !== 'anjo') return;
+  // -1 é o quadrinho da arma; 0, 1, 2 são os poderes.
+  const fileira = poderes.lista.map((_, i) => i);
+  if (comArma) fileira.unshift(-1);
+  const agora = comArma && p.modo === 'arma' ? -1 : poderes.selecionado;
+  const posicao = fileira.indexOf(agora);
+  for (let passo = 1; passo < fileira.length; passo++) {
+    const quadrinho = fileira[(posicao + passo) % fileira.length];
+    if (quadrinho === -1) {
+      p.modo = 'arma';
+      return;
+    }
+    if (!poderCarregado(p, quadrinho)) continue;
+    poderes.selecionado = quadrinho;
+    if (comArma) p.modo = 'poderes';
+    return;
+  }
+}
+
+// Apertou R. O golem do Grow desfaz a pedra. O Anjo, na forma base, só vira anjo com a barra de energia pixy
 // cheia e a recarga pronta (senão avisa o que falta) e a transformação gasta a energia. O outro
 // online vira quando ele virou lá: a energia dele vem da rede e já chega gasta.
 function apertouTransformar(p: Personagem): void {
@@ -692,10 +727,9 @@ function apertouTransformar(p: Personagem): void {
     if (!p.manobra) alternarGolem(p.golem, p.daRede);
     return;
   }
-  if (p.heroi !== 'anjo') {
-    if (!p.daRede) p.modo = p.modo === 'arma' ? 'poderes' : 'arma';
-    return;
-  }
+  // A Leslie e o Grow de gente não trocam mais de modo no R: arma e poderes estão na mesma
+  // fileira, e o botão direito passa por todos (passarSelecao).
+  if (p.heroi !== 'anjo') return;
   const base = formaDo(p) === 'base' && !transformando(p.anjo);
   if (base && !p.daRede) {
     if (p.anjo.recarga > 0) return avisar(p.poderes, `ANJO EM RECARGA: ${Math.ceil(p.anjo.recarga)}S`);

@@ -23,7 +23,7 @@ import { elemento } from './dom';
 
 // Uma linha sobre cada poder. Só o Tab mostra (e só os do seu personagem): na escolha de
 // personagem não aparece o que cada um faz.
-const SOBRE_PODER: Record<IdPoder, string> = {
+export const SOBRE_PODER: Record<IdPoder, string> = {
   chicote: 'uma vinha de espinhos que envenena; o veneno cura você',
   raizes: 'uma fileira de raízes rompe a terra e prende; a última, por mais tempo',
   flor: 'com a energia cheia: uma flor carnívora brota, persegue (até por baixo da terra) e cospe de longe bolas de veneno, uma alta e uma baixa',
@@ -56,9 +56,8 @@ const ARMAS: Linha[] = [
 ];
 
 const PODERES: Linha[] = [
-  [['R'], 'Trocar o que o clique usa: a arma ou os poderes'],
-  [['Clique dir.'], 'Passar para o próximo poder (o quadrinho aceso no painel)'],
-  [['Clique esq.'], 'Usar o poder escolhido, na direção da mira'],
+  [['Clique dir.'], 'Passar pela fileira: arma, poder 1, 2, 3 (poder descarregado é pulado)'],
+  [['Clique esq.'], 'Usar o que está escolhido (moldura verde): a arma ou o poder, na direção da mira'],
 ];
 
 const PARTIDA: Linha[] = [

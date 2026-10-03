@@ -85,6 +85,25 @@ exato do jogo (`https://terna.pages.dev`, sem barra no fim). Mais de um endereç
 vírgula. O Render reinicia o serviço ao salvar. Sem isso o navegador bloqueia o jogo de falar com
 o servidor.
 
+### 5. E-mails — Brevo
+
+O cadastro e o "esqueci a senha" mandam um código de 6 números por e-mail. O Render grátis
+bloqueia o SMTP, então o envio é pela API do **Brevo** (grátis até 300 e-mails por dia, sem
+cartão e sem domínio próprio).
+
+1. Crie a conta em <https://www.brevo.com> e confirme o seu e-mail.
+2. Em **Senders, Domains & Dedicated IPs → Senders**, adicione o e-mail que vai aparecer como
+   remetente (pode ser o seu Gmail) e confirme o link que o Brevo manda para ele.
+3. Em **SMTP & API → API Keys**, crie uma chave (**Generate a new API key**) e copie.
+4. No Render, em **terna-servidor → Environment**, preencha:
+   - **BREVO_API_KEY:** a chave do passo 3.
+   - **EMAIL_REMETENTE:** o e-mail do passo 2.
+5. Salve (o Render reinicia o serviço). Crie uma conta no jogo para conferir que o e-mail chega
+   (olhe também o spam na primeira vez).
+
+Sem essas duas variáveis o servidor não manda e-mail: o código aparece só no log do Render. Em casa
+(`npm run dev`) é assim que se testa: o código aparece no terminal do servidor.
+
 Pronto: abra o endereço do jogo.
 
 ---

@@ -14,8 +14,28 @@ export const jogadores = pgTable('jogadores', {
   nomeNormalizado: text().notNull().unique(),
   email: text().unique(),
   senhaHash: text().notNull(),
+  // Quando o código do e-mail foi conferido. Sem isso a conta não entra (o cadastro ficou pela
+  // metade). As contas de antes da confirmação valem como confirmadas (migração 0001).
+  emailConfirmadoEm: timestamp({ withTimezone: true }),
   criadoEm: criadoEm(),
 });
+
+// Os códigos que vão por e-mail: um por conta e por motivo ('confirmar' o cadastro ou trocar a
+// 'senha'), trocado a cada pedido. Só o hash fica aqui; erros demais apagam o código.
+export const codigosEmail = pgTable(
+  'codigos_email',
+  {
+    jogadorId: uuid()
+      .notNull()
+      .references(() => jogadores.id, { onDelete: 'cascade' }),
+    motivo: text().$type<'confirmar' | 'senha'>().notNull(),
+    codigoHash: text().notNull(),
+    tentativas: integer().notNull().default(0),
+    criadoEm: criadoEm(),
+    expiraEm: timestamp({ withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.jogadorId, t.motivo] })],
+);
 
 // Cada login é uma sessão; o token só existe com o jogador, aqui fica o hash dele.
 export const sessoes = pgTable(

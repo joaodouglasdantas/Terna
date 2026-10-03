@@ -71,6 +71,30 @@ function relogio(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+// Os textos da tela, quando ela serve para outra coisa que a partida sozinho: o treino.
+export interface TextosDaSelecao {
+  titulo: string;
+  sub: string;
+  voltar: string;
+  jogar: string;
+}
+
+// A escolha do treino (o atalho Treinamento da tela inicial).
+export const TEXTOS_DO_TREINO: TextosDaSelecao = {
+  titulo: 'Treinamento',
+  sub: 'Escolha com quem treinar: o tutorial mostra os controles e os poderes dele',
+  voltar: 'Voltar',
+  jogar: 'Treinar',
+};
+
+// A primeira vez, logo depois de criar a conta: o personagem do tutorial (ou pular).
+export const TEXTOS_DO_PRIMEIRO_TREINO: TextosDaSelecao = {
+  titulo: 'Escolha seu personagem',
+  sub: 'Você vai aprender a jogar com ele numa partida de treino',
+  voltar: 'Já sei jogar',
+  jogar: 'Começar',
+};
+
 interface Cartao {
   heroi: Heroi;
   elemento: HTMLButtonElement;
@@ -133,11 +157,16 @@ function desenharSprite(c: Cartao, escolhido: boolean, tempo: number): void {
   ctx.drawImage(imagem, Math.round(c.sprite.width / 2 - eixo), c.sprite.height - 1 - imagem.height);
 }
 
-export function telaSelecao(sala?: SalaNaSelecao): Promise<ResultadoSelecao> {
+// `textos`: sozinho, os textos de outra escolha (o treino); o 'voltou' é o botão de voltar dela.
+export function telaSelecao(sala?: SalaNaSelecao, textos?: TextosDaSelecao): Promise<ResultadoSelecao> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-selecao-tela');
-    const titulo = elemento('h1', 'inicio-titulo', 'Escolha o personagem');
-    const sub = elemento('p', 'inicio-sub', sala ? `Partida contra ${sala.oponente}` : 'A CPU espera a sua escolha e fica com outro personagem');
+    const titulo = elemento('h1', 'inicio-titulo', textos?.titulo ?? 'Escolha o personagem');
+    const sub = elemento(
+      'p',
+      'inicio-sub',
+      sala ? `Partida contra ${sala.oponente}` : (textos?.sub ?? 'A CPU espera a sua escolha e fica com outro personagem'),
+    );
     const grade = elemento('div', 'inicio-cartoes');
     grade.setAttribute('role', 'radiogroup');
     grade.setAttribute('aria-label', 'Personagens');
@@ -212,7 +241,7 @@ export function telaSelecao(sala?: SalaNaSelecao): Promise<ResultadoSelecao> {
       else void sairComEsmaecer(tela).then(() => resolver(resultado));
     };
 
-    const jogar = botao('Jogar', 'inicio-botao inicio-jogar', () => {
+    const jogar = botao(textos?.jogar ?? 'Jogar', 'inicio-botao inicio-jogar', () => {
       if (confirmado || !escolhido || escolhido === doOutro) return;
       if (!sala) return terminar({ tipo: 'escolheu', heroi: escolhido });
       // Online: manda a escolha, que o outro vê na hora, e espera ele (a partida começa quando os
@@ -223,7 +252,7 @@ export function telaSelecao(sala?: SalaNaSelecao): Promise<ResultadoSelecao> {
       estado.textContent = `Pronto! ${podeTrocar}`;
       pintar();
     });
-    const voltar = botao(sala ? 'Sair da sala' : 'Voltar', 'inicio-botao inicio-botao-claro', () => {
+    const voltar = botao(sala ? 'Sair da sala' : (textos?.voltar ?? 'Voltar'), 'inicio-botao inicio-botao-claro', () => {
       sala?.conexao.fechar();
       terminar({ tipo: 'voltou' });
     });

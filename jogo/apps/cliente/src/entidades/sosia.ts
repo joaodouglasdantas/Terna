@@ -283,13 +283,13 @@ export function pensarSosia(
   const podeApertar = corpo.noChao && c.segurando <= 0 && !corpo.transformarSegurado;
   if (corpo.heroi !== 'anjo') {
     // Com uma arma boa (ou sem energia nem para o primeiro poder), o modo arma; senão, os
-    // poderes. Aperta R por um quadro só. De golem não aperta (desfaria a pedra).
+    // poderes. Muda o modo por um quadro só (não há tecla para isso). De golem não muda.
     const semEnergia = corpo.energia < custoDeEnergia(corpo, corpo.poderes.lista[0]);
     // O Grow com a barra cheia quer os poderes: o terceiro vira golem.
     const cheia = podeVirarGolem(corpo);
     const quer: Modo = (guardando || semEnergia) && !cheia ? 'arma' : 'poderes';
     if (forma === 'base' && corpo.modo !== quer && podeApertar && !corpo.canalizando) {
-      controles.transformar = true;
+      corpo.modo = quer;
       return decisao;
     }
   } else {

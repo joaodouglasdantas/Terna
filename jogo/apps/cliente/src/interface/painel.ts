@@ -7,8 +7,8 @@
 // barra, do ícone para a ponta, com um clarão na frente, e ela fica assim (e brilhando) até ser
 // gasta — verde na Leslie, marrom no Grow, lilás no Anjo.
 // - Leslie: o da arma da mão e os três dos poderes, lado a lado; o que o clique esquerdo usa
-//   agora (a tecla R troca) fica aceso e o outro lado, apagado. A barra cheia é a Flor Carnívora
-//   pronta.
+//   agora (o botão direito passa por todos) fica com a moldura verde. A barra cheia é a Flor
+//   Carnívora pronta.
 // - Grow: de gente, como a Leslie (a barra cheia: dá para virar golem); de golem, a barra de pedra
 //   com o tempo que resta, descendo, e os três poderes do golem.
 // - Anjo: na forma base, a energia pixy (cheia, dá para virar anjo) e o quadrinho da arma; de
@@ -500,8 +500,8 @@ const MOLDURA_ESPACO = 'rgba(255, 250, 240, 0.32)';
 const COR_SEGUNDOS = '#ffffff';
 const COR_AVISO = '#fff4dc';
 
-// Um quadrinho de poder. Sem os poderes na mão (o Anjo fora da forma de anjo, a Leslie no modo
-// arma) ou sem a energia da Flor, o ícone fica apagado. Em recarga, uma sombra cobre o ícone e
+// Um quadrinho de poder. Sem poder usar (caído, enfeitiçado, transformando) ou sem a energia dele,
+// o ícone fica apagado; o escolhido tem a moldura verde. Em recarga, uma sombra cobre o ícone e
 // desce, sumindo de cima para baixo conforme o tempo passa, com os segundos que faltam por cima.
 function desenharEspaco(
   p: Pincel,
@@ -513,7 +513,7 @@ function desenharEspaco(
   falta: number,
   total: number,
 ): void {
-  p.arredondado(x, y, ESPACO, ESPACO, escolhido && ativo ? MOLDURA_ESCOLHIDO : MOLDURA_ESPACO);
+  p.arredondado(x, y, ESPACO, ESPACO, escolhido ? MOLDURA_ESCOLHIDO : MOLDURA_ESPACO);
   p.retangulo(x + 1, y + 1, ESPACO - 2, ESPACO - 2, 'rgba(26, 10, 22, 0.85)');
   p.imagem(icone, x + 1, y + 1, ativo ? (falta > 0 ? 0.55 : 1) : 0.3);
   if (falta <= 0) return;
@@ -524,20 +524,23 @@ function desenharEspaco(
 }
 
 // O quadrinho da arma: sem arma, o punho do soco; com ela, o ícone e, embaixo, a barrinha do
-// tempo que ela ainda dura, que se esvazia até quebrar. `ativo`: o clique esquerdo usa a arma agora
-// (a Leslie no modo poderes a deixa apagada).
-function desenharEspacoDaArma(p: Pincel, arma: ArmaNaMao | null, tempo: number, ativo = true): void {
+// tempo que ela ainda dura, que se esvazia até quebrar. `ativo`: o clique esquerdo usa a arma agora.
+// `naFileira` (a Leslie e o Grow de gente): o quadrinho é o primeiro da fileira que o botão direito
+// percorre; escolhido, ganha a moldura verde, e não escolhido só perde a moldura (o ícone não apaga).
+function desenharEspacoDaArma(p: Pincel, arma: ArmaNaMao | null, tempo: number, ativo = true, naFileira = false): void {
   const ARMA_X = BARRA_X; // a arma abre a fileira
   const acabando = arma !== null && arma.durabilidade < ACABANDO;
   const apaga = acabando && Math.floor(tempo * 8) % 2 === 0;
-  p.arredondado(ARMA_X, ESPACOS_Y, ESPACO, ESPACO, arma && ativo ? MOLDURA_ARMA : MOLDURA_ESPACO);
+  const moldura = naFileira ? (ativo ? MOLDURA_ESCOLHIDO : MOLDURA_ESPACO) : arma && ativo ? MOLDURA_ARMA : MOLDURA_ESPACO;
+  const apagado = naFileira ? 1 : 0.3; // o ícone apaga quando o clique não usa a arma, menos na fileira
+  p.arredondado(ARMA_X, ESPACOS_Y, ESPACO, ESPACO, moldura);
   p.retangulo(ARMA_X + 1, ESPACOS_Y + 1, ESPACO - 2, ESPACO - 2, 'rgba(26, 10, 22, 0.85)');
   if (!arma) {
     // Sem arma: o soco (apagadinho — é o ataque mais fraco).
-    p.imagem(PUNHO, ARMA_X + 1, ESPACOS_Y + 1, ativo ? 0.85 : 0.3);
+    p.imagem(PUNHO, ARMA_X + 1, ESPACOS_Y + 1, ativo || naFileira ? 0.85 : apagado);
     return;
   }
-  p.imagem(ICONES_ARMAS[arma.tipo], ARMA_X + 1, ESPACOS_Y + 1, !ativo ? 0.3 : apaga ? 0.45 : 1);
+  p.imagem(ICONES_ARMAS[arma.tipo], ARMA_X + 1, ESPACOS_Y + 1, !ativo ? apagado : apaga ? 0.45 : 1);
   const largura = ESPACO - 2;
   const cheia = Math.ceil(largura * Math.min(1, arma.durabilidade / DADOS_ARMA[arma.tipo].durabilidade));
   p.retangulo(ARMA_X + 1, ESPACOS_Y + ESPACO - 2, largura, 1, DURABILIDADE.fundo);
@@ -596,7 +599,7 @@ export function desenharPainel(
     if (formaDo(personagem) === 'golem') {
       desenharPoderes(p, personagem);
     } else {
-      desenharEspacoDaArma(p, personagem.arma, tempo, personagem.modo === 'arma');
+      desenharEspacoDaArma(p, personagem.arma, tempo, personagem.modo === 'arma', true);
       desenharPoderes(p, personagem, ESPACO + ENTRE_ESPACOS);
     }
   } else if (personagem.heroi === 'leslie') {
@@ -612,7 +615,7 @@ export function desenharPainel(
       p.retangulo(BARRA_X + 1 + x, ANJO_Y + 1, 1, 3, cor);
     }
     if (cheia) desenharBrilho(p, ANJO_Y, 3, tempo, ENERGIA_LESLIE.brilho);
-    desenharEspacoDaArma(p, personagem.arma, tempo, personagem.modo === 'arma');
+    desenharEspacoDaArma(p, personagem.arma, tempo, personagem.modo === 'arma', true);
     desenharPoderes(p, personagem, ESPACO + ENTRE_ESPACOS);
   } else {
     const anjo = barraDoAnjo(personagem.anjo, personagem.energia);
@@ -661,9 +664,11 @@ function desenharBrilho(p: Pincel, y: number, altura: number, tempo: number, bor
 // Os três quadrinhos de poder, a partir de `desde` px depois do começo da fileira.
 function desenharPoderes(p: Pincel, personagem: Personagem, desde = 0): void {
   const { poderes } = personagem;
-  const prontos = usaPoderes(personagem) && personagemLivre(personagem) && !personagem.encanto && personagem.vida > 0;
+  // Fora do modo poderes (a arma escolhida) eles seguem acesos: o botão direito passa por eles.
+  const prontos = personagemLivre(personagem) && !personagem.encanto && personagem.vida > 0;
+  const naMao = usaPoderes(personagem);
   poderes.lista.forEach((poder, i) => {
-    const escolhido = i === poderes.selecionado;
+    const escolhido = naMao && i === poderes.selecionado;
     // Tentou usar e não saiu: o quadrinho escolhido treme de lado.
     const tremor = escolhido && poderes.tremor > 0 ? Math.round(Math.sin(poderes.tremor * 70)) : 0;
     const x = BARRA_X + desde + i * (ESPACO + ENTRE_ESPACOS) + tremor;
@@ -676,6 +681,30 @@ function desenharPoderes(p: Pincel, personagem: Personagem, desde = 0): void {
         : [poderes.recarga[i], RECARGA_PODER[poder]];
     desenharEspaco(p, x, ESPACOS_Y, ICONES[poder], escolhido, ativo, falta, total);
   });
+}
+
+// Onde fica cada parte do seu painel (o da esquerda), em pixels da tela do jogo: o tutorial aponta
+// para elas. `comArma`: a fileira começa pelo quadrinho da arma (a Leslie e o Grow de gente); sem
+// ele (o golem, o Anjo de anjo), os poderes começam no lugar dela.
+export type ParteDoPainel = 'vida' | 'energia' | 'arma' | 'poderes' | 'poder1' | 'poder2' | 'poder3';
+export function areaNoSeuPainel(parte: ParteDoPainel, comArma = true): { x: number; y: number; w: number; h: number } {
+  const x = MARGEM + BARRA_X;
+  const passo = ESPACO + ENTRE_ESPACOS;
+  const poderes = x + (comArma ? passo : 0);
+  switch (parte) {
+    case 'vida':
+      return { x, y: MARGEM + VIDA_Y, w: BARRA + 2, h: 7 };
+    case 'energia':
+      return { x, y: MARGEM + ANJO_Y, w: BARRA + 2, h: 5 };
+    case 'arma':
+      return { x, y: MARGEM + ESPACOS_Y, w: ESPACO, h: ESPACO };
+    case 'poderes':
+      return { x: poderes, y: MARGEM + ESPACOS_Y, w: 3 * ESPACO + 2 * ENTRE_ESPACOS, h: ESPACO };
+    default: {
+      const i = Number(parte.slice(-1)) - 1;
+      return { x: poderes + i * passo, y: MARGEM + ESPACOS_Y, w: ESPACO, h: ESPACO };
+    }
+  }
 }
 
 // O ícone de um poder (11×11), para a tela de seleção mostrar os poderes de cada personagem.

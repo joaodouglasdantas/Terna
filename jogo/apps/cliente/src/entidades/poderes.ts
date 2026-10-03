@@ -103,11 +103,6 @@ export function poderEscolhido(p: Poderes): IdPoder {
   return p.lista[p.selecionado];
 }
 
-// Botão direito: o próximo quadrinho, dando a volta no último.
-export function trocarPoder(p: Poderes): void {
-  p.selecionado = (p.selecionado + 1) % p.lista.length;
-}
-
 export function avisar(p: Poderes, texto: string): void {
   p.aviso = { texto, resta: AVISO };
   p.tremor = TREMOR;

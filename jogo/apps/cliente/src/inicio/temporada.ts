@@ -22,8 +22,7 @@ export const TEMPORADA = {
 
 const DICAS = [
   'Dica: na partida, a tecla Tab mostra todos os controles.',
-  'Dica: a tecla R troca a arma da mão pelos poderes.',
-  'Dica: o botão direito do mouse passa para o próximo poder.',
+  'Dica: o botão direito do mouse passa da arma para os poderes, pulando os que ainda não carregaram.',
   'Dica: dar dano enche a energia pixy; cada poder gasta a dele.',
   'Dica: dois toques rápidos para um lado dão um arranco.',
   'Dica: o golem do Grow segura parte do dano com a pele de pedra.',

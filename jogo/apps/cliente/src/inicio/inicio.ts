@@ -3,7 +3,7 @@
 // o nome e os modos de jogo. São páginas comuns por cima do canvas: a logo é uma imagem grande
 // e o texto precisa ficar nítido, o que o canvas de 480×270 ampliado não daria.
 
-import { Apelido, type Heroi } from '@terna/compartilhado';
+import { Apelido, type Heroi, type Jogador } from '@terna/compartilhado';
 import logoSimplesUrl from '../assets/logo-simples.webp';
 import logoUrl from '../assets/logo.webp';
 import { carregarDecodificada } from '../motor/imagens';
@@ -18,7 +18,7 @@ import { botaoDaMusica } from './musica';
 import { telaMultiplayer, type EscolhaOnline } from './multiplayer';
 import { botaoDaOpiniao } from './opiniao';
 import { telaPersonagens } from './personagens';
-import { telaSelecao } from './selecao';
+import { TEXTOS_DO_TREINO, telaSelecao } from './selecao';
 import { carregarArteDaTemporada } from './temporada';
 import { carregarRetratos } from './terras';
 
@@ -41,8 +41,12 @@ interface Opcoes<C, H> {
   carregarHerois: () => Promise<H>;
 }
 
-// O que a pessoa escolheu na tela inicial (e na seleção de personagem).
-export type Escolha = { modo: 'solo'; nome: string; heroi: Heroi } | EscolhaOnline;
+// O que a pessoa escolheu na tela inicial (e na seleção de personagem). 'treino': a partida de
+// treino com o tutorial (inicio/tutorial.ts), contra o boneco.
+export type Escolha = { modo: 'solo'; nome: string; heroi: Heroi } | { modo: 'treino'; nome: string; heroi: Heroi } | EscolhaOnline;
+
+// Saiu da conta na tela inicial: o jogo volta para a tela de entrar.
+export const SAIU_DA_CONTA = 'saiu-da-conta';
 
 // A logo simples (só as letras, em branco) do carregamento. A imagem tem margem vazia em volta
 // das letras: a moldura tem a proporção só das letras e corta o resto (ver inicio.css).
@@ -211,6 +215,8 @@ const AVISO_ESMAECE_MS = 1200;
 // Os ícones dos atalhos, em pixels ('#' aceso): um busto e um marcador de mapa.
 const ICONE_PERSONAGENS = ['...###...', '..#####..', '..#####..', '...###...', '....#....', '.#######.', '#########', '#########'];
 const ICONE_MAPA = ['..####..', '.######.', '###..###', '###..###', '.######.', '..####..', '...##...', '...##...'];
+// O alvo do treino: os anéis de um alvo de arco e flecha.
+const ICONE_TREINO = ['..####..', '.#....#.', '#..##..#', '#.#..#.#', '#.#..#.#', '#..##..#', '.#....#.', '..####..'];
 
 function iconeDePixels(linhas: string[]): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -245,7 +251,9 @@ function atalho(texto: string, icone: string[]): HTMLButtonElement {
 // servidor, o Multiplayer fica apagado.
 // `aviso`: a sala da partida online caiu (o outro saiu, o tempo de escolher acabou, a rede caiu):
 // aparece em cima do nome e some sozinho, esmaecendo (antes, se a pessoa abrir outra tela).
-export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
+// `conta`: dentro da conta, o nome é o dela (no lugar do campo, com o botão de sair da conta, que
+// termina a tela com SAIU_DA_CONTA). Sem conta (offline), o campo do apelido, como antes.
+export function escolherModo(online: boolean, aviso = '', conta: Jogador | null = null): Promise<Escolha | typeof SAIU_DA_CONTA> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-titulo-tela');
     const avisoDaSala = elemento('p', 'inicio-sala-caiu');
@@ -283,8 +291,23 @@ export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
       entrada.removeAttribute('aria-invalid');
     });
 
-    // O nome vale para os dois modos: sem nome válido, avisa e volta para o campo.
+    // Com conta: o nome dela no lugar do campo, e o botão de sair da conta.
+    const faixaDaConta = elemento('div', 'inicio-conta-faixa');
+    if (conta) {
+      const quem = elemento('p', 'inicio-conta-quem');
+      quem.append('Jogando como ', elemento('strong', '', conta.nome));
+      const sair = botao('Sair da conta', 'inicio-link', () => {
+        window.removeEventListener('keydown', aoTeclar);
+        mostrarAviso('');
+        void sairComEsmaecer(tela).then(() => resolver(SAIU_DA_CONTA));
+      });
+      faixaDaConta.append(quem, sair);
+    }
+
+    // O nome vale para os dois modos: sem nome válido, avisa e volta para o campo. Com conta, é o
+    // nome dela (que já segue as regras do apelido).
     const nomeValido = (): string | null => {
+      if (conta) return conta.nome.slice(0, 12);
       const nome = Apelido.safeParse(entrada.value);
       if (nome.success) {
         guardarNome(nome.data);
@@ -346,10 +369,22 @@ export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
       });
       return b;
     };
+    // O treino: escolhe a Leslie ou o Grow e cai na partida de treino, com o tutorial.
+    const treino = atalho('Treinamento', ICONE_TREINO);
+    treino.addEventListener('click', () => {
+      const nome = nomeValido();
+      if (!nome) return;
+      window.removeEventListener('keydown', aoTeclar);
+      mostrarAviso('');
+      void telaSelecao(undefined, TEXTOS_DO_TREINO).then((r) => {
+        if (r.tipo === 'escolheu') resolver({ modo: 'treino', nome, heroi: r.heroi });
+        else voltarParaCa(treino);
+      });
+    });
     const personagens = abrirAoClicar(atalho('Personagens', ICONE_PERSONAGENS), telaPersonagens);
     const mapa = abrirAoClicar(atalho('Mapa', ICONE_MAPA), telaMapa);
     const atalhos = elemento('div', 'inicio-atalhos');
-    atalhos.append(personagens, mapa, botaoDaMusica('inicio-botao inicio-botao-claro inicio-atalho'));
+    atalhos.append(treino, personagens, mapa, botaoDaMusica('inicio-botao inicio-botao-claro inicio-atalho'));
 
     // Enter joga sozinho (também de dentro do campo de nome); Espaço só fora do campo.
     const aoTeclar = (evento: KeyboardEvent): void => {
@@ -363,7 +398,8 @@ export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
     window.addEventListener('keydown', aoTeclar);
 
     const modos = elemento('div', 'inicio-modos');
-    modos.append(avisoDaSala, campo, erroNome, solo, multiplayer);
+    if (conta) modos.append(avisoDaSala, faixaDaConta, solo, multiplayer);
+    else modos.append(avisoDaSala, campo, erroNome, solo, multiplayer);
     const logo = logoViva();
     // O formulário de opinião, no canto de baixo à direita, em cima da versão.
     const opiniao = botaoDaOpiniao('inicio-botao inicio-atalho inicio-opiniao-canto');
@@ -373,6 +409,6 @@ export function escolherModo(online: boolean, aviso = ''): Promise<Escolha> {
     logo.ligar();
     // Quem não tem nome começa no campo. Quem já tem não começa com foco em nada: o contorno
     // do foco no Singleplayer parecia um botão já escolhido. O Enter joga do mesmo jeito.
-    if (!entrada.value) entrada.focus();
+    if (!conta && !entrada.value) entrada.focus();
   });
 }

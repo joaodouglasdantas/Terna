@@ -45,3 +45,9 @@ services:
         sync: false
       - key: TURN_KEY_API_TOKEN
         sync: false
+      # O Brevo, que manda os e-mails com os códigos de confirmação e de troca de senha
+      # (brevo.com → SMTP & API → API Keys) e o e-mail verificado como remetente lá.
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_REMETENTE
+        sync: false

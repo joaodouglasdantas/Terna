@@ -4,6 +4,7 @@ import websocket from '@fastify/websocket';
 import { sql } from 'drizzle-orm';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Banco } from './banco/conexao';
+import { correioDoTerminal, type Correio } from './email/correio';
 import { ipDoPedido } from './http';
 import { rotaPartida } from './partida/rota';
 import { Salas } from './partida/salas';
@@ -23,6 +24,10 @@ export interface OpcoesApp {
   logger?: FastifyServerOptions['logger'];
   // O TURN do Cloudflare (partida/turn.ts), para as partidas online; sem ele, só o STUN.
   turn?: Turn;
+  // Quem manda os e-mails dos códigos (email/correio.ts); sem ele, o terminal.
+  correio?: Correio;
+  // O jogo publicado, para a logo dos e-mails.
+  urlDoJogo?: string;
 }
 
 // Monta o servidor sem abrir porta: o index.ts chama listen, os testes usam inject.
@@ -34,6 +39,8 @@ export async function criarApp({
   tentativasPorMinuto = 10,
   logger = false,
   turn,
+  correio,
+  urlDoJogo = 'https://terna.pages.dev',
 }: OpcoesApp): Promise<FastifyInstance> {
   const app = Fastify({ logger, bodyLimit: 256 * 1024, trustProxy: confiarProxy });
 
@@ -70,7 +77,12 @@ export async function criarApp({
         await banco.execute(sql`select 1`);
         return { ok: true };
       });
-      rotasContas(api, banco, diasSessao, tentativasPorMinuto);
+      rotasContas(api, banco, {
+        diasSessao,
+        tentativasPorMinuto,
+        correio: correio ?? correioDoTerminal(),
+        urlDoJogo,
+      });
       rotasSaves(api, banco);
       rotasRanking(api, banco);
       rotaTempoReal(api, banco);

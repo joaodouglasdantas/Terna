@@ -17,6 +17,12 @@ export interface Config {
   // A chave do TURN do Cloudflare (painel → Realtime → TURN Server): TURN_KEY_ID e
   // TURN_KEY_API_TOKEN. Sem as duas, null (as partidas online ficam só com o STUN).
   turn: { id: string; token: string } | null;
+  // O Brevo, que manda os e-mails com os códigos (email/correio.ts): BREVO_API_KEY e
+  // EMAIL_REMETENTE (o remetente verificado no Brevo). Sem eles, null: os códigos aparecem no
+  // terminal do servidor em vez de ir por e-mail.
+  brevo: { chave: string; remetente: string; nomeRemetente: string } | null;
+  // O endereço do jogo publicado: a logo dos e-mails vem de lá (URL_DO_JOGO).
+  urlDoJogo: string;
 }
 
 // Pasta do pacote do servidor (onde está o package.json), venha o código de src/ ou de dist/.
@@ -51,6 +57,11 @@ export function lerConfig(env: NodeJS.ProcessEnv = process.env): Config {
     diasSessao: numero(env.DIAS_SESSAO, 30),
     confiarProxy: env.CONFIAR_PROXY === '1',
     turn: env.TURN_KEY_ID && env.TURN_KEY_API_TOKEN ? { id: env.TURN_KEY_ID.trim(), token: env.TURN_KEY_API_TOKEN.trim() } : null,
+    brevo:
+      env.BREVO_API_KEY && env.EMAIL_REMETENTE
+        ? { chave: env.BREVO_API_KEY.trim(), remetente: env.EMAIL_REMETENTE.trim(), nomeRemetente: env.NOME_REMETENTE?.trim() || 'Terna' }
+        : null,
+    urlDoJogo: (env.URL_DO_JOGO || 'https://terna.pages.dev').trim(),
   };
 }
 

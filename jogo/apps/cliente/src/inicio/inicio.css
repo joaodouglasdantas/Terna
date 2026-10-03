@@ -2196,3 +2196,387 @@ a.inicio-botao {
     opacity: 0;
   }
 }
+
+/* ---- conta (conta.ts): entrar, criar conta, o código do e-mail e o esqueci a senha ---- */
+
+/* A logo em cima da caixa, com a floresta da tela inicial atrás. */
+.inicio-conta-tela {
+  gap: 0.4rem;
+}
+
+.inicio-conta-logo {
+  flex: none;
+  height: clamp(4.5rem, 19cqh, 11rem);
+  width: auto;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
+  user-select: none;
+}
+
+.inicio-conta-caixa {
+  width: min(24rem, 100%);
+  gap: 0.65rem;
+  padding: 1.2rem 1.5rem;
+}
+
+.inicio-conta-caixa .inicio-titulo {
+  font-size: 1.65rem;
+}
+
+.inicio-conta-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.8rem;
+  text-align: left;
+}
+
+.inicio-conta-form .inicio-erro {
+  margin: -0.2rem 0 0;
+  text-align: center;
+}
+
+.inicio-conta-form .inicio-rotulo {
+  font-size: 0.95rem;
+}
+
+.inicio-conta-form .inicio-entrada {
+  min-height: 2.5rem;
+  font-size: 1.15rem;
+}
+
+/* Embaixo do campo do nome: o que ele é e o que pode ter. */
+.inicio-campo-dica {
+  font-size: 0.85rem;
+  line-height: 1.3;
+  color: var(--suave);
+}
+
+/* O código: grande, com os números espaçados como os blocos do e-mail. O recuo à esquerda
+   compensa o espaço depois do último número, para eles ficarem no meio. */
+.inicio-conta-form .inicio-codigo-email {
+  min-height: 3.2rem;
+  padding-left: 0.55em;
+  font-size: 2rem;
+  letter-spacing: 0.55em;
+  text-align: center;
+  color: var(--verde-claro);
+}
+
+.inicio-codigo-email::selection {
+  color: var(--tinta);
+  background: var(--verde-fundo);
+}
+
+.inicio-codigo-email::placeholder {
+  letter-spacing: 0.55em;
+  color: #5a4a36;
+}
+
+.inicio-conta-email {
+  font-weight: normal;
+  color: var(--verde-claro);
+  overflow-wrap: anywhere;
+}
+
+.inicio-conta-aviso {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  color: var(--suave);
+}
+
+/* O botão principal esperando a resposta do servidor. */
+.inicio-botao[data-esperando] {
+  cursor: progress;
+  filter: saturate(0.6) brightness(0.9);
+}
+
+/* Os botões de texto: "Esqueci a senha", "Reenviar código", "Sair da conta". */
+.inicio-link {
+  align-self: center;
+  padding: 0.2rem 0.4rem;
+  font: inherit;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  color: var(--marrom-claro);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  text-shadow: 0 2px 0 var(--contorno);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.inicio-link:hover:not(:disabled) {
+  color: var(--tinta);
+}
+
+.inicio-link:focus-visible {
+  outline: 2px solid var(--verde);
+  outline-offset: 2px;
+}
+
+.inicio-link:disabled {
+  color: #8f7f68;
+  text-decoration: none;
+  cursor: default;
+}
+
+/* Na tela inicial, com conta: o nome dela no lugar do campo, e o sair da conta. */
+.inicio-conta-faixa {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.inicio-conta-quem {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+  color: var(--tinta);
+  text-shadow: 0 0 4px #000, 0 1px 3px #000;
+}
+
+.inicio-conta-quem strong {
+  font-weight: normal;
+  color: var(--verde-claro);
+}
+
+/* ---- tutorial (tutorial.ts), por cima da partida de treino ---- */
+
+/* O HUD fica fora do #inicio: as cores das telas valem aqui também (os botões são os mesmos), e
+   ele é a medida do texto (cqw), que cresce com a tela do jogo. */
+#hud {
+  --tinta: #fbf3e4;
+  --suave: #c9b89c;
+  --marrom: #9a6a3a;
+  --marrom-claro: #e6c9a0;
+  --marrom-escuro: #4e3016;
+  --contorno: #120c06;
+  --verde: #7fd66b;
+  --verde-claro: #c8f5b0;
+  --verde-fundo: #2f7a3a;
+  container-type: size;
+  font-family: 'Tiny5', ui-monospace, monospace;
+  font-synthesis: none;
+}
+
+/* O cartão da etapa: no alto, no meio, acima dos personagens. Os cliques passam por ele (a mira
+   continua valendo), menos nos botões. */
+#hud .tut-cartao {
+  position: absolute;
+  left: 50%;
+  top: 15%;
+  transform: translateX(-50%);
+  width: min(46cqw, 34rem);
+  box-sizing: border-box;
+  padding: 1.1cqw 1.5cqw 1.2cqw;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6cqw;
+  font-size: clamp(11px, 1.45cqw, 22px);
+  color: var(--tinta);
+  text-align: center;
+  background: linear-gradient(to bottom, rgba(90, 58, 26, 0.45), rgba(0, 0, 0, 0) 3em), rgba(22, 14, 8, 0.86);
+  border: 3px solid var(--marrom);
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px rgba(239, 220, 162, 0.25), 0 10px 30px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  animation: tut-entra 0.35s ease-out;
+}
+
+#hud .tut-cartao[hidden] {
+  display: none;
+}
+
+#hud .tut-cartao button {
+  pointer-events: auto;
+}
+
+/* Feita a etapa: a moldura fica verde por um instante ("Boa!"). */
+.tut-feito {
+  border-color: var(--verde) !important;
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px rgba(200, 245, 176, 0.45), 0 0 26px rgba(127, 214, 107, 0.55) !important;
+}
+
+.tut-feito .tut-titulo {
+  color: var(--verde-claro);
+  animation: tut-pula 0.45s ease-out;
+}
+
+.tut-topo {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  font-size: 0.72em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--suave);
+}
+
+.tut-titulo {
+  margin: 0;
+  font-size: 1.45em;
+  font-weight: normal;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-shadow: 0 3px 0 var(--marrom-escuro);
+}
+
+.tut-texto,
+.tut-dica {
+  margin: 0;
+  line-height: 1.45;
+  color: #efe4cf;
+}
+
+.tut-dica {
+  font-size: 0.88em;
+  color: #ffe08a;
+}
+
+.tut-dica:empty {
+  display: none;
+}
+
+/* As teclas no texto: tampinhas de madeira clara, como na tela de controles. */
+.tut-tecla {
+  display: inline-block;
+  min-width: 1em;
+  margin: 0 0.1em;
+  padding: 0 0.3em 0.08em;
+  font: inherit;
+  font-size: 0.9em;
+  line-height: 1.25;
+  color: #2a1a06;
+  background: var(--marrom-claro);
+  box-shadow: 0 0 0 2px var(--contorno), inset 0 -3px 0 #b88f5e;
+}
+
+.tut-barra {
+  height: 0.45em;
+  margin-top: 0.2em;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 2px var(--contorno);
+}
+
+.tut-barra[hidden] {
+  display: none;
+}
+
+.tut-barra-cheia {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(to bottom, var(--verde-claro) 0 30%, var(--verde) 30% 75%, #4fa84a 75%);
+  transition: width 0.2s ease;
+}
+
+.tut-acoes {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.8em;
+}
+
+.tut-acoes:empty {
+  display: none;
+}
+
+.tut-conta {
+  font-size: 1.1em;
+  letter-spacing: 0.1em;
+  color: var(--verde-claro);
+}
+
+#hud .tut-botao {
+  min-width: 0;
+  min-height: 0;
+  padding: 0.35em 1em;
+  font-size: 0.95em;
+}
+
+/* "Já sei jogar" / "Sair do treino": no canto de baixo à direita, longe dos painéis. */
+#hud .tut-sair {
+  position: absolute;
+  right: 1.6cqw;
+  bottom: 2.4cqh;
+  min-width: 0;
+  min-height: 0;
+  padding: 0.35em 0.9em;
+  font-size: clamp(11px, 1.3cqw, 20px);
+}
+
+#hud .tut-sair[hidden] {
+  display: none;
+}
+
+/* O contorno que aponta a parte do painel de que a etapa fala, piscando, com a setinha embaixo. */
+#hud .tut-destaque {
+  position: absolute;
+  box-sizing: content-box;
+  margin: -0.55cqw 0 0 -0.55cqw;
+  padding: 0.25cqw;
+  border: 0.3cqw solid #ffd966;
+  box-shadow: 0 0 0 0.25cqw var(--contorno), 0 0 1.4cqw rgba(255, 217, 102, 0.8);
+  pointer-events: none;
+  animation: tut-pisca 1s ease-in-out infinite;
+}
+
+#hud .tut-destaque[hidden] {
+  display: none;
+}
+
+#hud .tut-destaque::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 0.8cqw);
+  width: 0;
+  height: 0;
+  margin-left: -0.9cqw;
+  border: 0.9cqw solid transparent;
+  border-top: none;
+  border-bottom: 1.2cqw solid #ffd966;
+  filter: drop-shadow(0 0.2cqw 0 var(--contorno));
+  animation: tut-seta 0.8s ease-in-out infinite;
+}
+
+#hud .tut-destaque-barra::after {
+  display: none;
+}
+
+@keyframes tut-entra {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -0.8cqw);
+  }
+}
+
+@keyframes tut-pula {
+  40% {
+    transform: scale(1.18);
+  }
+}
+
+@keyframes tut-pisca {
+  50% {
+    border-color: #fff4c2;
+    box-shadow: 0 0 0 0.25cqw var(--contorno), 0 0 2.2cqw rgba(255, 244, 194, 0.95);
+  }
+}
+
+@keyframes tut-seta {
+  50% {
+    transform: translateY(0.6cqw);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #hud .tut-cartao,
+  #hud .tut-destaque,
+  #hud .tut-destaque::after,
+  .tut-feito .tut-titulo {
+    animation: none;
+  }
+}

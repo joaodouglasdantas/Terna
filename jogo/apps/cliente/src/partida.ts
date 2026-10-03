@@ -26,6 +26,10 @@
 // O Vendaval do Grow sopra enquanto o botão esquerdo fica segurado: o seu para quando você
 // solta; o da CPU quando o cérebro dela solta; o do outro online quando o estado dele chega sem
 // ele soprando.
+//
+// O treino (o tutorial: inicio/tutorial.ts): sem contagem e sem relógio, contra o boneco — o
+// outro personagem parado, que não ataca, não pega arma e nunca cai (apanhando muito, a vida
+// dele volta). As armas não caem sozinhas: o tutorial solta a dele na hora certa.
 
 import {
   CARREGAMENTO_MS,
@@ -67,6 +71,7 @@ import {
   ganharEnergia,
   gesticular,
   maoDo,
+  passarSelecao,
   peitoDo,
   personagemLivre,
   podePegarArma,
@@ -90,7 +95,6 @@ import {
   pararVento,
   soprando,
   tentarUsar,
-  trocarPoder,
   type Alvo,
   type Efeitos,
 } from './entidades/poderes';
@@ -125,6 +129,8 @@ const REPEDIR_ARMA = 0.5; // segundos: pediu uma arma e o servidor não deu, ped
 const AVISO_DE_VIDA = 0.25; // segundos: no máximo uns quatro avisos de vida ao servidor por segundo
 
 const PARADO: Controles = { esquerda: false, direita: false, pular: false, transformar: false };
+// No treino, com menos que isto de vida o boneco se cura inteiro (ele nunca cai).
+const BONECO_SE_CURA = 0.3;
 
 export type FimDaPartida = MotivoFim | 'conexao';
 
@@ -163,6 +169,7 @@ interface Remoto {
 
 export interface Partida {
   online: boolean;
+  treino: boolean; // o tutorial, contra o boneco
   jogador: Personagem;
   outro: Personagem;
   eu: Identidade;
@@ -195,13 +202,17 @@ export function criarPartida(
   // Online, o relógio conta do aviso de que começou (o carregamento e a contagem vêm antes): os
   // dois lados terminam a contagem juntos, mesmo se um abriu o mapa um pouco depois.
   const agora = performance.now();
-  const valendo = escolha.modo === 'online' ? escolha.comecouEm + CARREGAMENTO_MS + CONTAGEM_MS : agora + CONTAGEM_MS;
+  const treino = escolha.modo === 'treino';
+  // O treino começa na hora, sem o 3, 2, 1.
+  const valendo =
+    escolha.modo === 'online' ? escolha.comecouEm + CARREGAMENTO_MS + CONTAGEM_MS : treino ? agora : agora + CONTAGEM_MS;
   const p: Partida = {
     online: escolha.modo === 'online',
+    treino,
     jogador: criarPersonagem(escolha.heroi, meuX, meuLado),
     outro: criarPersonagem(heroiDele, dele, ladoDele),
     eu: { texto: escolha.nome, ...AZUL },
-    ele: { texto: escolha.modo === 'online' ? escolha.oponente : 'CPU', ...VERMELHO },
+    ele: { texto: escolha.modo === 'online' ? escolha.oponente : treino ? 'BONECO' : 'CPU', ...VERMELHO },
     efeitos: criarEfeitos(),
     arsenal: criarArsenal(escolha.modo === 'solo'),
     restanteMs: escolha.modo === 'online' ? escolha.restanteMs : DURACAO_PARTIDA_MS,
@@ -411,7 +422,7 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
   const vidas = [p.jogador.vida, p.outro.vida];
   const livre = !p.menuAberto && !p.acabou && p.jogador.vida > 0;
   if (livre) {
-    for (let i = 0; i < mouse.trocar; i++) trocarPoder(p.jogador.poderes);
+    for (let i = 0; i < mouse.trocar; i++) passarSelecao(p.jogador);
     if (mouse.usar) usarAcao(p, p.jogador, mouse.usar);
     if (mouse.descartar && descartarArma(p.arsenal, p.jogador)) p.remoto?.conexao.descartarArma();
   }
@@ -430,6 +441,8 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
     if (pode && decisao.golpe) usarAcao(p, p.outro, decisao.golpe);
     if (p.outro.canalizando && (!pode || decisao.soltar)) pararVento(p.efeitos, p.outro);
   }
+  // O boneco do treino: parado, mas o corpo dele cai, é empurrado e levado pelas águias.
+  if (p.treino) atualizarPersonagem(p.outro, PARADO, dt, tempo);
   if (p.remoto) {
     atualizarRemoto(p.remoto, p.outro, dt, tempo);
     if (!p.acabou) enviarEstado(p.remoto, p.jogador, livre ? teclado : PARADO);
@@ -439,7 +452,7 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
     cuidarDaArma(p, p.jogador, dt);
     // A arma do outro online: só passa o tempo aqui; largar, pegar e quebrar chegam pela rede.
     if (p.remoto) gastarArma(p.arsenal, p.outro, dt, false);
-    else cuidarDaArma(p, p.outro, dt);
+    else if (!p.treino) cuidarDaArma(p, p.outro, dt); // o boneco não pega arma
     if (p.remoto) p.remoto.pediuArma += dt;
     else atualizarQuedas(p.arsenal, dt, Number(Boolean(p.jogador.arma)) + Number(Boolean(p.outro.arma)));
   }
@@ -467,6 +480,16 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
   }
 
   if (p.acabou) return;
+  // No treino ninguém cai e o tempo não corre: o boneco apanhando muito volta a ter a vida inteira.
+  if (p.treino) {
+    for (const corpo of [p.outro, p.jogador]) {
+      if (corpo.vida >= VIDA_MAXIMA * BONECO_SE_CURA) continue;
+      mostrarCura(p.efeitos, corpo, VIDA_MAXIMA - corpo.vida);
+      corpo.vida = VIDA_MAXIMA;
+      corpo.veneno = 0;
+    }
+    return;
+  }
   if (p.remoto) {
     // Caiu: avisa o servidor, que acaba a partida para os dois.
     if (p.jogador.vida <= 0 && !p.remoto.morteEnviada) {

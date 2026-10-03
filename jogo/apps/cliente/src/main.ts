@@ -1,9 +1,11 @@
 // Ponto de entrada do jogo: carrega as folhas de sprite, monta o mundo e roda o laço
 // principal (atualizar → desenhar) a cada quadro do navegador. Por cima, o ciclo das telas:
-// carregamento → tela inicial → partida → fim → tela inicial de novo.
+// carregamento → conta (entrar ou criar; com o servidor fora do ar, pula) → tela inicial →
+// partida → fim → tela inicial de novo. Quem acabou de criar a conta cai antes no treino, com o
+// tutorial (ou aperta "Já sei jogar").
 
 import './monitor/erros';
-import { CARREGAMENTO_MS, MUNDO } from '@terna/compartilhado';
+import { CARREGAMENTO_MS, MUNDO, type Jogador } from '@terna/compartilhado';
 import { atualizarAnimais, desenharAnimais, desenharAnimaisNoAr, prepararAnimais } from './entidades/animais';
 import { desenharArmasNaFrente, desenharArmasNoChao, desenharPreviaDoArco, prepararArmas } from './entidades/armas';
 import {
@@ -33,9 +35,11 @@ import { esconderCena, prepararCena } from './inicio/cena';
 import { prepararRamos } from './inicio/ramos';
 import { abrirCortina, fecharCortina } from './inicio/dom';
 import { aparelhoMovel, telaSoNoComputador } from './inicio/aparelho';
-import { carregar, escolherModo, type Escolha } from './inicio/inicio';
+import { telaConta } from './inicio/conta';
+import { carregar, escolherModo, SAIU_DA_CONTA, type Escolha } from './inicio/inicio';
 import { ouvirRevanche } from './inicio/revanche';
-import { telaSelecao, type SalaNaSelecao } from './inicio/selecao';
+import { TEXTOS_DO_PRIMEIRO_TREINO, telaSelecao, type SalaNaSelecao } from './inicio/selecao';
+import { iniciarTutorial, type Tutorial } from './inicio/tutorial';
 import { telaTemporada } from './inicio/temporada';
 import { vigiarJanela } from './inicio/janela';
 import { montarMenus, type MenusDaPartida } from './inicio/na-partida';
@@ -73,6 +77,7 @@ import {
   type FimDaPartida,
   type Partida,
 } from './partida';
+import { retomarSessao, sairDaConta } from './save/sessao';
 import { tocarMusica } from './som/musica';
 
 const canvas = document.getElementById('jogo');
@@ -96,6 +101,8 @@ let folhaCenario: CanvasImageSource;
 let partida: Partida | null = null;
 // Os menus por cima dela (a engrenagem, o Esc): a janela ficando pequena demais abre o menu.
 let menusDaPartida: MenusDaPartida | null = null;
+// No treino: o tutorial, que olha a partida a cada quadro (inicio/tutorial.ts).
+let tutorial: Tutorial | null = null;
 
 // ---- Câmera e tela dividida ----
 // Cada metade da tela é uma janela sobre uma tela inteira com câmera própria: a da esquerda
@@ -300,6 +307,7 @@ function atualizar(dt: number, tempo: number): void {
     // O clique e as teclas de um toque valem uma vez, no primeiro passo; o botão segurado, em todos.
     const depois: AcoesMouse = { ...SEM_ACOES, segurando: acoes.segurando };
     for (let i = 0; i < passos; i++) atualizarPartida(partida, teclado, i === 0 ? acoes : depois, dt / passos, tempo);
+    tutorial?.atualizar(partida);
     atualizarCamera(partida, dt);
     sentirBordas(bordas, partida.jogador, dt);
   }
@@ -435,7 +443,7 @@ function desenhar(tempo: number): void {
   // Os painéis ficam sempre no mesmo canto: o seu à esquerda, o do outro à direita.
   desenharPainel(ctx, p.jogador, p.eu, 'esquerda', LARGURA, tempo, true);
   desenharPainel(ctx, p.outro, p.ele, 'direita', LARGURA, tempo);
-  desenharCronometro(ctx, p.restanteMs, LARGURA, tempo);
+  if (!p.treino) desenharCronometro(ctx, p.restanteMs, LARGURA, tempo); // o treino não tem relógio
   // Ligado no menu: os quadros por segundo e, online, o ping até o outro, no canto de baixo.
   desenharMedidor(ctx, { fps: contador.fps(), online: p.remoto ? p.remoto.conexao.rede() : null }, ALTURA);
   desenharContagem(ctx, p.contagem, p.relogio - p.contagemInicial, LARGURA, ALTURA);
@@ -486,11 +494,14 @@ function textoDoFim(motivo: FimDaPartida, venceu: boolean | null, oponente: stri
 // No fim por morte, a tela espera um pouco: dá para ver o último golpe, quem caiu deitado no
 // chão e a luz do céu em quem venceu.
 const ESPERA_FIM_MORTE = 2800; // ms
+// O carregamento antes do treino: mais curto que o da partida (não há outro jogador a esperar).
+const CARREGAMENTO_TREINO_MS = 2200;
 
 // Uma partida inteira: começa, roda até o tempo acabar (ou alguém sair) e termina quando a
 // pessoa volta ao menu (null) ou pede para jogar de novo: sozinho ('sozinho'), na hora; online,
-// quando os dois pedem a revanche (a sala, para a escolha de personagem de novo).
-function jogar(escolha: Escolha): Promise<SalaNaSelecao | 'sozinho' | null> {
+// quando os dois pedem a revanche (a sala, para a escolha de personagem de novo). O treino só
+// termina saindo (pelo tutorial ou pelo menu); `primeiraVez`: o de logo depois de criar a conta.
+function jogar(escolha: Escolha, primeiraVez = false): Promise<SalaNaSelecao | 'sozinho' | null> {
   return new Promise((resolver) => {
     // Sai escurecendo: a próxima tela aparece do escuro. Com `proxima` (a revanche online), a
     // conexão continua aberta. Uma vez só: saindo pelo menu enquanto a tela de fim esperava (a
@@ -501,6 +512,8 @@ function jogar(escolha: Escolha): Promise<SalaNaSelecao | 'sozinho' | null> {
       if (!partida || saindo) return;
       saindo = true;
       clearTimeout(esperaDoFim);
+      tutorial?.remover();
+      tutorial = null;
       encerrarPartida(partida, typeof proxima !== 'object');
       void fecharCortina().then(() => {
         partida = null;
@@ -546,6 +559,16 @@ function jogar(escolha: Escolha): Promise<SalaNaSelecao | 'sozinho' | null> {
     soltarTeclas();
     partida = nova;
     bordas = criarBordas();
+    if (escolha.modo === 'treino') {
+      tutorial = iniciarTutorial({
+        heroi: escolha.heroi,
+        primeiraVez,
+        aoSair: () => {
+          menus.remover();
+          sair();
+        },
+      });
+    }
     // A partida aparece do escuro (a tela de antes sumiu escurecendo o jogo junto).
     void abrirCortina();
   });
@@ -577,24 +600,47 @@ async function principal(): Promise<void> {
   prepararRamos();
   requestAnimationFrame(loop);
 
+  // A conta: com o servidor no ar, é preciso estar nela (a sessão guardada deste navegador vale;
+  // senão, a tela de entrar ou criar). Offline, o jogo segue com o apelido, como antes.
+  let conta: Jogador | null = online ? await retomarSessao() : null;
+  // O primeiro treino, logo depois de criar a conta (null: apertou "Já sei jogar").
+  let primeiroTreino: Escolha | null = null;
+  const entrarNaConta = async (): Promise<void> => {
+    const entrou = await telaConta();
+    conta = entrou.jogador;
+    if (!entrou.nova) return;
+    const r = await telaSelecao(undefined, TEXTOS_DO_PRIMEIRO_TREINO);
+    if (r.tipo === 'escolheu') primeiroTreino = { modo: 'treino', nome: entrou.jogador.nome.slice(0, 12), heroi: r.heroi };
+  };
+
   // A sala da revanche caindo na escolha (o outro saiu, o tempo de escolher acabou), a tela
   // inicial diz por quê.
   let aviso: string | undefined;
   for (;;) {
-    let escolha: Escolha | null = await escolherModo(online, aviso);
+    if (online && !conta) await entrarNaConta();
+    const primeiraVez = primeiroTreino !== null;
+    const escolhido: Escolha | typeof SAIU_DA_CONTA = primeiroTreino ?? (await escolherModo(online, aviso, conta));
+    primeiroTreino = null;
     aviso = undefined;
+    if (escolhido === SAIU_DA_CONTA) {
+      await sairDaConta();
+      conta = null;
+      continue;
+    }
+    let escolha: Escolha | null = escolhido;
     while (escolha) {
       const atual: Escolha = escolha;
       escolha = null;
       // O carregamento da temporada; online, termina junto para os dois (conta do início no
-      // servidor). O outro saindo enquanto isso, volta ao menu.
-      const ate = (atual.modo === 'online' ? atual.comecouEm : performance.now()) + CARREGAMENTO_MS;
+      // servidor). O outro saindo enquanto isso, volta ao menu. O do treino é mais curto.
+      const ate =
+        (atual.modo === 'online' ? atual.comecouEm : performance.now()) + (atual.modo === 'treino' ? CARREGAMENTO_TREINO_MS : CARREGAMENTO_MS);
       const online = atual.modo === 'online' ? { conexao: atual.conexao, oponente: atual.oponente } : undefined;
       const { saiu } = await telaTemporada({ ate, online });
       if (saiu) break;
       esconderCena(); // a arte do menu sai: a partida aparece atrás da tela do carregamento
       tocarMusica('combate');
-      const revanche = await jogar(atual);
+      const revanche = await jogar(atual, primeiraVez && atual.modo === 'treino');
       tocarMusica('telas');
       // Jogar de novo: a escolha de personagem outra vez — sozinho, contra outra CPU sorteada;
       // online, na mesma sala, e os dois escolhendo começa outra rodada. Voltando, o menu.
