@@ -2199,46 +2199,12 @@ a.inicio-botao {
 
 /* ---- conta (conta.ts): entrar, criar conta, o código do e-mail e o esqueci a senha ---- */
 
-/* A logo em cima da caixa, com a caverna (caverna.ts) atrás. Sem o véu escuro das telas do menu
+/* Só a caixa, com a caverna (caverna.ts) atrás. Sem o véu escuro das telas do menu
    (o de .inicio-multi-tela): a escuridão é a da caverna, por cima das tochas e com os buracos das
    luzes. */
 .inicio-conta-tela {
   gap: 0.4rem;
   background: none;
-}
-
-/* A caixa da logo, do tamanho dela, flutuando; por cima, a luz da caverna (caverna.ts), recortada
-   no desenho da logo. Embaixo, um espaço vazio antes da caixa (onde ficava o lema). */
-.inicio-conta-logo-caixa {
-  position: relative;
-  flex: none;
-  margin-bottom: 1.6rem;
-  animation: inicio-flutua 4.5s ease-in-out infinite;
-}
-
-.inicio-conta-logo-luz {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  mask-size: 100% 100%;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%;
-  -webkit-mask-repeat: no-repeat;
-}
-
-.inicio-conta-logo-cor {
-  mix-blend-mode: screen;
-}
-
-.inicio-conta-logo {
-  display: block;
-  flex: none;
-  height: clamp(4rem, 16cqh, 9.5rem);
-  width: auto;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
-  user-select: none;
 }
 
 .inicio-conta-caixa {
@@ -2778,16 +2744,8 @@ a.inicio-botao {
 
 @media (prefers-reduced-motion: reduce) {
   .inicio-tocha,
-  .inicio-caverna,
-  .inicio-conta-logo-caixa {
+  .inicio-caverna {
     animation: none;
-  }
-}
-
-/* Baixa: o espaço vazio embaixo da logo sai. */
-@container (max-height: 640px) {
-  .inicio-conta-logo-caixa {
-    margin-bottom: 0;
   }
 }
 
@@ -3078,16 +3036,7 @@ a.inicio-botao {
   pointer-events: none;
 }
 
-/* As vistas com muitos campos (criar conta, senha nova): sem o espaço embaixo da logo e com a
-   logo menor. */
-.inicio-conta-longa .inicio-conta-logo-caixa {
-  margin-bottom: 0;
-}
-
-.inicio-conta-longa .inicio-conta-logo {
-  height: clamp(3.5rem, 11cqh, 7rem);
-}
-
+/* As vistas com muitos campos (criar conta, senha nova): a caixa mais justa. */
 .inicio-conta-longa .inicio-conta-caixa {
   gap: 0.55rem;
 }

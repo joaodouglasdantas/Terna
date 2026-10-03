@@ -7,10 +7,11 @@
 // e-mail também cai na tela do código (o servidor manda um novo). Esqueceu a senha: o código do
 // e-mail e a senha nova (duas vezes), e entra.
 //
-// A tela: a logo e a caixa no meio da floresta da tela inicial, duas tochas grandes acesas
+// A tela: só a caixa, no meio da caverna escura (caverna.ts), com duas tochas grandes acesas
 // subindo do chão, uma de cada lado (tocha.ts), as abas Entrar / Criar conta no alto da caixa, o
-// botão da música no canto (como na tela inicial) e a versão no outro. Os campos de senha têm o olho para mostrar o que foi digitado
-// e avisam do Caps Lock; o de criar mostra a força da senha e se a repetida bate.
+// botão da música no canto (como na tela inicial) e a versão no outro. Os campos de senha têm o
+// olho para mostrar o que foi digitado e avisam do Caps Lock; o de criar mostra a força da senha
+// e se a repetida bate.
 //
 // No jogo rodando em casa (npm run dev, servidor sem e-mail de verdade), a tela do código mostra o
 // código que o servidor gerou — o e-mail não sai do localhost (rotas/contas.ts: /teste/codigo).
@@ -35,7 +36,7 @@ import { guardarSessao } from '../save/sessao';
 import { VERSAO } from '../versao';
 import { criarCaverna } from './caverna';
 import { esconderCena } from './cena';
-import { botao, elemento, imagemDaLogo, mostrarTela, sairComEsmaecer } from './dom';
+import { botao, elemento, mostrarTela, sairComEsmaecer } from './dom';
 import { botaoDaMusica } from './musica';
 import { criarTocha } from './tocha';
 
@@ -227,21 +228,16 @@ const relogio = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60).p
 export function telaConta(aviso = ''): Promise<Entrou> {
   return new Promise((resolver) => {
     const tela = elemento('section', 'inicio-tela inicio-multi-tela inicio-conta-tela');
-    const logo = imagemDaLogo('inicio-conta-logo');
     const caixa = elemento('div', 'inicio-caixa inicio-conta-caixa');
     const centro = elemento('div', 'inicio-conta-centro');
-    // A logo numa caixa do tamanho dela, flutuando: a caverna pinta por cima a luz do ambiente
-    // (a escuridão, o fogo das tochas e o cristal), só onde há logo.
-    const caixaDaLogo = elemento('div', 'inicio-conta-logo-caixa');
-    caixaDaLogo.append(logo);
-    centro.append(caixaDaLogo, caixa);
+    centro.append(caixa);
     // As tochas sobem do chão e, chegando, o fogo acende.
     const tochas = [criarTocha('esquerda'), criarTocha('direita')];
     const atalhos = elemento('div', 'inicio-atalhos');
     atalhos.append(botaoDaMusica('inicio-botao inicio-botao-claro inicio-atalho'));
     // O fundo é a caverna (caverna.ts), com as tochas dentro dela: ela escurece e ficam as luzes
-    // do fogo e do cristal da logo. A floresta dos menus sai daqui (volta na tela inicial).
-    const caverna = criarCaverna(tochas, caixaDaLogo);
+    // do fogo. A floresta dos menus sai daqui (volta na tela inicial).
+    const caverna = criarCaverna(tochas);
     tela.append(caverna.el, centro, atalhos, elemento('p', 'inicio-versao', VERSAO));
     esconderCena();
     mostrarTela(tela);
@@ -312,7 +308,7 @@ export function telaConta(aviso = ''): Promise<Entrou> {
       enviar: (pronto: (erro?: string) => void) => void;
       depois?: HTMLElement[];
       voltarPara?: (() => void) | null;
-      longa?: boolean; // muitos campos: a logo encolhe e o espaço embaixo dela sai, para caber sem rolar
+      longa?: boolean; // muitos campos: a caixa fica mais justa, para caber sem rolar
     }): { erro: HTMLParagraphElement; form: HTMLFormElement } => {
       pararRelogios();
       tela.classList.toggle('inicio-conta-longa', Boolean(opcoes.longa));
