@@ -33,7 +33,8 @@ import type { z } from 'zod';
 import { api, ErroApi } from '../rede/api';
 import { guardarSessao } from '../save/sessao';
 import { VERSAO } from '../versao';
-import { anexarCena } from './cena';
+import { criarCaverna } from './caverna';
+import { esconderCena } from './cena';
 import { botao, elemento, imagemDaLogo, mostrarTela, sairComEsmaecer } from './dom';
 import { botaoDaMusica } from './musica';
 import { criarTocha } from './tocha';
@@ -235,12 +236,11 @@ export function telaConta(aviso = ''): Promise<Entrou> {
     const tochas = [criarTocha('esquerda'), criarTocha('direita')];
     const atalhos = elemento('div', 'inicio-atalhos');
     atalhos.append(botaoDaMusica('inicio-botao inicio-botao-claro inicio-atalho'));
-    // Numa camada que corta o que passa da tela (o brilho é largo): sem barra de rolagem.
-    const camadaDasTochas = elemento('div', 'inicio-conta-tochas');
-    // O corpo das tochas por baixo do véu escuro da tela (o ::after da camada) e o fogo por cima.
-    camadaDasTochas.append(...tochas.map((t) => t.el), ...tochas.map((t) => t.fogo));
-    tela.append(camadaDasTochas, centro, atalhos, elemento('p', 'inicio-versao', VERSAO));
-    anexarCena(tela, true);
+    // O fundo é a caverna (caverna.ts), com as tochas dentro dela: ela escurece e ficam as luzes
+    // do fogo e do cristal da logo. A floresta dos menus sai daqui (volta na tela inicial).
+    const caverna = criarCaverna(tochas, logo);
+    tela.append(caverna.el, centro, atalhos, elemento('p', 'inicio-versao', VERSAO));
+    esconderCena();
     mostrarTela(tela);
 
     const comeco = performance.now();
@@ -251,6 +251,7 @@ export function telaConta(aviso = ''): Promise<Entrou> {
       anterior = agora;
       const acesa = Math.max(0, Math.min(1, (agora - comeco - SUBIDA_DAS_TOCHAS_MS * 0.6) / 1000 / ACENDER_S));
       for (const t of tochas) t.quadro(dt, acesa);
+      caverna.quadro(dt);
       requestAnimationFrame(animar);
     };
     requestAnimationFrame(animar);

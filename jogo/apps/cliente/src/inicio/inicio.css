@@ -2199,9 +2199,9 @@ a.inicio-botao {
 
 /* ---- conta (conta.ts): entrar, criar conta, o código do e-mail e o esqueci a senha ---- */
 
-/* A logo em cima da caixa, com a floresta da tela inicial atrás. O véu escuro das telas do menu
-   (o de .inicio-multi-tela) passa para a camada das tochas, por cima delas: assim elas escurecem
-   igual à arte do fundo e não ficam mais claras que o resto. */
+/* A logo em cima da caixa, com a caverna (caverna.ts) atrás. Sem o véu escuro das telas do menu
+   (o de .inicio-multi-tela): a escuridão é a da caverna, por cima das tochas e com os buracos das
+   luzes. */
 .inicio-conta-tela {
   gap: 0.4rem;
   background: none;
@@ -2609,28 +2609,68 @@ a.inicio-botao {
 .inicio-tocha {
   position: absolute;
   bottom: 0;
-  z-index: 0;
-  /* O pixel da tocha do mesmo tamanho do pixel da arte do fundo (~313 pixels de altura). */
-  height: clamp(220px, 48cqh, 560px);
-  aspect-ratio: 30 / 150;
+  z-index: 1;
+  /* O pixel da tocha do mesmo tamanho do pixel da caverna do fundo (~170 pixels de altura). */
+  height: clamp(240px, 53cqh, 620px);
+  aspect-ratio: 22 / 90;
   pointer-events: none;
   animation: inicio-tocha-sobe 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
 
-.inicio-conta-tochas {
+.inicio-caverna {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
   isolation: isolate;
+  background: #04060c;
+  animation: inicio-caverna-chega 1.4s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
-.inicio-conta-tochas::after {
-  content: '';
+.inicio-caverna-arte {
   position: absolute;
   inset: 0;
-  z-index: 1;
-  background: radial-gradient(ellipse at 50% 50%, rgba(20, 14, 8, 0.4) 0%, rgba(20, 14, 8, 0.78) 100%);
+  z-index: 0;
+  will-change: transform;
+}
+
+.inicio-caverna-fundo {
+  position: absolute;
+  inset: 0;
+  background: center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+}
+
+.inicio-caverna-vida,
+.inicio-caverna-escuro,
+.inicio-caverna-luzes,
+.inicio-caverna-pontos {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.inicio-caverna-escuro {
+  z-index: 2;
+}
+
+/* A cor das luzes e os pontos de luz somam luz ao que está embaixo. */
+.inicio-caverna-luzes {
+  z-index: 3;
+  mix-blend-mode: screen;
+}
+
+.inicio-caverna-pontos {
+  z-index: 4;
+  mix-blend-mode: screen;
+}
+
+@keyframes inicio-caverna-chega {
+  from {
+    opacity: 0;
+    filter: brightness(0.4);
+  }
 }
 
 /* A borda de dentro de cada tocha fica a 4rem da caixa (12.5rem é metade da largura dela). */
@@ -2653,9 +2693,9 @@ a.inicio-botao {
   filter: blur(0.5px) drop-shadow(0 0 4px rgba(0, 0, 0, 0.45));
 }
 
-/* A camada do fogo: por cima do véu escuro da tela (o fogo é luz, não escurece com a arte). */
+/* A camada do fogo: por cima da escuridão da caverna (o fogo é luz, não escurece com a arte). */
 .inicio-tocha-fogo {
-  z-index: 2;
+  z-index: 5;
 }
 
 .inicio-tocha-chama {
@@ -2720,7 +2760,8 @@ a.inicio-botao {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .inicio-tocha {
+  .inicio-tocha,
+  .inicio-caverna {
     animation: none;
   }
 }

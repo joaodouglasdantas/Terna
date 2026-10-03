@@ -9,6 +9,7 @@ import logoUrl from '../assets/logo.webp';
 import { carregarDecodificada } from '../motor/imagens';
 import { checarBanco, checarServidor } from '../rede/saude';
 import { VERSAO } from '../versao';
+import { carregarArteDaCaverna } from './caverna';
 import { anexarCena, carregarArteDaCena } from './cena';
 import { botao, digitandoEm, elemento, mostrarTela, sairComEsmaecer } from './dom';
 import { logoViva } from './logo-viva';
@@ -63,15 +64,17 @@ const esperar = (ms: number): Promise<void> => new Promise((resolver) => setTime
 
 // A logo grande e a letra da tela inicial, baixadas e já decodificadas antes de a tela abrir:
 // sem isso ela aparecia com as árvores subindo e a logo chegava segundos depois. Junto, o que as
-// telas seguintes mostram de cara: a floresta do fundo dos menus, os retratos dos cartões e a arte
-// do carregamento antes de cada partida. A imagem da logo fica guardada aqui para o navegador não
-// descartar a versão decodificada (as outras ficam guardadas por quem carrega).
+// telas seguintes mostram de cara: a caverna da conta, a floresta do fundo dos menus, os retratos
+// dos cartões e a arte do carregamento antes de cada partida. A imagem da logo fica guardada aqui
+// para o navegador não descartar a versão decodificada (as outras ficam guardadas por quem
+// carrega).
 let logoPronta: HTMLImageElement | undefined;
 async function prepararTelaInicial(): Promise<void> {
   const [logo] = await Promise.all([
     carregarDecodificada(logoUrl),
     document.fonts.load('1rem "Tiny5"'),
     carregarArteDaCena(),
+    carregarArteDaCaverna(),
     carregarRetratos(),
     carregarArteDaTemporada(),
   ]);
