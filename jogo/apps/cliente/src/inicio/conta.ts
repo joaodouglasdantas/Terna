@@ -237,7 +237,8 @@ export function telaConta(aviso = ''): Promise<Entrou> {
     atalhos.append(botaoDaMusica('inicio-botao inicio-botao-claro inicio-atalho'));
     // Numa camada que corta o que passa da tela (o brilho é largo): sem barra de rolagem.
     const camadaDasTochas = elemento('div', 'inicio-conta-tochas');
-    camadaDasTochas.append(...tochas.map((t) => t.el));
+    // O corpo das tochas por baixo do véu escuro da tela (o ::after da camada) e o fogo por cima.
+    camadaDasTochas.append(...tochas.map((t) => t.el), ...tochas.map((t) => t.fogo));
     tela.append(camadaDasTochas, centro, atalhos, elemento('p', 'inicio-versao', VERSAO));
     anexarCena(tela, true);
     mostrarTela(tela);
