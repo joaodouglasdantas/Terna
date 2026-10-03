@@ -85,8 +85,9 @@ def costas(nome):
 
 
 # A cabeça virada para a direita (vista de trás, três quartos): a orelha do lado de lá some, a do
-# lado de cá vai para trás do rosto, e o perfil do rosto aparece na beirada (a bochecha, o
-# nariz passando um pouco do cabelo, o olho e a franja por cima). Para a esquerda é o espelho.
+# lado de cá vai para trás do rosto, e o perfil do rosto aparece na beirada (a bochecha, o olho e
+# a franja por cima), sem passar do contorno da cabeça: os heróis não têm nariz no jogo. Para a
+# esquerda é o espelho.
 # Cada pixel: (coluna, linha, cor); None apaga.
 PERFIS = {
     'leslie': dict(
@@ -94,16 +95,16 @@ PERFIS = {
         apagar=[(0, 6), (1, 6), (0, 7), (1, 7), (1, 8), (2, 8), (2, 9), (14, 6), (15, 6), (14, 7), (15, 7)],
         pintar=[
             # o contorno do cabelo onde ficavam as orelhas
-            (1, 9, '1d2615'), (2, 8, '1d2615'), (2, 7, '2c3721'), (2, 9, '3d492a'), (13, 7, '191d11'),
+            (1, 9, '1d2615'), (2, 8, '1d2615'), (2, 7, '2c3721'), (2, 9, '3d492a'), (13, 7, '191d11'), (13, 8, '191d11'),
             # a orelha de cá, entre o cabelo e o rosto, com a ponta para cima
-            (9, 7, 'e3a37c'), (9, 8, 'c88968'), (10, 8, 'ac7355'),
+            (8, 7, 'e3a37c'), (8, 8, 'c88968'), (9, 8, 'ac7355'),
             # a franja caindo na testa
-            (11, 8, '4c5c33'), (12, 8, '55673a'), (13, 8, '191d11'),
-            # o rosto de perfil: o olho, a bochecha, o nariz e o queixo
-            (10, 9, '45522d'), (11, 9, '100e09'), (12, 9, 'f1c299'), (13, 9, 'c88968'), (14, 9, '1d2615'),
-            (10, 10, '3d492a'), (11, 10, 'f1c299'), (12, 10, 'fde2ba'), (13, 10, 'f1c299'), (14, 10, 'e3a37c'), (15, 10, '1d2615'),
-            (11, 11, 'e3a37c'), (12, 11, 'fde2ba'), (13, 11, 'e3a37c'), (14, 11, '1d2615'),
-            (12, 12, 'c88968'), (13, 12, '10180d'),
+            (10, 8, '4c5c33'), (11, 8, '55673a'), (12, 8, '45522d'),
+            # o rosto de perfil, dentro do contorno da cabeça: o olho, a bochecha e o queixo
+            (9, 9, '45522d'), (10, 9, '100e09'), (11, 9, 'f1c299'), (12, 9, 'c88968'), (13, 9, '1d2615'),
+            (9, 10, '3d492a'), (10, 10, 'f1c299'), (11, 10, 'fde2ba'), (12, 10, 'f1c299'), (13, 10, '1d2615'),
+            (10, 11, 'e3a37c'), (11, 11, 'fde2ba'), (12, 11, 'e3a37c'), (13, 11, '10180d'),
+            (11, 12, 'c88968'), (12, 12, '10180d'),
         ],
         cabeca_ate=13,
         meio=7.5,
@@ -112,14 +113,14 @@ PERFIS = {
         apagar=[],
         pintar=[
             # a orelha de cá, saindo do cabelo
-            (13, 10, 'c7a18a'), (13, 11, 'ad846f'), (12, 11, '91604b'),
+            (12, 10, 'c7a18a'), (12, 11, 'ad846f'), (11, 11, '91604b'),
             # a franja por cima do olho
-            (15, 9, '58352c'), (16, 9, '4e3229'), (17, 9, '603c31'),
-            # o rosto de perfil: o olho, a bochecha, o nariz e o queixo
-            (14, 10, '462b24'), (15, 10, '0d0403'), (16, 10, 'c7a18a'), (17, 10, 'eac2a9'), (18, 10, 'ad846f'), (19, 10, '190404'),
-            (14, 11, '4e3229'), (15, 11, 'c7a18a'), (16, 11, 'eac2a9'), (17, 11, 'fbe6cc'), (18, 11, 'eac2a9'), (19, 11, 'c7a18a'), (20, 11, '190404'),
-            (15, 12, 'eac2a9'), (16, 12, 'eac2a9'), (17, 12, 'eac2a9'), (18, 12, 'ad846f'), (19, 12, '190404'),
-            (16, 13, 'c7a18a'), (17, 13, '91604b'), (18, 13, '030001'),
+            (14, 9, '58352c'), (15, 9, '4e3229'), (16, 9, '603c31'),
+            # o rosto de perfil, dentro do contorno da cabeça: o olho, a bochecha e o queixo
+            (13, 10, '462b24'), (14, 10, '0d0403'), (15, 10, 'c7a18a'), (16, 10, 'eac2a9'), (17, 10, 'ad846f'), (18, 10, '190404'),
+            (13, 11, '4e3229'), (14, 11, 'c7a18a'), (15, 11, 'eac2a9'), (16, 11, 'fbe6cc'), (17, 11, 'eac2a9'), (18, 11, '190404'),
+            (14, 12, 'eac2a9'), (15, 12, 'eac2a9'), (16, 12, 'eac2a9'), (17, 12, 'ad846f'), (18, 12, '190404'),
+            (15, 13, 'c7a18a'), (16, 13, '91604b'), (17, 13, '030001'),
         ],
         cabeca_ate=14,
         meio=11.5,
@@ -140,6 +141,8 @@ def virada(nome, frente, de_costas, lado):
         px[x, y] = (0, 0, 0, 0)
     for x, y, c in perfil['pintar']:
         px[x, y] = cor(c)
+    for x, y in perfil.get('vazio', []):
+        px[x, y] = (0, 0, 0, 0)
     if lado < 0:
         # Para a esquerda: a cabeça espelhada em volta do meio dela (o corpo fica como está).
         alto = perfil['cabeca_ate']
