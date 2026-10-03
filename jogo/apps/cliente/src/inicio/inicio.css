@@ -2607,8 +2607,9 @@ a.inicio-botao {
   position: absolute;
   bottom: 0;
   z-index: 0;
-  height: clamp(260px, 66cqh, 640px);
-  aspect-ratio: 34 / 156;
+  /* O pixel da tocha do mesmo tamanho do pixel da arte do fundo (~313 pixels de altura). */
+  height: clamp(220px, 48cqh, 560px);
+  aspect-ratio: 30 / 150;
   pointer-events: none;
   animation: inicio-tocha-sobe 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
@@ -2636,18 +2637,24 @@ a.inicio-botao {
   width: 100%;
   height: 100%;
   image-rendering: pixelated;
-  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.6));
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.45));
 }
 
 /* O brilho: um círculo quente e macio em volta do fogo (a opacidade tremula pelo tocha.ts). */
 .inicio-tocha-luz {
   position: absolute;
   left: 50%;
-  top: 28%;
-  width: 520%;
+  top: 30%;
+  width: 560%;
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(255, 170, 70, 0.42) 0%, rgba(255, 120, 40, 0.18) 32%, rgba(255, 100, 30, 0) 66%);
+  background: radial-gradient(
+    circle,
+    rgba(255, 220, 130, 0.75) 0%,
+    rgba(255, 170, 70, 0.4) 9%,
+    rgba(255, 120, 40, 0.14) 28%,
+    rgba(255, 100, 30, 0) 62%
+  );
   mix-blend-mode: screen;
   opacity: 0;
 }
