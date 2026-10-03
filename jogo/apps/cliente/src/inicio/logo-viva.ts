@@ -4,10 +4,13 @@
 // as suas partículas — poeira dourada subindo do cristal e brilhos de quatro pontas piscando
 // nele, reflexos descendo a cachoeira, gotas e névoa onde ela cai, folhas em pixel caindo das
 // duas árvores, vagalumes nas copas e terra se soltando da ilha flutuante.
+// A logo fica na luz do cenário: o sol se pondo à direita acende as bordas viradas para ele (uma
+// borda laranja tirada do próprio desenho da logo) e esquenta esse lado, e o lado de lá e a parte
+// de baixo da ilha ficam na sombra, arroxeada como a das montanhas.
 // Tudo é medido em pixels da arte, para os efeitos parecerem parte dela.
 
 import logoUrl from '../assets/logo.webp';
-import { contexto2d } from '../motor/imagens';
+import { carregarDecodificada, contexto2d, novoCanvas } from '../motor/imagens';
 import { elemento, imagemDaLogo } from './dom';
 import {
   cair,
@@ -226,6 +229,47 @@ function alfa(p: Particula): number {
   return Math.max(0, Math.min(1, t * 6) * Math.min(1, (1 - t) * 2.5));
 }
 
+// A borda acesa pelo sol: os pixels da logo que têm vazio logo à direita (e um pouco acima), o
+// lado virado para o sol, pintados de laranja — mais forte bem na beirada. Feita uma vez, numa
+// cópia menor da logo (o CSS estica).
+let bordaPronta: Promise<HTMLCanvasElement> | null = null;
+function bordaDoSol(): Promise<HTMLCanvasElement> {
+  bordaPronta ??= carregarDecodificada(logoUrl).then((img) => {
+    const w = 550;
+    const h = Math.round((w * img.naturalHeight) / img.naturalWidth);
+    const base = novoCanvas(w, h);
+    const b = contexto2d(base, { willReadFrequently: true });
+    b.drawImage(img, 0, 0, w, h);
+    const alfa = b.getImageData(0, 0, w, h).data;
+    const cheio = (x: number, y: number): boolean => x >= 0 && x < w && y >= 0 && y < h && alfa[(y * w + x) * 4 + 3] > 100;
+    const saida = novoCanvas(w, h);
+    const s = contexto2d(saida);
+    const pixels = s.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (!cheio(x, y)) continue;
+        // Quão perto da beirada do lado do sol (1: na beirada; 0: a 4 px ou mais).
+        let perto = 0;
+        for (let d = 1; d <= 4; d++) {
+          if (!cheio(x + d, y - Math.floor(d / 2))) {
+            perto = (5 - d) / 4;
+            break;
+          }
+        }
+        if (perto === 0) continue;
+        const i = (y * w + x) * 4;
+        pixels.data[i] = 255;
+        pixels.data[i + 1] = Math.round(150 + 60 * perto);
+        pixels.data[i + 2] = Math.round(80 + 60 * perto);
+        pixels.data[i + 3] = Math.round(235 * perto);
+      }
+    }
+    s.putImageData(pixels, 0, 0);
+    return saida;
+  });
+  return bordaPronta;
+}
+
 // A logo e `ligar`, que põe as partículas para rodar: chamar depois de a logo entrar na página
 // (e de novo quando ela volta). O laço para sozinho quando a logo sai.
 export function logoViva(): { palco: HTMLElement; ligar: () => void } {
@@ -237,7 +281,18 @@ export function logoViva(): { palco: HTMLElement; ligar: () => void } {
   reluz.style.setProperty('--logo', `url("${logoUrl}")`);
   const canvas = elemento('canvas', 'inicio-logo-particulas');
   canvas.setAttribute('aria-hidden', 'true');
-  palco.append(raios, aura, imagemDaLogo('inicio-logo'), reluz, canvas);
+  // A luz do sol na logo: a sombra do lado de lá e embaixo, o calor do lado do sol e a borda acesa
+  // (as três recortadas no desenho da logo).
+  const sombra = elemento('div', 'inicio-logo-sombra');
+  const calor = elemento('div', 'inicio-logo-calor');
+  for (const camada of [sombra, calor]) camada.style.setProperty('--logo', `url("${logoUrl}")`);
+  const borda = elemento('canvas', 'inicio-logo-borda');
+  void bordaDoSol().then((pronta) => {
+    borda.width = pronta.width;
+    borda.height = pronta.height;
+    contexto2d(borda).drawImage(pronta, 0, 0);
+  });
+  palco.append(raios, aura, imagemDaLogo('inicio-logo'), sombra, calor, borda, reluz, canvas);
 
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return { palco, ligar: () => undefined };
 

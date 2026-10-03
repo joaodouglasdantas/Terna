@@ -12,6 +12,7 @@ import { contaAtual, souMestre } from '../save/sessao';
 import { VERSAO } from '../versao';
 import { carregarArteDaCaverna } from './caverna';
 import { anexarCena, carregarArteDaCena } from './cena';
+import { carregarConversa } from './conversa';
 import { botao, digitandoEm, elemento, mostrarTela, sairComEsmaecer } from './dom';
 import { logoViva } from './logo-viva';
 import { telaMapa } from './mapa';
@@ -77,6 +78,7 @@ async function prepararTelaInicial(): Promise<void> {
     document.fonts.load('1rem "Tiny5"'),
     carregarArteDaCena(),
     carregarArteDaCaverna(),
+    carregarConversa(),
     carregarRetratos(),
     carregarArteDaTemporada(),
   ]);

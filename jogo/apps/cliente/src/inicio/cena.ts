@@ -10,7 +10,9 @@
 //   por trás das árvores das beiradas;
 //   o rio brilha e as cachoeiras soltam espuma;
 // - das copas caem folhas em pixel, balançando como pêndulo e rodopiando; flutua pólen na luz e
-//   piscam vagalumes perto do chão.
+//   piscam vagalumes perto do chão;
+// - na grama, a Leslie e o Grow sentados vendo o pôr do sol e conversando (conversa.ts), só na
+//   tela inicial.
 // Fica por baixo da logo e dos botões, sempre dentro do quadro do jogo (as margens pretas ficam
 // livres). É uma peça só, que passa de uma tela para a outra (inicial ↔ seleção ↔ multiplayer)
 // sem recomeçar; o laço dela para sozinho quando ela sai da página (a partida começou).
@@ -20,6 +22,7 @@
 import urlArvores from '../assets/tela-inicial-arvores.png';
 import urlArte from '../assets/tela-inicial.webp';
 import { carregarDecodificada, contexto2d, novoCanvas, umaVez } from '../motor/imagens';
+import { atualizarConversa, desenharConversa } from './conversa';
 import { elemento, palco } from './dom';
 import {
   cair,
@@ -349,6 +352,8 @@ function quadro(agora: number): void {
   const dt = ultimo ? Math.min((agora - ultimo) / 1000, 1 / 20) : 0;
   ultimo = agora;
   const tempo = agora / 1000;
+  // A Leslie e o Grow conversando na grama: só na tela inicial.
+  atualizarConversa(dt, document.querySelector('.inicio-titulo-tela') !== null);
   if (!semMovimento()) {
     soltar(dt, tempo);
     atualizar(dt, tempo);
@@ -587,6 +592,7 @@ function desenhar(tempo: number): void {
   c.imageSmoothingEnabled = true;
   if (!semMovimento()) mexer(c, tempo);
   c.imageSmoothingEnabled = false;
+  desenharConversa(c, largura, altura, tempo);
 
   // Os pássaros, lá longe no céu.
   c.globalAlpha = 0.92;
