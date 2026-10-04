@@ -48,7 +48,14 @@ const CORES_DO_FOGO: [number, number, number, number][] = [
   [253, 255, 186, 255],
   [254, 254, 224, 255],
 ];
-const PASSO_DO_FOGO = 1 / 24; // segundos entre um desenho do fogo e outro
+const PASSO_DO_FOGO = 1 / 24;
+
+// As brasas na boca do colar, na frente do pé do fogo: a altura de cada coluna (da esquerda para
+// a direita, x de 6 a 15, passando um pouco da boca), uns pedaços de carvão mais altos que outros.
+const BRASAS = [1, 2, 2, 1, 3, 2, 1, 2, 3, 1];
+const BRASAS_X = COLAR.x + 1;
+const BRASAS_Y = COLAR.y + 1; // a linha de baixo delas (o tampo do colar)
+const CARVAO = ['#140804', '#21100a', '#33140a']; // segundos entre um desenho do fogo e outro
 
 interface Fagulha {
   x: number;
@@ -254,6 +261,24 @@ function pintarMusgo(ctx: CanvasRenderingContext2D, lado: 'esquerda' | 'direita'
   }
 }
 
+// As brasas: carvão escuro na frente do pé do fogo (quebra a linha reta de onde ele sai), com o
+// alto de cada pedaço aceso em vermelho e laranja, pulsando devagar e cada um no seu ritmo.
+function desenharBrasas(ctx: CanvasRenderingContext2D, alturas: number[], tempo: number, acesa: number): void {
+  alturas.forEach((h, i) => {
+    const x = BRASAS_X + i;
+    for (let k = 0; k < h; k++) {
+      const y = BRASAS_Y - k;
+      const topo = k === h - 1;
+      const calor = ruido(x * 1.7 + k * 3.1, tempo * (1.4 + (i % 3) * 0.35)) * acesa;
+      let cor: string;
+      if (topo) cor = calor > 0.6 ? '#ffb02e' : calor > 0.44 ? '#ff6a10' : calor > 0.28 ? '#d4380a' : '#7a1c08';
+      // As rachaduras do carvão também acendem de vez em quando.
+      else cor = calor > 0.66 ? '#e2470c' : calor > 0.56 ? '#8f240a' : tomDe(CARVAO, sorteio(x, y) * CARVAO.length - 0.5);
+      pixel(ctx, x, y, 1, 1, cor);
+    }
+  });
+}
+
 export function criarTocha(lado: 'esquerda' | 'direita'): Tocha {
   const el = elemento('div', `inicio-tocha inicio-tocha-${lado}`);
   el.setAttribute('aria-hidden', 'true');
@@ -311,14 +336,20 @@ export function criarTocha(lado: 'esquerda' | 'direita'): Tocha {
       for (let x = 0; x < FOGO.w; x++) {
         const i = (y * FOGO.w + x) * 4;
         pixels.data[i + 3] = 0;
-        if (t < 0 || t > 1.2 || acesa <= 0) continue;
-        // A gota: larga e redonda embaixo, afinando em ponta, balançando mais em cima.
-        const balanco = (Math.sin(tempo * 3.4 - t * 3) * 0.8 + vento * 1) * t * t;
-        const largura = 4.3 * Math.pow(1 - Math.min(t, 1), 0.7) * Math.sqrt(Math.min(1, t * 2.5 + 0.55)) + 0.35;
+        if (t > 1.2 || acesa <= 0) continue;
+        // O pé não é reto: arredondado, mais baixo no meio e subindo nas beiradas, com línguas que
+        // descem e sobem entre as brasas (a linha muda com o tempo).
+        const dx = Math.abs(x - meio);
+        const pe = Math.min(base, base + 0.5 - (dx / 3.2) ** 2 * 2.2 + (ruido(x * 0.9 + 3, tempo * 5) - 0.55) * 2.2);
+        if (y > pe) continue;
+        const tt = Math.max(0, t);
+        // A gota: redonda embaixo, afinando em ponta, balançando mais em cima.
+        const balanco = (Math.sin(tempo * 3.4 - tt * 3) * 0.8 + vento * 1) * tt * tt;
+        const largura = 4.3 * Math.pow(1 - Math.min(tt, 1), 0.7) * Math.sqrt(Math.min(1, (tt + 0.1) / 0.3)) + 0.35;
         const d = Math.abs(x - meio - balanco) / largura;
         // As línguas: um ruído que sobe arranca pedaços da borda e da ponta.
         const n = ruido(x * 0.6, y * 0.45 + tempo * 7.5);
-        const calor = (1 - d) * 1.6 - t * 0.55 + (n - 0.5) * 0.6;
+        const calor = (1 - d) * 1.6 - tt * 0.55 + (n - 0.5) * 0.6;
         if (calor <= 0.08) continue;
         const c = CORES_DO_FOGO[Math.min(CORES_DO_FOGO.length - 1, Math.floor(calor * CORES_DO_FOGO.length))];
         pixels.data[i] = c[0];
@@ -377,6 +408,7 @@ export function criarTocha(lado: 'esquerda' | 'direita'): Tocha {
 
       chamaCtx.clearRect(0, 0, LARGURA, ALTURA);
       chamaCtx.drawImage(fogo, FOGO.x, FOGO.y);
+      desenharBrasas(chamaCtx, lado === 'esquerda' ? BRASAS : [...BRASAS].reverse(), tempo, acesa);
       for (const f of fagulhas) {
         const t = f.vida / f.total;
         chamaCtx.globalAlpha = Math.min(1, t * 1.8);
