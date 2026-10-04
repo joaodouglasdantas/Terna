@@ -335,14 +335,14 @@
   gap: 1rem;
 }
 
-/* A logo com os efeitos (logo-viva.ts). O palco tem a proporção exata da imagem (1090×360), para
+/* A logo com os efeitos (logo-viva.ts). O palco tem a proporção exata da imagem (1086×366), para
    as folhas soltarem do musgo nos pontos certos da arte. */
 .inicio-logo-palco {
   position: relative;
   flex-shrink: 0;
   /* Cabe com os dois botões embaixo na altura do quadro. */
-  width: min(560px, 70cqw, max(240px, (100cqh - 330px) * 0.9 * 1090 / 360));
-  aspect-ratio: 1090 / 360;
+  width: min(560px, 70cqw, max(240px, (100cqh - 330px) * 0.9 * 1086 / 366));
+  aspect-ratio: 1086 / 366;
   margin-bottom: 0.5rem;
   animation: inicio-flutua 4s ease-in-out infinite;
 }
@@ -354,6 +354,38 @@
   height: 100%;
   user-select: none;
   filter: drop-shadow(0 8px 24px rgba(16, 8, 32, 0.65));
+}
+
+/* A luz do pôr do sol na logo: o sol do cenário fica em cima à direita. Um calor que vem de lá
+   (soft-light: esquenta e dá contraste sem apagar o desenho), preso ao formato da logo pela
+   máscara, e as beiradas viradas para o sol acesas, somando luz e respirando devagar. */
+.inicio-logo-sol {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(130% 170% at 105% -20%, rgba(255, 200, 120, 0.9), rgba(255, 150, 90, 0.4) 42%, rgba(70, 40, 120, 0.55) 100%);
+  mix-blend-mode: soft-light;
+  -webkit-mask: var(--mascara) center / 100% 100% no-repeat;
+  mask: var(--mascara) center / 100% 100% no-repeat;
+}
+
+.inicio-logo-beiradas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  animation: inicio-sol-respira 6s ease-in-out infinite;
+}
+
+@keyframes inicio-sol-respira {
+  50% {
+    opacity: 0.8;
+  }
 }
 
 /* O canvas das partículas passa da logo: igual a SOBRA em logo-viva.ts. */
@@ -1263,6 +1295,7 @@ a.inicio-botao {
 
 @media (prefers-reduced-motion: reduce) {
   .inicio-logo-palco,
+  .inicio-logo-beiradas,
   .inicio-jogar,
   .inicio-jogar::before,
   .inicio-jogar::after,

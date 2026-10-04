@@ -1,13 +1,16 @@
-// A logo da tela inicial, viva: as letras de pedra com musgo flutuam devagar (no CSS) e, por
-// cima, o musgo solta folhinhas em pixel que caem balançando, umas gotas de orvalho piscam nele e
-// vagalumes passeiam em volta das letras. Tudo é medido em pixels da arte, para os efeitos
+// A logo da tela inicial, viva: as letras de pedra com musgo flutuam devagar (no CSS), com a luz
+// do pôr do sol do cenário batendo nelas pela direita (uma camada quente presa ao formato da logo
+// e as beiradas viradas para o sol acesas, respirando). Por cima, o musgo solta folhinhas em pixel
+// que caem balançando, umas gotas de orvalho piscam nele e vagalumes passeiam em volta das letras. Tudo é medido em pixels da arte, para os efeitos
 // parecerem parte dela.
 
+import logoUrl from '../assets/logo.webp';
+import luzUrl from '../assets/logo-luz.webp';
 import { contexto2d } from '../motor/imagens';
 import { elemento, imagemDaLogo } from './dom';
 import { cair, desenharBrilho, desenharFolha, desenharHalo, folhaPronta, inclinacao, type Folha as DesenhoDeFolha, type Queda } from './efeitos';
 
-// Trechos da arte (logo.webp, 1090×360) em frações da largura (u) e da altura (v).
+// Trechos da arte (logo.webp, 1086×366) em frações da largura (u) e da altura (v).
 type Faixa = { u: readonly [number, number]; v: readonly [number, number] };
 // As pontas de musgo de baixo de cada letra, de onde as folhas se soltam.
 const MUSGO_DE_BAIXO: readonly Faixa[] = [
@@ -126,7 +129,15 @@ export function logoViva(): { palco: HTMLElement; ligar: () => void } {
   const palco = elemento('div', 'inicio-logo-palco');
   const canvas = elemento('canvas', 'inicio-logo-particulas');
   canvas.setAttribute('aria-hidden', 'true');
-  palco.append(imagemDaLogo('inicio-logo'), canvas);
+  // A luz do sol: o calor da tarde por cima da logo (só onde há logo: a própria imagem é a
+  // máscara) e as beiradas viradas para o sol (logo-luz.webp, feita da mesma arte).
+  const sol = elemento('div', 'inicio-logo-sol');
+  sol.style.setProperty('--mascara', `url("${logoUrl}")`);
+  const beiradas = elemento('img', 'inicio-logo-beiradas');
+  beiradas.src = luzUrl;
+  beiradas.alt = '';
+  beiradas.draggable = false;
+  palco.append(imagemDaLogo('inicio-logo'), sol, beiradas, canvas);
 
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return { palco, ligar: () => undefined };
 
