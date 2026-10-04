@@ -335,14 +335,117 @@
   gap: 1rem;
 }
 
-/* A logo com os efeitos (logo-viva.ts). O palco tem a proporção exata da imagem (1086×366), para
+/* O foco no meio: as laterais da arte (as árvores, o estandarte, a fogueira) ficam um pouco
+   desfocadas e escurecidas, sumindo antes do centro, para a logo e os botões não brigarem com
+   elas. Por baixo do conteúdo da tela (z-index -1, a tela é isolada). */
+.inicio-titulo-tela::before,
+.inicio-titulo-tela::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* O desfoque leve, só nas beiradas. */
+.inicio-titulo-tela::before {
+  -webkit-backdrop-filter: blur(1.6px);
+  backdrop-filter: blur(1.6px);
+  -webkit-mask: linear-gradient(to right, #000 0%, rgba(0, 0, 0, 0.6) 12%, transparent 26%, transparent 74%, rgba(0, 0, 0, 0.6) 88%, #000 100%);
+  mask: linear-gradient(to right, #000 0%, rgba(0, 0, 0, 0.6) 12%, transparent 26%, transparent 74%, rgba(0, 0, 0, 0.6) 88%, #000 100%);
+}
+
+/* A vinheta: escura nas laterais, mais leve em cima e embaixo (o céu e o chão com a Leslie e o
+   Grow continuam à vista), e uma sombra bem suave atrás dos dois botões, onde a textura da
+   floresta mais competia com eles. */
+.inicio-titulo-tela::after {
+  background:
+    radial-gradient(ellipse 22% 16% at 50% 62%, rgba(12, 8, 22, 0.34) 0%, rgba(12, 8, 22, 0.18) 55%, rgba(12, 8, 22, 0) 100%),
+    linear-gradient(to right, rgba(12, 8, 22, 0.62) 0%, rgba(12, 8, 22, 0.3) 14%, rgba(12, 8, 22, 0) 32%, rgba(12, 8, 22, 0) 68%, rgba(12, 8, 22, 0.3) 86%, rgba(12, 8, 22, 0.62) 100%),
+    radial-gradient(ellipse 75% 85% at 50% 48%, rgba(12, 8, 22, 0) 55%, rgba(12, 8, 22, 0.28) 100%);
+}
+
+/* A placa de madeira (placa.ts), com a logo entalhada: o quadro fica logo acima dos botões (que
+   ficam entre as pernas) e as pernas descem por trás dele até o chão do
+   cenário (a altura delas vem do placa.ts). */
+.inicio-titulo-tela {
+  /* De baixo para cima: os botões a uma distância fixa do chão (88,8% da altura) e a placa logo
+     acima deles, então ela não fica mais alta que o necessário. */
+  justify-content: safe flex-end;
+  padding-bottom: 35cqh;
+}
+
+/* Quadro baixo: não sobe tanto (senão o topo da placa passa da beirada de cima). */
+@container (max-height: 640px) {
+  .inicio-titulo-tela {
+    padding-bottom: 29cqh;
+  }
+}
+
+.inicio-placa {
+  position: relative;
+  flex-shrink: 0;
+  width: min(640px, 64cqw, max(250px, (100cqh - 300px) * 0.95 * 1170 / 563));
+  aspect-ratio: 1170 / 563;
+  filter: drop-shadow(0 6px 10px rgba(12, 6, 20, 0.45));
+}
+
+.inicio-placa-quadro {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+}
+
+.inicio-placa-perna {
+  position: absolute;
+  top: calc(100% - 2px);
+  background-repeat: repeat-y;
+  background-position: top left;
+  pointer-events: none;
+}
+
+/* No pé, na frente da madeira: a grama da própria arte (placa.ts põe a faixa de grama no lugar
+   exato dela na arte) e uma moita de folhas altas da mesma grama. */
+.inicio-placa-grama {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
+.inicio-placa-tufo {
+  position: absolute;
+  background: center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+}
+
+.inicio-placa-tufo-espelhado {
+  transform: scaleX(-1);
+}
+
+/* Os dois modos mais baixos aqui, embaixo da placa. */
+.inicio-titulo-tela .inicio-modos {
+  width: min(15.5rem, 100%);
+  gap: 0.7rem;
+}
+
+.inicio-titulo-tela .inicio-jogar,
+.inicio-titulo-tela .inicio-multiplayer {
+  min-height: 2.8rem;
+  font-size: 1.35rem;
+}
+
+/* A logo com os efeitos (logo-viva.ts). O palco tem a proporção exata da imagem (1626×708), para
    as folhas soltarem do musgo nos pontos certos da arte. */
 .inicio-logo-palco {
   position: relative;
   flex-shrink: 0;
   /* Cabe com os dois botões embaixo na altura do quadro. */
-  width: min(560px, 70cqw, max(240px, (100cqh - 330px) * 0.9 * 1086 / 366));
-  aspect-ratio: 1086 / 366;
+  width: min(600px, 72cqw, max(240px, (100cqh - 330px) * 0.9 * 1626 / 708));
+  aspect-ratio: 1626 / 708;
   margin-bottom: 0.5rem;
   animation: inicio-flutua 4s ease-in-out infinite;
 }
@@ -400,9 +503,8 @@
 
 /* ---- o fundo dos menus (cena.ts) ---- */
 
-/* A floresta ao pôr do sol cobre o quadro, por baixo do conteúdo da tela. A arte fica um pouco
-   maior que o quadro (sobra para a paralaxe andar sem mostrar a beirada), respira devagar e anda
-   de leve atrás do mouse (--px, --py, do cena.ts). */
+/* A floresta ao pôr do sol cobre o quadro, por baixo do conteúdo da tela, parada (a placa da tela
+   inicial sai do chão dela). */
 /* O quadro da cena: o mesmo tamanho e lugar do #inicio, logo atrás dele (fica na página; as telas
    do menu passam por cima dele sem deixar o jogo aparecer entre uma e outra). */
 .inicio-cena-palco {
@@ -429,11 +531,9 @@
 }
 
 .inicio-cena-arte {
+  /* Parada no quadro: a placa da tela inicial sai do chão da arte e precisa ficar presa nele. */
   position: absolute;
   inset: 0;
-  transform: translate(var(--px, 0px), var(--py, 0px)) scale(1.035);
-  animation: inicio-cena-respira 26s ease-in-out infinite alternate;
-  will-change: transform;
 }
 
 .inicio-cena-fundo {
@@ -492,30 +592,20 @@
   image-rendering: pixelated;
 }
 
-/* Abrindo a tela inicial, a arte chega: clareia e se aproxima. Até a chegada começar ela fica
+/* Abrindo a tela inicial, a arte chega: clareia (sem zoom: a placa já está no chão dela). Até a chegada começar ela fica
    escondida (senão aparecia inteira por dois quadros e sumia). */
 .inicio-cena-escondida .inicio-cena-arte {
   opacity: 0;
 }
 
 .inicio-cena-entrando .inicio-cena-arte {
-  animation: inicio-cena-chega 1.4s cubic-bezier(0.2, 0.8, 0.3, 1) both, inicio-cena-respira 26s ease-in-out 1.4s infinite alternate;
-}
-
-@keyframes inicio-cena-respira {
-  from {
-    transform: translate(var(--px, 0px), var(--py, 0px)) scale(1.035);
-  }
-  to {
-    transform: translate(var(--px, 0px), var(--py, 0px)) scale(1.07);
-  }
+  animation: inicio-cena-chega 1.4s cubic-bezier(0.2, 0.8, 0.3, 1) both;
 }
 
 @keyframes inicio-cena-chega {
   from {
     opacity: 0;
     filter: brightness(0.4);
-    transform: translate(var(--px, 0px), var(--py, 0px)) scale(1.12);
   }
 }
 

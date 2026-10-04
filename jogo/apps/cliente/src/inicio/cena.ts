@@ -1,7 +1,8 @@
 // O fundo dos menus: a floresta ao pôr do sol (assets/tela-inicial.webp) — as árvores grandes
 // emoldurando as beiradas, a bandeira, as lanternas, as tochas e a fogueira, o rio e as cachoeiras
 // — e tudo o que dá vida a ela:
-// - a arte respira devagar (um zoom que vai e volta) e segue de leve o mouse (paralaxe);
+// - a arte fica parada no quadro (sem zoom nem paralaxe: a placa da tela inicial sai do chão
+//   dela e precisa ficar presa nele);
 // - o vento balança as copas e a bandeira, e a água das cachoeiras e do rio ondula: esses pedaços
 //   da arte são redesenhados por cima dela em faixas finas, cada faixa um pouco deslocada por uma
 //   onda que corre (com a borda esfumada, para não mostrar o recorte);
@@ -13,7 +14,7 @@
 //   piscam vagalumes perto do chão;
 // - na grama, a Leslie e o Grow sentados vendo o pôr do sol e conversando (conversa.ts), só na
 //   tela inicial.
-// Fica por baixo da logo e dos botões, sempre dentro do quadro do jogo (as margens pretas ficam
+// Fica por baixo da placa e dos botões, sempre dentro do quadro do jogo (as margens pretas ficam
 // livres). É uma peça só, que passa de uma tela para a outra (inicial ↔ seleção ↔ multiplayer)
 // sem recomeçar; o laço dela para sozinho quando ela sai da página (a partida começou).
 //
@@ -102,9 +103,6 @@ const POLENS = 34;
 const VAGALUMES = 10;
 const FOLHAS_POR_SEGUNDO = 1.4; // por copa
 const ENTRADA_MS = 1400;
-// A paralaxe: até quanto (fração do quadro) a arte anda seguindo o mouse, e quão depressa chega.
-const PARALAXE = 0.012;
-const SEGUE = 2.5; // por segundo
 
 interface FolhaCaindo extends Queda {
   desenho: DesenhoDeFolha;
@@ -164,9 +162,6 @@ let rodando = false;
 let pixel = 1; // um "pixel" da arte na tela
 let largura = 0;
 let altura = 0;
-// A paralaxe: para onde o mouse puxa (de -1 a 1) e onde a arte está.
-const mouse = { x: 0, y: 0 };
-const paralaxe = { x: 0, y: 0 };
 
 const semMovimento = (): boolean => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const sortear = (min: number, max: number): number => min + Math.random() * (max - min);
@@ -296,11 +291,6 @@ export function prepararCena(): void {
   palcoDaCena.hidden = true;
   palcoDaCena.append(camada);
   palco().after(palcoDaCena);
-  // A arte segue o mouse de leve.
-  window.addEventListener('pointermove', (evento) => {
-    mouse.x = Math.max(-1, Math.min(1, (evento.clientX / innerWidth) * 2 - 1));
-    mouse.y = Math.max(-1, Math.min(1, (evento.clientY / innerHeight) * 2 - 1));
-  });
   // A camada cobre o quadro: mudou de tamanho (a janela, ou o quadro que apareceu), mede de novo.
   new ResizeObserver(() => {
     if (palcoDaCena && !palcoDaCena.hidden) medir();
@@ -357,12 +347,6 @@ function quadro(agora: number): void {
   if (!semMovimento()) {
     soltar(dt, tempo);
     atualizar(dt, tempo);
-    // A paralaxe: a arte vai devagar para o lado contrário do mouse.
-    const k = 1 - Math.exp(-SEGUE * dt);
-    paralaxe.x += (-mouse.x * PARALAXE - paralaxe.x) * k;
-    paralaxe.y += (-mouse.y * PARALAXE - paralaxe.y) * k;
-    arte.style.setProperty('--px', `${(paralaxe.x * largura).toFixed(2)}px`);
-    arte.style.setProperty('--py', `${(paralaxe.y * altura).toFixed(2)}px`);
   }
   desenhar(tempo);
   requestAnimationFrame(quadro);

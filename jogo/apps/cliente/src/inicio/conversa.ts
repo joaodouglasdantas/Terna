@@ -16,7 +16,7 @@ type Jeito = 'costas' | 'esquerda' | 'direita';
 // fica o outro.
 // O meio da dupla fica fixo no quadro e cada um senta a `lado` pixels do desenho dele: crescendo
 // os dois, a distância entre eles cresce junto (sem um entrar no outro).
-const MEIO_DA_DUPLA = 0.6745;
+const MEIO_DA_DUPLA = 0.74; // ao lado da perna direita da placa (placa.ts)
 const LUGARES = {
   leslie: { lado: -10, y: 0.888, outro: 'direita' as const },
   grow: { lado: 10, y: 0.888, outro: 'esquerda' as const },

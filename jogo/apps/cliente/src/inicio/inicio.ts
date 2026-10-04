@@ -1,11 +1,10 @@
 // Telas de antes do jogo: primeiro a de carregamento, uma barra de progresso que confere o
-// servidor, o banco e a arte (e deixa o servidor grátis acordar); depois a inicial, com a logo,
-// o nome e os modos de jogo. São páginas comuns por cima do canvas: a logo é uma imagem grande
+// servidor, o banco e a arte (e deixa o servidor grátis acordar); depois a inicial, com a placa,
+// o nome e os modos de jogo. São páginas comuns por cima do canvas: a placa é uma imagem grande
 // e o texto precisa ficar nítido, o que o canvas de 480×270 ampliado não daria.
 
 import type { Heroi, Jogador } from '@terna/compartilhado';
 import logoSimplesUrl from '../assets/logo-simples.webp';
-import logoUrl from '../assets/logo.webp';
 import { carregarDecodificada } from '../motor/imagens';
 import { checarBanco, checarServidor } from '../rede/saude';
 import { contaAtual, souMestre } from '../save/sessao';
@@ -14,12 +13,12 @@ import { carregarArteDaCaverna } from './caverna';
 import { anexarCena, carregarArteDaCena } from './cena';
 import { carregarConversa } from './conversa';
 import { botao, digitandoEm, elemento, mostrarTela, sairComEsmaecer } from './dom';
-import { logoViva } from './logo-viva';
 import { telaMapa } from './mapa';
 import { botaoDaMusica } from './musica';
 import { telaMultiplayer, type EscolhaOnline } from './multiplayer';
 import { botaoDaOpiniao } from './opiniao';
 import { criarPerfil } from './perfil';
+import { carregarPlaca, criarPlaca } from './placa';
 import { telaPersonagens } from './personagens';
 import { TEXTOS_DO_TREINO, telaSelecao } from './selecao';
 import { carregarArteDaTemporada } from './temporada';
@@ -64,16 +63,16 @@ export function logoSimples(): HTMLElement {
 
 const esperar = (ms: number): Promise<void> => new Promise((resolver) => setTimeout(resolver, ms));
 
-// A logo grande e a letra da tela inicial, baixadas e já decodificadas antes de a tela abrir:
-// sem isso ela aparecia com as árvores subindo e a logo chegava segundos depois. Junto, o que as
+// A placa e a letra da tela inicial, baixadas e já decodificadas antes de a tela abrir: sem
+// isso ela aparecia com as árvores subindo e a placa chegava segundos depois. Junto, o que as
 // telas seguintes mostram de cara: a caverna da conta, a floresta do fundo dos menus, os retratos
-// dos cartões e a arte do carregamento antes de cada partida. A imagem da logo fica guardada aqui
-// para o navegador não descartar a versão decodificada (as outras ficam guardadas por quem
+// dos cartões e a arte do carregamento antes de cada partida. As imagens da placa ficam guardadas
+// aqui para o navegador não descartar a versão decodificada (as outras ficam guardadas por quem
 // carrega).
-let logoPronta: HTMLImageElement | undefined;
+let placaPronta: unknown;
 async function prepararTelaInicial(): Promise<void> {
-  const [logo] = await Promise.all([
-    carregarDecodificada(logoUrl),
+  const [placa] = await Promise.all([
+    carregarPlaca(),
     document.fonts.load('1rem "Tiny5"'),
     carregarArteDaCena(),
     carregarArteDaCaverna(),
@@ -81,7 +80,7 @@ async function prepararTelaInicial(): Promise<void> {
     carregarRetratos(),
     carregarArteDaTemporada(),
   ]);
-  logoPronta = logo;
+  placaPronta = placa;
 }
 
 // Guarda o valor carregado e transforma o sucesso/erro em Resultado.
@@ -247,7 +246,7 @@ function atalho(texto: string, icone: string[]): HTMLButtonElement {
   return b;
 }
 
-// A tela inicial: a logo (viva, com partículas), o perfil da conta (perfil.ts) e os modos de
+// A tela inicial: a placa de madeira (placa.ts), o perfil da conta (perfil.ts) e os modos de
 // jogo, com as árvores da frente subindo nas beiradas. Termina quando a pessoa escolhe um modo e
 // o personagem — Singleplayer, depois da seleção de personagem; Multiplayer, depois de criar ou entrar numa sala
 // e dos dois escolherem (as telas deles voltam para cá se ela desistir) — ou sai da conta
@@ -297,7 +296,6 @@ export function escolherModo(conta: Jogador, aviso = ''): Promise<Escolha | type
       mostrarAviso(aviso);
       anexarCena(tela);
       mostrarTela(tela);
-      logo.ligar();
       window.addEventListener('keydown', aoTeclar);
       foco.focus();
     };
@@ -357,13 +355,12 @@ export function escolherModo(conta: Jogador, aviso = ''): Promise<Escolha | type
 
     const modos = elemento('div', 'inicio-modos');
     modos.append(avisoDaSala, solo, multiplayer);
-    const logo = logoViva();
+    const placa = criarPlaca(tela);
     // O formulário de opinião, no canto de baixo à direita, em cima da versão.
     const opiniao = botaoDaOpiniao('inicio-botao inicio-atalho inicio-opiniao-canto');
-    tela.append(logo.palco, modos, elemento('p', 'inicio-versao', VERSAO), atalhos, opiniao, perfil.botao, perfil.painel);
+    tela.append(placa.el, modos, elemento('p', 'inicio-versao', VERSAO), atalhos, opiniao, perfil.botao, perfil.painel);
     anexarCena(tela, true);
     mostrarTela(tela);
-    logo.ligar();
     // Sem foco inicial em nada: o contorno do foco no Singleplayer parecia um botão já escolhido.
     // O Enter joga do mesmo jeito.
   });
