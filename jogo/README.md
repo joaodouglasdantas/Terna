@@ -135,7 +135,7 @@ jogo/
 │   │       └── assets/       folhas de sprite (saída das ferramentas; não editar)
 │   └── servidor/         API + tempo real (Node + Fastify + Drizzle)
 │       ├── src/
-│       │   ├── rotas/        contas, sessões, saves, ranking
+│       │   ├── rotas/        contas, sessões, progresso (XP, azios e passe), saves, ranking
 │       │   ├── tempo-real/   WebSocket: quem está no mundo e onde (com conta)
 │       │   ├── partida/      salas 1v1 com código, sem conta: tempo marcado pelo servidor
 │       │   ├── auth/         hash de senha (scrypt) e sessões (token)
@@ -144,7 +144,7 @@ jogo/
 ├── packages/
 │   └── compartilhado/    o que cliente e servidor precisam concordar
 │       └── src/
-│           ├── contas.ts, saves.ts, ranking.ts, protocolo.ts   formatos validados com zod
+│           ├── contas.ts, progresso.ts, saves.ts, ranking.ts, protocolo.ts   formatos validados com zod
 │           └── conteudo/     dados do jogo (comportamento dos animais…)
 ├── ferramentas/          geradores de sprite (leem fontes/, escrevem no cliente)
 └── fontes/               artes originais em alta resolução
@@ -171,7 +171,8 @@ Tabelas em `apps/servidor/src/banco/schema.ts`:
 
 | Tabela | O que guarda |
 |---|---|
-| `jogadores` | conta: nome (único, sem diferenciar maiúsculas), e-mail opcional, hash da senha |
+| `jogadores` | conta: nome (único, sem diferenciar maiúsculas), e-mail opcional, hash da senha; o XP do perfil, os azios e o passe da temporada (pontos e níveis resgatados) |
+| `partidas_da_conta` | cada partida (sozinho ou online) de cada conta: quando começou e terminou, o resultado e o que deu de XP e pontos do passe |
 | `sessoes` | cada login: hash do token e validade (30 dias por padrão) |
 | `saves` | até 3 espaços de save por jogador; o conteúdo é JSON validado por `DadosSave` |
 | `recordes` | melhor marca de cada jogador em cada categoria de ranking |
@@ -194,6 +195,8 @@ Tudo sob `/api`. Rotas com 🔒 pedem `Authorization: Bearer <token>`.
 | `POST /sessoes` | entra `{ login, senha }` (login = nome ou e-mail) |
 | `DELETE /sessoes` 🔒 | sai (invalida o token) |
 | `GET /eu` 🔒 | dados da conta |
+| `POST /eu/partidas` 🔒 · `POST /eu/partidas/:id/fim` 🔒 | abre a partida da conta `{ modo }` · fecha com `{ resultado }` e devolve o XP e os pontos do passe que ela deu |
+| `POST /eu/passe/resgatar` 🔒 · `POST /eu/passe/recomecar` 🔒 | resgata um nível liberado do passe `{ nivel }` (XP e azios) · recomeça o passe (só a conta mestre) |
 | `GET /saves` 🔒 · `GET /saves/:slot` 🔒 · `PUT /saves/:slot` 🔒 | saves 1 a 3 |
 | `GET /ranking/:categoria` · `POST /ranking` 🔒 | top 50 · enviar `{ categoria, valor }` |
 | `WS /tempo-real?token=…` | mundo aberto com conta: `bem-vindo`, `entrou`, `saiu`, `posicao` (ver `protocolo.ts`) |
@@ -284,6 +287,8 @@ instalador bem maior.
 - Contas, saves e o mundo aberto (`rede/api.ts`, `rede/tempo-real.ts`, `save/save.ts`) estão
   prontos e testados, mas o jogo ainda não os usa: faltam tela de entrar/criar conta e quando
   salvar.
+- O resultado das partidas (para o XP e o passe) vem do cliente: o servidor só segura o óbvio
+  (cada partida fecha uma vez, menos de 20 s não dá nada, até 40 partidas com ganho por dia).
 - Ranking e posição vêm do cliente e só são validados por faixa. Antes de o ranking valer
   algo, o servidor tem de calcular a pontuação.
 - Recuperar senha por e-mail ainda não existe (o e-mail já é guardado).

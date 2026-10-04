@@ -29,6 +29,13 @@
       "when": 1791070092863,
       "tag": "0003_codigo_do_jogador",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791151807102,
+      "tag": "0004_progresso",
+      "breakpoints": true
     }
   ]
 }

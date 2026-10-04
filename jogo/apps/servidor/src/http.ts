@@ -1,4 +1,4 @@
-import { DIAS_ENTRE_TROCAS_DE_NOME } from '@terna/compartilhado';
+import { DIAS_ENTRE_TROCAS_DE_NOME, PASSE_VAZIO, TEMPORADA_DO_PASSE, type PasseDaConta } from '@terna/compartilhado';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { z } from 'zod';
 import type { Banco } from './banco/conexao';
@@ -50,6 +50,12 @@ export function nomeLivreEm(j: JogadorAutenticado, mestres: ReadonlySet<string>,
   return livre > agora ? livre : null;
 }
 
+// O passe da conta como vale agora: o guardado é de outra temporada, recomeça vazio.
+export const passeDe = (j: JogadorAutenticado): PasseDaConta =>
+  j.passeTemporada === TEMPORADA_DO_PASSE
+    ? { temporada: j.passeTemporada, pontos: j.passePontos, resgatados: [...j.passeResgatados].sort((a, b) => a - b) }
+    : PASSE_VAZIO;
+
 // O que vai para o jogo sobre o jogador.
 export const jogadorPublico = (j: JogadorAutenticado, mestres: ReadonlySet<string> = new Set()) => ({
   id: j.id,
@@ -62,4 +68,7 @@ export const jogadorPublico = (j: JogadorAutenticado, mestres: ReadonlySet<strin
   nomeLivreEm: nomeLivreEm(j, mestres)?.toISOString() ?? null,
   // Nunca trocou: a primeira troca é grátis (não espera os dias da regra).
   primeiraTrocaDeNome: j.nomeTrocadoEm === null,
+  xp: j.xp,
+  azios: j.azios,
+  passe: passeDe(j),
 });

@@ -575,6 +575,47 @@
   animation: inicio-lanterna 2.2s ease-in-out var(--atraso) infinite;
 }
 
+/* Os raios do sol (em 76,9% × 32% da arte): faixas largas de luz quente, bem fracas e de beiradas
+   macias, girando bem devagar em volta dele e respirando de leve, apagando para fora (a máscara) —
+   somam um pouco de luz por cima da cena, sem marcar as faixas. */
+.inicio-cena-raios {
+  position: absolute;
+  left: calc(76.9% - 22%);
+  top: calc(32% - 22% * 16 / 9);
+  width: 44%;
+  aspect-ratio: 1;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(255, 200, 130, 0) 0deg 4deg,
+    rgba(255, 208, 140, 0.13) 11deg,
+    rgba(255, 200, 130, 0) 18deg 22deg,
+    rgba(255, 222, 168, 0.07) 27deg,
+    rgba(255, 200, 130, 0) 32deg 36deg
+  );
+  filter: blur(6px);
+  -webkit-mask: radial-gradient(closest-side, rgba(0, 0, 0, 0) 10%, rgba(0, 0, 0, 0.85) 18%, rgba(0, 0, 0, 0.3) 48%, transparent 92%);
+  mask: radial-gradient(closest-side, rgba(0, 0, 0, 0) 10%, rgba(0, 0, 0, 0.85) 18%, rgba(0, 0, 0, 0.3) 48%, transparent 92%);
+  animation: inicio-raios-giram 220s linear infinite, inicio-raios-respiram 11s ease-in-out infinite;
+}
+
+@keyframes inicio-raios-giram {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes inicio-raios-respiram {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.75;
+  }
+}
+
 .inicio-cena-arte::after {
   /* Um pouco mais escuro nas beiradas, para o meio (a logo e os botões) se destacar. */
   content: '';
@@ -739,8 +780,11 @@ a.inicio-botao {
   gap: 0.75rem;
 }
 
+/* Na tela inicial, na terra do rodapé, ao lado da versão: em cima dela o botão escondia os pés da
+   Leslie e do Grow sentados. */
 .inicio-titulo-tela .inicio-opiniao-canto {
-  bottom: 3.6rem;
+  right: 16.5rem;
+  bottom: 0.6rem;
 }
 
 /* Os modos de jogo, um embaixo do outro, com a mesma largura. */
@@ -1394,7 +1438,8 @@ a.inicio-botao {
   .inicio-multiplayer::after,
   .inicio-aguarde,
   .inicio-cena-arte,
-  .inicio-cena-luz {
+  .inicio-cena-luz,
+  .inicio-cena-raios {
     animation: none;
   }
 
@@ -3438,4 +3483,872 @@ a.inicio-botao {
 
 .inicio-conta-longa .inicio-conta-form {
   gap: 0.6rem;
+}
+
+/* ---- progresso (progresso.ts): o nível do perfil, os azios e o ganho da partida ---- */
+
+.inicio-icone-azio,
+.inicio-icone-xp {
+  display: block;
+  flex: none;
+  width: 1.15em;
+  height: auto;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.45));
+}
+
+/* O selo do nível: uma plaquinha dourada com o número. */
+.inicio-nivel {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.inicio-nivel-selo {
+  flex: none;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.85rem;
+  line-height: 1.1;
+  letter-spacing: 0.06em;
+  color: #2b1a08;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+  background: linear-gradient(to bottom, #ffe7a0 0 45%, #e2b24e 45%);
+  box-shadow: 0 0 0 2px #6b4416, 0 0 0 4px var(--contorno), inset 0 -2px 0 rgba(0, 0, 0, 0.18);
+  white-space: nowrap;
+}
+
+/* A barra do XP no nível: o trilho escuro e o verde enchendo. */
+.inicio-nivel-trilho {
+  position: relative;
+  flex: 1;
+  min-width: 4rem;
+  height: 0.6rem;
+  background: #1a100a;
+  box-shadow: 0 0 0 2px #6b5636, 0 0 0 4px var(--contorno), inset 0 2px 0 rgba(0, 0, 0, 0.5);
+}
+
+.inicio-nivel-cheio {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(to bottom, #b8f09a 0 40%, #6cc457 40%);
+  transition: width 0.5s ease;
+}
+
+.inicio-nivel-texto {
+  font-size: 0.85rem;
+  color: var(--marrom-claro);
+  white-space: nowrap;
+}
+
+/* O contador de azios: o ícone e o número numa plaquinha escura. */
+.inicio-azios {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.75rem 0.3rem 0.5rem;
+  font-size: 1.15rem;
+  letter-spacing: 0.05em;
+  color: #d6f1ff;
+  background: rgba(20, 14, 26, 0.88);
+  border: 3px solid #3d5f86;
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px rgba(159, 220, 255, 0.18);
+}
+
+.inicio-azios .inicio-icone-azio {
+  width: 1.35rem;
+}
+
+/* Na tela inicial: embaixo do perfil, encostado na direita. */
+.inicio-azios-canto {
+  position: absolute;
+  top: calc(14px + 5.2rem + 3px + 1rem);
+  right: 14px;
+}
+
+/* No botão do perfil: o selo do nível em cima da beirada de baixo do ícone (a barra fica no
+   painel). */
+.inicio-perfil-icone-caixa {
+  position: relative;
+  flex: none;
+}
+
+.inicio-perfil-nivel {
+  position: absolute;
+  left: 50%;
+  bottom: -0.55rem;
+  transform: translateX(-50%);
+}
+
+.inicio-perfil-nivel .inicio-nivel-trilho {
+  display: none;
+}
+
+/* No painel do perfil: a barra inteira, com quanto falta, e os azios ao lado. */
+.inicio-perfil-linha-nivel {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.inicio-perfil-nivel-grande {
+  flex: 1;
+  flex-wrap: wrap;
+  row-gap: 0.45rem;
+}
+
+.inicio-perfil-nivel-grande .inicio-nivel-selo {
+  font-size: 1rem;
+}
+
+.inicio-perfil-nivel-grande .inicio-nivel-texto {
+  flex-basis: 100%;
+}
+
+/* O ganho da partida, na tela de fim. */
+.inicio-ganho-lugar:empty {
+  display: none;
+}
+
+.inicio-ganho {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  animation: inicio-ganho-chega 0.45s cubic-bezier(0.2, 0.8, 0.3, 1.3) both;
+}
+
+@keyframes inicio-ganho-chega {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.92);
+  }
+}
+
+.inicio-ganho-linha {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem 1.1rem;
+  margin: 0;
+}
+
+.inicio-ganho-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.7rem;
+  font-size: 1.1rem;
+  color: var(--tinta);
+  background: rgba(0, 0, 0, 0.35);
+  border: 2px solid #6b5636;
+}
+
+.inicio-ganho-passe {
+  padding: 0 0.3rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #2b1a08;
+  background: #e2b24e;
+}
+
+.inicio-ganho-subiu {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #ffe08a;
+  text-shadow: 0 2px 0 #4e3016, 0 0 12px rgba(255, 210, 110, 0.6);
+}
+
+.inicio-ganho-nada {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--suave);
+}
+
+/* ---- passe da temporada (passe.ts) ---- */
+
+/* O botão do canto de cima à esquerda, de madeira como o do perfil: o selo com a estrela, o nome,
+   o nível com a barra e o aviso de quantos níveis há para resgatar. */
+.inicio-passe-botao {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.5rem 1.1rem 0.55rem 0.5rem;
+  font: inherit;
+  color: var(--tinta);
+  text-align: left;
+  background: linear-gradient(to bottom, rgba(90, 58, 26, 0.45), rgba(0, 0, 0, 0) 2.5rem), rgba(26, 16, 10, 0.88);
+  border: 3px solid var(--marrom);
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px rgba(239, 220, 162, 0.22), 0 6px 18px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.inicio-passe-botao:hover,
+.inicio-passe-botao:focus-visible {
+  border-color: #c9a55a;
+  transform: translateY(-1px);
+  outline: none;
+}
+
+/* O selo: um quadro dourado com a estrela, que brilha quando há o que resgatar. */
+.inicio-passe-botao-selo {
+  display: grid;
+  place-items: center;
+  width: 3.6rem;
+  aspect-ratio: 1;
+  background: radial-gradient(circle at 50% 42%, #6a4a1c 0%, #2c1b0b 75%);
+  box-shadow: 0 0 0 2px #c9a55a, 0 0 0 4px var(--contorno), inset 0 0 0 2px rgba(0, 0, 0, 0.35);
+}
+
+.inicio-passe-botao-estrela {
+  width: 62%;
+  height: auto;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.5));
+}
+
+.inicio-passe-botao-pronto .inicio-passe-botao-selo {
+  animation: inicio-passe-selo-brilha 1.8s ease-in-out infinite;
+}
+
+@keyframes inicio-passe-selo-brilha {
+  50% {
+    box-shadow: 0 0 0 2px #ffe08a, 0 0 0 4px var(--contorno), inset 0 0 0 2px rgba(0, 0, 0, 0.35), 0 0 18px rgba(255, 210, 110, 0.75);
+  }
+}
+
+.inicio-passe-botao-texto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  line-height: 1.1;
+}
+
+.inicio-passe-botao-rotulo {
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--marrom-claro);
+}
+
+.inicio-passe-botao-nome {
+  font-size: 1.3rem;
+  letter-spacing: 0.04em;
+  color: #ffe08a;
+}
+
+.inicio-passe-botao-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.15rem;
+}
+
+.inicio-passe-botao-nivel {
+  font-size: 0.85rem;
+  color: var(--tinta);
+  white-space: nowrap;
+}
+
+.inicio-passe-botao-trilho {
+  position: relative;
+  width: 6.5rem;
+  height: 0.5rem;
+  background: #1a100a;
+  box-shadow: 0 0 0 2px #6b5636, 0 0 0 4px var(--contorno);
+}
+
+.inicio-passe-botao-cheio {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(to bottom, #ffe7a0 0 40%, #e2a93e 40%);
+}
+
+/* O aviso: um selo vermelho com quantos níveis estão prontos, pulando de leve. */
+.inicio-passe-botao-aviso {
+  position: absolute;
+  top: -0.7rem;
+  right: -0.7rem;
+  min-width: 1.5rem;
+  padding: 0.1rem 0.35rem;
+  box-sizing: border-box;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  text-align: center;
+  color: #fff6ec;
+  background: #d8414e;
+  box-shadow: 0 0 0 2px #ffb3b9, 0 0 0 4px var(--contorno);
+  animation: inicio-passe-aviso-pula 1.8s ease-in-out infinite;
+}
+
+.inicio-passe-botao-aviso[hidden] {
+  display: none;
+}
+
+@keyframes inicio-passe-aviso-pula {
+  0%,
+  70%,
+  100% {
+    transform: translateY(0);
+  }
+  80% {
+    transform: translateY(-3px);
+  }
+}
+
+/* A tela: a floresta do menu atrás, escurecida, e a caixa larga no meio. */
+.inicio-passe-tela {
+  background: radial-gradient(ellipse at 50% 45%, rgba(20, 14, 8, 0.55) 0%, rgba(14, 9, 5, 0.9) 100%);
+}
+
+.inicio-passe {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+  width: min(72rem, 100%);
+}
+
+.inicio-passe-cabeca {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  flex-wrap: wrap;
+}
+
+.inicio-passe-titulo {
+  color: #ffe08a;
+  text-align: left;
+}
+
+.inicio-passe-temporada {
+  margin: 0.25rem 0 0;
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  color: var(--marrom-claro);
+}
+
+.inicio-passe-conta {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+}
+
+.inicio-passe-perfil {
+  padding: 0.45rem 0.8rem;
+  background: rgba(26, 16, 10, 0.88);
+  border: 3px solid var(--marrom);
+  box-shadow: 0 0 0 3px var(--contorno);
+}
+
+.inicio-passe-perfil .inicio-nivel-trilho {
+  min-width: 6rem;
+}
+
+/* O progresso: o nível alcançado grande, a barra dos pontos e quanto falta. */
+.inicio-passe-progresso {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.4rem 1.2rem;
+  padding: 0.7rem 1.1rem;
+  background: linear-gradient(to bottom, rgba(90, 58, 26, 0.35), rgba(0, 0, 0, 0) 3rem), rgba(26, 16, 10, 0.9);
+  border: 3px solid var(--marrom);
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px rgba(239, 220, 162, 0.2);
+}
+
+.inicio-passe-alcancado {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.inicio-passe-alcancado-rotulo {
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--marrom-claro);
+}
+
+.inicio-passe-alcancado-valor {
+  font-size: 2rem;
+  font-weight: normal;
+  line-height: 1;
+  color: #ffe08a;
+  text-shadow: 0 3px 0 var(--marrom-escuro);
+}
+
+.inicio-passe-alcancado-de {
+  font-size: 1rem;
+  color: var(--suave);
+}
+
+.inicio-passe-barra {
+  position: relative;
+  height: 1rem;
+  background: #1a100a;
+  box-shadow: 0 0 0 2px #6b5636, 0 0 0 4px var(--contorno), inset 0 3px 0 rgba(0, 0, 0, 0.5);
+}
+
+.inicio-passe-barra-cheia {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(to bottom, #fff0a8 0 35%, #f2bf48 35% 80%, #c98a26 80%);
+  transition: width 0.6s ease;
+}
+
+.inicio-passe-faltam {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--tinta);
+  white-space: nowrap;
+}
+
+/* A trilha: os degraus lado a lado, rolando de lado, com as setas por cima das pontas. */
+.inicio-passe-moldura {
+  position: relative;
+}
+
+.inicio-passe-trilha {
+  display: flex;
+  overflow-x: auto;
+  padding: 0.6rem 2.4rem 1rem;
+  scroll-padding: 0 2.4rem;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -webkit-mask: linear-gradient(to right, transparent, #000 2.2rem, #000 calc(100% - 2.2rem), transparent);
+  mask: linear-gradient(to right, transparent, #000 2.2rem, #000 calc(100% - 2.2rem), transparent);
+}
+
+.inicio-passe-trilha::-webkit-scrollbar {
+  display: none;
+}
+
+.inicio-passe-seta {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  width: 2.6rem;
+  height: 2.6rem;
+  margin-top: -1.3rem;
+  font: inherit;
+  color: var(--tinta);
+  background: rgba(26, 16, 10, 0.92);
+  border: 3px solid var(--marrom);
+  box-shadow: 0 0 0 3px var(--contorno);
+  cursor: pointer;
+}
+
+.inicio-passe-seta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 0.7rem;
+  height: 0.7rem;
+  border: solid currentColor;
+  border-width: 0 0 4px 4px;
+  transform: translateX(15%) rotate(45deg);
+}
+
+.inicio-passe-seta-depois::before {
+  transform: translateX(-15%) rotate(-135deg);
+}
+
+.inicio-passe-seta-antes {
+  left: -1.1rem;
+}
+
+.inicio-passe-seta-depois {
+  right: -1.1rem;
+}
+
+.inicio-passe-seta:hover:not(:disabled),
+.inicio-passe-seta:focus-visible {
+  border-color: #c9a55a;
+  color: #ffe08a;
+  outline: none;
+}
+
+.inicio-passe-seta:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Cada degrau: o nó na linha da trilha e o cartão embaixo. A linha passa pelo meio dos nós (a de
+   cada degrau vai até o do lado) e acende até onde os pontos chegaram; a do degrau seguinte enche
+   com a `--parte`. */
+.inicio-passe-degrau {
+  --linha: 1.9rem; /* a altura do meio do nó */
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  width: 9.4rem;
+  padding: 0 0.45rem;
+  box-sizing: border-box;
+  scroll-snap-align: center;
+}
+
+.inicio-passe-degrau::before,
+.inicio-passe-degrau::after {
+  content: '';
+  position: absolute;
+  top: calc(var(--linha) - 0.3rem);
+  left: -50%;
+  width: 100%;
+  height: 0.6rem;
+  z-index: 0;
+}
+
+.inicio-passe-degrau::before {
+  background: #2a1d12;
+  box-shadow: 0 0 0 2px var(--contorno);
+}
+
+.inicio-passe-degrau::after {
+  width: calc(100% * var(--parte, 0));
+  background: linear-gradient(to bottom, #fff0a8 0 35%, #f2bf48 35%);
+  transition: width 0.6s ease;
+}
+
+.inicio-passe-degrau:first-child::before,
+.inicio-passe-degrau:first-child::after {
+  display: none;
+}
+
+.inicio-passe-no {
+  --no-borda: #5a4a36;
+  --no-claro: #34261a;
+  --no-escuro: #2a1d12;
+  --no-numero: var(--suave);
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 3.8rem;
+  height: 3.8rem;
+}
+
+/* O losango: 19 pixels de largura (23 nos níveis de 5 em 5, que passam um pouco da caixa), cada
+   pixel com 0,2rem, com o número em pixels no meio. */
+.inicio-passe-losango {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 3.8rem;
+  height: 3.8rem;
+  overflow: visible;
+}
+
+.inicio-passe-degrau-maior .inicio-passe-losango {
+  width: 4.6rem;
+  height: 4.6rem;
+}
+
+.l-contorno {
+  fill: var(--contorno);
+}
+
+.l-borda {
+  fill: var(--no-borda);
+}
+
+.l-claro {
+  fill: var(--no-claro);
+}
+
+.l-escuro {
+  fill: var(--no-escuro);
+}
+
+.l-numero {
+  fill: var(--no-numero);
+}
+
+.inicio-passe-aceso .inicio-passe-no {
+  --no-borda: #fff6cf;
+  --no-claro: #fff0a8;
+  --no-escuro: #e2b24e;
+  --no-numero: #2b1a08;
+}
+
+.inicio-passe-degrau-maior .inicio-passe-no {
+  --no-borda: #c9a55a;
+}
+
+.inicio-passe-degrau-maior.inicio-passe-aceso .inicio-passe-no {
+  --no-borda: #fff6cf;
+}
+
+/* O cartão do nível. */
+.inicio-passe-cartao {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 10.5rem;
+  padding: 0.6rem 0.5rem 0.7rem;
+  box-sizing: border-box;
+  background: linear-gradient(to bottom, rgba(90, 58, 26, 0.4), rgba(0, 0, 0, 0) 3.5rem), rgba(26, 16, 10, 0.94);
+  border: 3px solid #5a4a36;
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px rgba(239, 220, 162, 0.12);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.inicio-passe-degrau-maior .inicio-passe-cartao {
+  border-color: #c9a55a;
+  background: radial-gradient(ellipse at 50% 40%, rgba(255, 210, 110, 0.16), rgba(0, 0, 0, 0) 70%), linear-gradient(to bottom, rgba(120, 80, 30, 0.5), rgba(0, 0, 0, 0) 3.5rem), rgba(30, 19, 10, 0.95);
+}
+
+.inicio-passe-cartao-nivel {
+  font-size: 0.85rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--marrom-claro);
+}
+
+.inicio-passe-itens {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inicio-passe-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 1.15rem;
+  color: var(--tinta);
+}
+
+.inicio-passe-item-icone {
+  width: 1.9rem;
+  height: auto;
+  filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.5));
+}
+
+.inicio-passe-degrau-maior .inicio-passe-item-icone {
+  width: 2.1rem;
+}
+
+.inicio-passe-item-azios .inicio-passe-item-qtd {
+  color: #bfe9ff;
+}
+
+.inicio-passe-item-xp .inicio-passe-item-qtd {
+  color: #ffe08a;
+}
+
+.inicio-passe-item-nome {
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--suave);
+}
+
+.inicio-passe-cartao-rodape {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.2rem;
+  align-items: center;
+}
+
+.inicio-passe-resgatar.inicio-botao {
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.95rem;
+}
+
+.inicio-passe-feito,
+.inicio-passe-trancado {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.inicio-passe-feito {
+  color: var(--verde);
+}
+
+.inicio-passe-trancado {
+  color: #8a7a64;
+}
+
+.inicio-passe-visto,
+.inicio-passe-cadeado {
+  width: auto;
+  height: 0.85rem;
+  fill: currentColor;
+}
+
+/* Os estados: o liberado brilha, o resgatado fica mais calmo, o bloqueado apagado. */
+.inicio-passe-degrau[data-estado='liberado'] .inicio-passe-cartao {
+  border-color: #ffe08a;
+  box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px rgba(255, 240, 168, 0.25), 0 0 18px rgba(255, 210, 110, 0.45);
+  animation: inicio-passe-pronto 2.2s ease-in-out infinite;
+}
+
+@keyframes inicio-passe-pronto {
+  50% {
+    box-shadow: 0 0 0 3px var(--contorno), inset 0 0 0 2px rgba(255, 240, 168, 0.35), 0 0 26px rgba(255, 210, 110, 0.7);
+  }
+}
+
+.inicio-passe-degrau[data-estado='liberado'] .inicio-passe-cartao:hover {
+  transform: translateY(-3px);
+}
+
+.inicio-passe-degrau[data-estado='resgatado'] .inicio-passe-itens {
+  opacity: 0.55;
+}
+
+.inicio-passe-degrau[data-estado='bloqueado'] .inicio-passe-itens {
+  opacity: 0.6;
+  filter: saturate(0.55);
+}
+
+.inicio-passe-degrau[data-estado='bloqueado'] .inicio-passe-cartao {
+  background: rgba(22, 15, 10, 0.92);
+}
+
+/* Resgatou: o cartão dá um pulo e a recompensa sobe de dentro dele. */
+.inicio-passe-resgatou .inicio-passe-cartao {
+  animation: inicio-passe-pulo 0.5s cubic-bezier(0.2, 0.8, 0.3, 1.4);
+}
+
+@keyframes inicio-passe-pulo {
+  40% {
+    transform: translateY(-6px) scale(1.05);
+    border-color: #fff6cf;
+  }
+}
+
+.inicio-passe-sobe {
+  position: absolute;
+  left: 50%;
+  top: 7.5rem;
+  z-index: 3;
+  padding: 0.15rem 0.5rem;
+  font-size: 1.05rem;
+  background: rgba(26, 16, 10, 0.85);
+  box-shadow: 0 0 0 2px #c9a55a, 0 0 0 4px var(--contorno);
+  white-space: nowrap;
+  color: #fff6cf;
+  text-shadow: 0 2px 0 #4e3016, 0 0 10px rgba(255, 210, 110, 0.8);
+  pointer-events: none;
+  animation: inicio-passe-sobe 1.4s ease-out forwards;
+}
+
+@keyframes inicio-passe-sobe {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 0.6rem);
+  }
+  20% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -2.6rem);
+  }
+}
+
+.inicio-passe-como {
+  margin: 0;
+  font-size: 0.95rem;
+  text-align: center;
+  color: var(--suave);
+}
+
+.inicio-passe-aviso {
+  min-height: 1.4rem;
+  margin: 0;
+  font-size: 1.05rem;
+  text-align: center;
+  color: #ffe08a;
+}
+
+.inicio-passe-aviso-erro {
+  color: var(--vermelho);
+}
+
+.inicio-passe-aviso-novo {
+  animation: inicio-entra 0.3s ease;
+}
+
+.inicio-passe-acoes {
+  display: flex;
+  justify-content: center;
+  gap: 1.2rem;
+}
+
+.inicio-passe-todos[hidden],
+.inicio-passe-recomecar[hidden] {
+  display: none;
+}
+
+.inicio-passe-recomecar {
+  align-self: center;
+}
+
+@container (max-height: 640px) {
+  .inicio-passe {
+    gap: 0.6rem;
+  }
+  .inicio-passe-cartao {
+    min-height: 9rem;
+  }
+  .inicio-passe-titulo {
+    font-size: 1.6rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inicio-passe-botao-pronto .inicio-passe-botao-selo,
+  .inicio-passe-botao-aviso,
+  .inicio-passe-degrau[data-estado='liberado'] .inicio-passe-cartao,
+  .inicio-passe-resgatou .inicio-passe-cartao,
+  .inicio-ganho {
+    animation: none;
+  }
+}
+
+/* Quadro estreito: a placa chega perto dos cantos, então o botão do passe fica mais compacto (o nome
+   em duas linhas e a barra curta) para não passar por cima dela. */
+@container (max-width: 1250px) {
+  .inicio-passe-botao-rotulo {
+    display: none;
+  }
+  .inicio-passe-botao-nome {
+    max-width: 6.2rem;
+    font-size: 1.05rem;
+  }
+  .inicio-passe-botao-trilho {
+    width: 3rem;
+  }
+  .inicio-passe-botao {
+    gap: 0.6rem;
+    padding-right: 0.8rem;
+  }
 }

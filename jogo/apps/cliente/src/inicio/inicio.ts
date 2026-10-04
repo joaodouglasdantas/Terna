@@ -11,12 +11,15 @@ import { contaAtual, souMestre } from '../save/sessao';
 import { VERSAO } from '../versao';
 import { carregarArteDaCaverna } from './caverna';
 import { anexarCena, carregarArteDaCena } from './cena';
+import { carregarCeu } from './ceu';
 import { carregarConversa } from './conversa';
 import { botao, digitandoEm, elemento, mostrarTela, sairComEsmaecer } from './dom';
 import { telaMapa } from './mapa';
 import { botaoDaMusica } from './musica';
 import { telaMultiplayer, type EscolhaOnline } from './multiplayer';
 import { botaoDaOpiniao } from './opiniao';
+import { botaoDoPasse, telaPasse } from './passe';
+import { contadorDeAzios } from './progresso';
 import { criarPerfil } from './perfil';
 import { carregarPlaca, criarPlaca } from './placa';
 import { telaPersonagens } from './personagens';
@@ -77,6 +80,7 @@ async function prepararTelaInicial(): Promise<void> {
     carregarArteDaCena(),
     carregarArteDaCaverna(),
     carregarConversa(),
+    carregarCeu(),
     carregarRetratos(),
     carregarArteDaTemporada(),
   ]);
@@ -291,9 +295,13 @@ export function escolherModo(conta: Jogador, aviso = ''): Promise<Escolha | type
       aoFechar: () => window.addEventListener('keydown', aoTeclar),
     });
 
-    // Desistiu numa das telas seguintes (ou a sala caiu: `aviso`): a tela inicial volta como estava.
+    // Desistiu numa das telas seguintes (ou a sala caiu: `aviso`): a tela inicial volta como estava
+    // (com o passe, os azios e o nível como a conta está agora: o passe pode ter resgatado).
     const voltarParaCa = (foco: HTMLElement, aviso = ''): void => {
       mostrarAviso(aviso);
+      passe.mostrar();
+      azios.mostrar();
+      perfil.atualizar();
       anexarCena(tela);
       mostrarTela(tela);
       window.addEventListener('keydown', aoTeclar);
@@ -317,6 +325,14 @@ export function escolherModo(conta: Jogador, aviso = ''): Promise<Escolha | type
         voltarParaCa(multiplayer, fim.aviso);
       });
     });
+
+    // O passe da temporada, no canto de cima à esquerda, e os azios embaixo do perfil.
+    const passe = botaoDoPasse(() => {
+      window.removeEventListener('keydown', aoTeclar);
+      mostrarAviso('');
+      void telaPasse().then(() => voltarParaCa(passe.el));
+    });
+    const azios = contadorDeAzios('inicio-azios-canto');
 
     // Os atalhos do canto de baixo: o treino, os personagens, o mapa e a música.
     const abrirAoClicar = (b: HTMLButtonElement, abrirTela: () => Promise<void>): HTMLButtonElement => {
@@ -358,7 +374,7 @@ export function escolherModo(conta: Jogador, aviso = ''): Promise<Escolha | type
     const placa = criarPlaca(tela);
     // O formulário de opinião, no canto de baixo à direita, em cima da versão.
     const opiniao = botaoDaOpiniao('inicio-botao inicio-atalho inicio-opiniao-canto');
-    tela.append(placa.el, modos, elemento('p', 'inicio-versao', VERSAO), atalhos, opiniao, perfil.botao, perfil.painel);
+    tela.append(placa.el, modos, elemento('p', 'inicio-versao', VERSAO), atalhos, opiniao, passe.el, perfil.botao, azios.el, perfil.painel);
     anexarCena(tela, true);
     mostrarTela(tela);
     // Sem foco inicial em nada: o contorno do foco no Singleplayer parecia um botão já escolhido.

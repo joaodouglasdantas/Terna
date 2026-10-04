@@ -10,6 +10,7 @@ import { rotaPartida } from './partida/rota';
 import { Salas } from './partida/salas';
 import type { Turn } from './partida/turn';
 import { rotasContas } from './rotas/contas';
+import { rotasProgresso } from './rotas/progresso';
 import { rotasRanking } from './rotas/ranking';
 import { rotasSaves } from './rotas/saves';
 import { rotaTempoReal } from './tempo-real/rota';
@@ -90,6 +91,7 @@ export async function criarApp({
         mestres,
         codigosNaTela,
       });
+      rotasProgresso(api, banco, mestres);
       rotasSaves(api, banco);
       rotasRanking(api, banco);
       rotaTempoReal(api, banco);

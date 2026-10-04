@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PASSE_VAZIO, PasseDaConta } from './progresso';
 
 // Nome que aparece para os outros jogadores: letras, números, _ e -. Até 12 caracteres, o mesmo
 // limite do apelido das partidas (partida.ts): o nome da conta é o que vai em cima da cabeça.
@@ -74,7 +75,8 @@ export const DIAS_ENTRE_TROCAS_DE_NOME = 30;
 // com tudo liberado para testar — o dono pode desligar para jogar como uma conta comum.
 // `nomeLivreEm`: quando o nome pode ser trocado de novo (null: já pode). `primeiraTrocaDeNome`:
 // a troca grátis de quem nunca trocou (a primeira não espera os 30 dias). `codigo`: o código único
-// do jogador.
+// do jogador. `xp`: o XP do perfil no total (o nível sai dele: nivelDoPerfil). `azios`: a moeda do
+// jogo. `passe`: o passe da temporada (progresso.ts).
 export const Jogador = z.object({
   id: z.string(),
   codigo: z.string().default(''),
@@ -85,6 +87,9 @@ export const Jogador = z.object({
   icone: IdIcone.catch(ICONE_PADRAO).default(ICONE_PADRAO),
   nomeLivreEm: z.string().nullable().default(null),
   primeiraTrocaDeNome: z.boolean().default(false),
+  xp: z.number().int().default(0),
+  azios: z.number().int().default(0),
+  passe: PasseDaConta.default(PASSE_VAZIO),
 });
 export type Jogador = z.infer<typeof Jogador>;
 
@@ -105,6 +110,23 @@ export const TrocarIcone = z.object({ icone: IdIcone });
 export type TrocarIcone = z.infer<typeof TrocarIcone>;
 export const ModoMestre = z.object({ ligado: z.boolean() });
 export type ModoMestre = z.infer<typeof ModoMestre>;
+
+// O fim da partida da conta: a conta como ficou e o que a partida deu (zero quando não contou:
+// curta demais, ou passou das partidas com ganho do dia). `subiuPara`: o nível novo do perfil.
+export const FimDaPartidaDaConta = z.object({
+  jogador: Jogador,
+  ganho: z.object({ xp: z.number().int(), pontos: z.number().int() }),
+  subiuPara: z.number().int().nullable(),
+});
+export type FimDaPartidaDaConta = z.infer<typeof FimDaPartidaDaConta>;
+
+// Resgatou um nível do passe: a conta como ficou, o que veio e o nível novo do perfil (se subiu).
+export const NivelResgatado = z.object({
+  jogador: Jogador,
+  recompensa: z.object({ xp: z.number().int(), azios: z.number().int() }),
+  subiuPara: z.number().int().nullable(),
+});
+export type NivelResgatado = z.infer<typeof NivelResgatado>;
 
 export const Erro = z.object({ erro: z.string() });
 export type Erro = z.infer<typeof Erro>;

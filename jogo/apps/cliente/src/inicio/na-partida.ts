@@ -4,12 +4,13 @@
 // oferece jogar de novo: sozinho, direto; online, com o mesmo oponente, se ele aceitar
 // (revanche.ts).
 
-import type { Heroi } from '@terna/compartilhado';
+import type { FimDaPartidaDaConta, Heroi } from '@terna/compartilhado';
 import { montarAjuda } from './ajuda';
 import { botao, elemento, mostrarTela, sairComEsmaecer } from './dom';
 import { ligarMedidor, medidorLigado } from '../interface/medidor';
 import { botaoDaMusica } from './musica';
 import { botaoDaOpiniao } from './opiniao';
+import { linhaDoGanho } from './progresso';
 import type { Revanche } from './revanche';
 
 export interface OpcoesMenus {
@@ -23,7 +24,8 @@ export interface MenusDaPartida {
   // Termina a partida na tela: fecha o menu, tira a engrenagem e mostra o resultado. A promessa
   // termina quando a pessoa aperta "Voltar ao menu" ('menu') ou jogar de novo ('revanche'):
   // `'sozinho'`, contra a CPU, na hora; com uma `Revanche` (online), quando os dois pediram.
-  mostrarFim(titulo: string, texto: string, revanche?: Revanche | 'sozinho'): Promise<'menu' | 'revanche'>;
+  // `ganho`: o que a partida deu para a conta (XP e pontos do passe), quando o servidor responder.
+  mostrarFim(titulo: string, texto: string, revanche?: Revanche | 'sozinho', ganho?: Promise<FimDaPartidaDaConta | null>): Promise<'menu' | 'revanche'>;
   // Abre o menu, como o Esc, se nada estiver aberto (a janela ficou pequena demais: janela.ts).
   abrirMenu(): void;
   // Tira tudo da tela (saiu da partida).
@@ -188,7 +190,7 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
   };
 
   return {
-    mostrarFim(titulo, texto, revanche) {
+    mostrarFim(titulo, texto, revanche, ganho) {
       remover('trocando');
       return new Promise((resolver) => {
         const tela = elemento('section', 'inicio-tela inicio-pausa');
@@ -201,6 +203,12 @@ export function montarMenus({ online, heroi, aoMudarMenu, aoSair }: OpcoesMenus)
         };
         const voltar = botao('Voltar ao menu', revanche ? 'inicio-botao inicio-botao-claro' : 'inicio-botao', () => sair('menu'));
         caixa.append(elemento('h1', 'inicio-titulo', titulo), elemento('p', 'inicio-sub', texto));
+        // O ganho da partida entra embaixo do texto quando chegar (sem segurar a tela).
+        const lugarDoGanho = elemento('div', 'inicio-ganho-lugar');
+        caixa.append(lugarDoGanho);
+        void ganho?.then((fim) => {
+          if (fim && !acabou) lugarDoGanho.replaceChildren(linhaDoGanho(fim));
+        });
         if (revanche === 'sozinho') {
           // Contra a CPU: jogar de novo volta direto à escolha de personagem.
           const jogar = botao('Jogar novamente', 'inicio-botao', () => sair('revanche'));

@@ -3,7 +3,10 @@
 import {
   CodigoEnviado,
   Erro,
+  FimDaPartidaDaConta,
   Jogador,
+  NivelResgatado,
+  PartidaDaConta,
   LinhaRanking,
   Save,
   Sessao,
@@ -13,6 +16,8 @@ import {
   type Entrar,
   type EnviarPontuacao,
   type IdIcone,
+  type ModoDaPartidaDaConta,
+  type ResultadoDaPartida,
   type TrocarSenha,
 } from '@terna/compartilhado';
 import { z } from 'zod';
@@ -90,6 +95,14 @@ export const api = {
   trocarNome: (nome: string): Promise<Jogador> => pedir('PUT', '/eu/nome', Jogador, { nome }),
   trocarIcone: (icone: IdIcone): Promise<Jogador> => pedir('PUT', '/eu/icone', Jogador, { icone }),
   modoMestre: (ligado: boolean): Promise<Jogador> => pedir('PUT', '/eu/mestre', Jogador, { ligado }),
+  // O progresso (progresso.ts de @terna/compartilhado): a partida da conta começa e termina com o
+  // resultado (o servidor soma o XP e os pontos do passe); os níveis liberados do passe se
+  // resgatam. Recomeçar o passe: só a conta mestre, para testar.
+  comecarPartida: (modo: ModoDaPartidaDaConta): Promise<string> => pedir('POST', '/eu/partidas', PartidaDaConta, { modo }).then((r) => r.id),
+  terminarPartida: (id: string, resultado: ResultadoDaPartida): Promise<FimDaPartidaDaConta> =>
+    pedir('POST', `/eu/partidas/${encodeURIComponent(id)}/fim`, FimDaPartidaDaConta, { resultado }),
+  resgatarNivelDoPasse: (nivel: number): Promise<NivelResgatado> => pedir('POST', '/eu/passe/resgatar', NivelResgatado, { nivel }),
+  recomecarPasse: (): Promise<Jogador> => pedir('POST', '/eu/passe/recomecar', Jogador),
   // Só o jogo em casa (servidor sem e-mail de verdade): o último código mandado para o e-mail.
   codigoDeTeste: (email: string): Promise<string> =>
     pedir('GET', `/teste/codigo?email=${encodeURIComponent(email)}`, z.object({ codigo: z.string() })).then((r) => r.codigo),

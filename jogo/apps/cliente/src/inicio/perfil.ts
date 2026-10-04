@@ -17,6 +17,7 @@ import urlGolemDoNinho from '../assets/icones/golem-do-ninho.webp';
 import { api, ErroApi } from '../rede/api';
 import { atualizarConta, contaAtual } from '../save/sessao';
 import { botao, elemento } from './dom';
+import { barraDeNivel, contadorDeAzios } from './progresso';
 
 export const URL_DOS_ICONES: Record<IdIcone, string> = {
   'flor-de-chapeu': urlFlorDeChapeu,
@@ -38,6 +39,8 @@ export interface Perfil {
   painel: HTMLElement;
   abrir(): void;
   fechar(): void;
+  // Mostra de novo a conta como está (mudou fora do perfil: o passe, uma partida).
+  atualizar(): void;
 }
 
 const mensagemDe = (erro: unknown): string =>
@@ -66,8 +69,12 @@ export function criarPerfil(opcoes: { aoSair: () => void; aoAbrir?: () => void; 
   const nomeDoBotao = elemento('span', 'inicio-perfil-nome');
   const seloDoBotao = elemento('span', 'inicio-conta-selo', 'Mestre');
   const textoDoBotao = elemento('span', 'inicio-perfil-texto');
+  // O nível do perfil, num selo em cima do ícone, e a barra do XP embaixo do nome.
+  const nivelDoBotao = barraDeNivel('inicio-perfil-nivel');
+  const iconeComNivel = elemento('span', 'inicio-perfil-icone-caixa');
+  iconeComNivel.append(iconeDoBotao, nivelDoBotao.el);
   textoDoBotao.append(elemento('span', 'inicio-perfil-rotulo', 'Perfil'), nomeDoBotao);
-  botaoDoPerfil.append(iconeDoBotao, textoDoBotao, seloDoBotao);
+  botaoDoPerfil.append(iconeComNivel, textoDoBotao, seloDoBotao);
 
   // O painel.
   const painel = elemento('div', 'inicio-perfil');
@@ -105,6 +112,13 @@ export function criarPerfil(opcoes: { aoSair: () => void; aoAbrir?: () => void; 
   const quem = elemento('div', 'inicio-perfil-quem');
   quem.append(nomeGrande, tipoDaConta, linhaDoCodigo);
   topo.append(iconeGrande, quem);
+
+  // O nível: o selo, a barra e quanto falta para o próximo; ao lado, os azios.
+  const nivelDoPainel = barraDeNivel('inicio-perfil-nivel-grande', true);
+  const aziosDoPainel = contadorDeAzios('inicio-perfil-azios');
+  const linhaDoNivel = elemento('div', 'inicio-perfil-linha-nivel');
+  linhaDoNivel.append(nivelDoPainel.el, aziosDoPainel.el);
+  const secaoDoNivel = secao('Nível', linhaDoNivel);
 
   // O ícone.
   const erroDoIcone = elemento('p', 'inicio-erro');
@@ -212,7 +226,7 @@ export function criarPerfil(opcoes: { aoSair: () => void; aoAbrir?: () => void; 
     opcoes.aoSair();
   });
 
-  caixa.append(fecharX, elemento('h2', 'inicio-titulo inicio-perfil-titulo', 'Perfil'), topo, secaoDoIcone, secaoDoNome, secaoDoMestre, sair);
+  caixa.append(fecharX, elemento('h2', 'inicio-titulo inicio-perfil-titulo', 'Perfil'), topo, secaoDoNivel, secaoDoIcone, secaoDoNome, secaoDoMestre, sair);
   painel.append(caixa);
 
   let ocupado = false;
@@ -227,6 +241,9 @@ export function criarPerfil(opcoes: { aoSair: () => void; aoAbrir?: () => void; 
     iconeGrande.src = url;
     nomeDoBotao.textContent = atual.nome;
     nomeGrande.textContent = atual.nome;
+    nivelDoBotao.mostrar(atual);
+    nivelDoPainel.mostrar(atual);
+    aziosDoPainel.mostrar();
     codigo.textContent = atual.codigo ? `#${atual.codigo}` : '';
     linhaDoCodigo.hidden = !atual.codigo;
     seloDoBotao.hidden = !atual.mestre;
@@ -296,7 +313,7 @@ export function criarPerfil(opcoes: { aoSair: () => void; aoAbrir?: () => void; 
   });
   botaoDoPerfil.addEventListener('click', abrir);
   mostrar();
-  return { botao: botaoDoPerfil, painel, abrir, fechar };
+  return { botao: botaoDoPerfil, painel, abrir, fechar, atualizar: () => mostrar() };
 }
 
 function rotulo(texto: string, para: string): HTMLLabelElement {

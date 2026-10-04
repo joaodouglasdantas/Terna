@@ -110,3 +110,33 @@ describe('armas', () => {
     expect(sortearArma(() => 0.9999)).toEqual({ tipo: 'arco', x: MUNDO - QUEDA_DE_ARMAS.margem });
   });
 });
+
+describe('progresso', () => {
+  it('cada nível do perfil pede mais XP que o anterior', async () => {
+    const { NIVEL_MAXIMO, nivelDoPerfil, xpParaSubir } = await import('../src/progresso');
+    expect(nivelDoPerfil(0)).toEqual({ nivel: 1, xpNoNivel: 0, xpParaSubir: xpParaSubir(1) });
+    expect(nivelDoPerfil(xpParaSubir(1) - 1).nivel).toBe(1);
+    expect(nivelDoPerfil(xpParaSubir(1))).toEqual({ nivel: 2, xpNoNivel: 0, xpParaSubir: xpParaSubir(2) });
+    for (let n = 1; n < 50; n++) expect(xpParaSubir(n + 1)).toBeGreaterThan(xpParaSubir(n));
+    expect(nivelDoPerfil(10_000_000)).toEqual({ nivel: NIVEL_MAXIMO, xpNoNivel: 0, xpParaSubir: 0 });
+  });
+
+  it('a trilha do passe libera um nível a cada PONTOS_POR_NIVEL_DO_PASSE e todo nível dá algo', async () => {
+    const { NIVEIS_DO_PASSE, PONTOS_POR_NIVEL_DO_PASSE, nivelLiberadoDoPasse } = await import('../src/progresso');
+    expect(nivelLiberadoDoPasse(0)).toBe(0);
+    expect(nivelLiberadoDoPasse(PONTOS_POR_NIVEL_DO_PASSE - 1)).toBe(0);
+    expect(nivelLiberadoDoPasse(PONTOS_POR_NIVEL_DO_PASSE)).toBe(1);
+    expect(nivelLiberadoDoPasse(1e9)).toBe(NIVEIS_DO_PASSE.length);
+    for (const r of NIVEIS_DO_PASSE) expect(r.xp + r.azios).toBeGreaterThan(0);
+  });
+
+  it('o passe dura 30 dias e depois do fim não dá mais pontos', async () => {
+    const { DIAS_DO_PASSE, PASSE_COMECA_EM, PASSE_TERMINA_EM, diasParaOPasseAcabar, passeAberto } = await import('../src/progresso');
+    const comeco = new Date(PASSE_COMECA_EM);
+    expect(PASSE_TERMINA_EM.getTime() - comeco.getTime()).toBe(DIAS_DO_PASSE * 24 * 60 * 60 * 1000);
+    expect(passeAberto(comeco)).toBe(true);
+    expect(diasParaOPasseAcabar(comeco)).toBe(DIAS_DO_PASSE);
+    expect(passeAberto(PASSE_TERMINA_EM)).toBe(false);
+    expect(diasParaOPasseAcabar(PASSE_TERMINA_EM)).toBe(0);
+  });
+});

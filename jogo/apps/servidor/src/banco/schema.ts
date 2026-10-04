@@ -10,7 +10,7 @@ export function gerarCodigoDoJogador(): string {
   return `${letras.slice(0, 4)}-${letras.slice(4)}`;
 }
 
-import type { DadosSave } from '@terna/compartilhado';
+import { TEMPORADA_DO_PASSE, type DadosSave, type ModoDaPartidaDaConta, type ResultadoDaPartida } from '@terna/compartilhado';
 import { randomInt } from 'node:crypto';
 import { boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
@@ -35,8 +35,37 @@ export const jogadores = pgTable('jogadores', {
   codigo: text().notNull().unique().$defaultFn(gerarCodigoDoJogador),
   nomeTrocadoEm: timestamp({ withTimezone: true }),
   modoMestre: boolean().notNull().default(true),
+  // O progresso (progresso.ts de @terna/compartilhado): o XP do perfil no total, os azios (a moeda
+  // do jogo) e o passe da temporada — de que temporada é, os pontos juntados e os níveis já
+  // resgatados. Virando a temporada (TEMPORADA_DO_PASSE), o passe recomeça na próxima vez que a
+  // conta aparecer.
+  xp: integer().notNull().default(0),
+  azios: integer().notNull().default(0),
+  passeTemporada: integer().notNull().default(TEMPORADA_DO_PASSE),
+  passePontos: integer().notNull().default(0),
+  passeResgatados: jsonb().$type<number[]>().notNull().default([]),
   criadoEm: criadoEm(),
 });
+
+// As partidas de cada conta (sozinho ou online), para o XP e os pontos do passe: o jogo abre a
+// partida quando ela começa e fecha no fim, com o resultado. Só fecha uma vez, e só dá ganho a que
+// durou o bastante (DURACAO_MINIMA_DA_PARTIDA_S) e até PARTIDAS_COM_GANHO_POR_DIA por dia.
+export const partidasDaConta = pgTable(
+  'partidas_da_conta',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    jogadorId: uuid()
+      .notNull()
+      .references(() => jogadores.id, { onDelete: 'cascade' }),
+    modo: text().$type<ModoDaPartidaDaConta>().notNull(),
+    comecouEm: criadoEm(),
+    terminouEm: timestamp({ withTimezone: true }),
+    resultado: text().$type<ResultadoDaPartida>(),
+    xp: integer().notNull().default(0),
+    pontos: integer().notNull().default(0),
+  },
+  (t) => [index('partidas_da_conta_jogador_idx').on(t.jogadorId, t.comecouEm)],
+);
 
 // Os códigos que vão por e-mail: um por conta e por motivo ('confirmar' o cadastro ou trocar a
 // 'senha'), trocado a cada pedido. Só o hash fica aqui; erros demais apagam o código.

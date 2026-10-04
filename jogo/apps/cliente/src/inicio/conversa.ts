@@ -16,12 +16,29 @@ type Jeito = 'costas' | 'esquerda' | 'direita';
 // fica o outro.
 // O meio da dupla fica fixo no quadro e cada um senta a `lado` pixels do desenho dele: crescendo
 // os dois, a distância entre eles cresce junto (sem um entrar no outro).
-const MEIO_DA_DUPLA = 0.74; // ao lado da perna direita da placa (placa.ts)
+const MEIO_DA_DUPLA = 0.74; // ao lado da perna direita da placa (placa.ts), em tela grande
 const LUGARES = {
   leslie: { lado: -10, y: 0.888, outro: 'direita' as const },
   grow: { lado: 10, y: 0.888, outro: 'esquerda' as const },
 };
 type Quem = keyof typeof LUGARES;
+
+// Diminuindo a tela, a placa encolhe menos que o resto e a perna direita dela vai chegando perto
+// da Leslie: o meio da dupla anda para a direita o bastante para ela ficar sempre ao lado da
+// perna (e do tufo de grama do pé), nunca atrás. As medidas são as do CSS (.inicio-placa: largura;
+// placa.ts: onde a perna fica no quadro e o tamanho do tufo) — manter juntas.
+const PLACA = { quadro: 1170, perna: { x: 982, largura: 110 }, tufo: 100, arte: 1672 };
+const FOLGA_DA_LESLIE = 8; // pixels do desenho entre o tufo e o corpo dela (meia largura + respiro)
+
+function meioDaDupla(largura: number, altura: number, u: number): number {
+  const placa = Math.min(640, 0.64 * largura, Math.max(250, ((altura - 300) * 0.95 * PLACA.quadro) / 563));
+  const centroDaPerna = largura / 2 + ((PLACA.perna.x + PLACA.perna.largura / 2) / PLACA.quadro - 0.5) * placa;
+  const fimDoTufo = centroDaPerna + (PLACA.tufo / 2 / PLACA.arte) * largura;
+  const preciso = fimDoTufo + (FOLGA_DA_LESLIE - LUGARES.leslie.lado) * u;
+  // Sem passar de onde o Grow ainda cabe na tela.
+  const limite = largura - (LUGARES.grow.lado + FOLGA_DA_LESLIE + 2) * u;
+  return Math.round(Math.min(limite, Math.max(MEIO_DA_DUPLA * largura, preciso)));
+}
 
 // Os passos da conversa: quem está virado para o outro, quem fala e por quanto tempo.
 interface Passo {
@@ -82,11 +99,12 @@ export function desenharConversa(c: CanvasRenderingContext2D, largura: number, a
   c.save();
   c.imageSmoothingEnabled = false;
   c.globalAlpha = visivel;
+  const centro = meioDaDupla(largura, altura, u);
   for (const quem of ['leslie', 'grow'] as const) {
     const lugar = LUGARES[quem];
     const jeito: Jeito = passo.virados.includes(quem) ? lugar.outro : 'costas';
     const i = ORDEM.indexOf(`${quem}-${jeito}`);
-    const meio = Math.round(MEIO_DA_DUPLA * largura) + lugar.lado * u;
+    const meio = centro + lugar.lado * u;
     const x = meio - (QUADRO * u) / 2;
     const chao = Math.round(lugar.y * altura);
     const falando = passo.fala === quem;

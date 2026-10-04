@@ -41,6 +41,7 @@ import { ouvirRevanche } from './inicio/revanche';
 import { TEXTOS_DO_PRIMEIRO_TREINO, telaSelecao, type SalaNaSelecao } from './inicio/selecao';
 import { iniciarTutorial, type Tutorial } from './inicio/tutorial';
 import { telaTemporada } from './inicio/temporada';
+import { comecarPartidaDaConta } from './inicio/progresso';
 import { vigiarJanela } from './inicio/janela';
 import { montarMenus, type MenusDaPartida } from './inicio/na-partida';
 import { criarBordas, desenharBordas, sentirBordas } from './interface/bordas';
@@ -551,9 +552,15 @@ function jogar(escolha: Escolha, primeiraVez = false): Promise<SalaNaSelecao | '
       aoSair: () => sair(),
     });
     menusDaPartida = menus;
+    // A partida da conta (sozinho ou online; o treino não conta): no fim, o resultado vai para o
+    // servidor, que dá o XP e os pontos do passe — a tela de fim mostra quando chegar. A queda da
+    // conexão e sair pelo menu não contam.
+    const daConta = escolha.modo === 'treino' ? null : comecarPartidaDaConta(escolha.modo);
     const nova = criarPartida(escolha, (motivo, venceu) => {
       const oponente = escolha.modo === 'online' ? escolha.oponente : 'A CPU';
       const { titulo, texto } = textoDoFim(motivo, venceu, oponente);
+      const resultado = motivo === 'conexao' ? null : motivo === 'oponente-saiu' || venceu === true ? 'vitoria' : venceu === false ? 'derrota' : 'empate';
+      const ganho = daConta && resultado ? daConta.terminar(resultado) : undefined;
       // Por tempo ou morte dá para jogar de novo: sozinho, direto; online a sala continua e é a
       // revanche (já ouvindo, que o outro pode pedir antes de a tela de fim aparecer).
       const deNovo = motivo === 'morte' || motivo === 'tempo';
@@ -561,7 +568,7 @@ function jogar(escolha: Escolha, primeiraVez = false): Promise<SalaNaSelecao | '
         escolha.modo !== 'online' ? (deNovo ? 'sozinho' : undefined) : deNovo ? ouvirRevanche(escolha.conexao, escolha.oponente) : undefined;
       const mostrar = (): void => {
         if (saindo) return;
-        void menus.mostrarFim(titulo, texto, revanche).then((como) => {
+        void menus.mostrarFim(titulo, texto, revanche, ganho).then((como) => {
           if (como !== 'revanche' || !revanche) return sair();
           if (revanche === 'sozinho' || escolha.modo !== 'online') return sair('sozinho');
           sair({ conexao: escolha.conexao, oponente: escolha.oponente, prazoAte: revanche.prazoAte });
