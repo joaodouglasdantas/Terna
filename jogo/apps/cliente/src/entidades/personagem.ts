@@ -630,8 +630,8 @@ function poseDe(p: Personagem): Pose {
     x: Math.round(p.x),
     topo: Math.round(p.y) - imagem.height + AFUNDAR_NA_GRAMA,
     direcao: p.direcao,
-    // O golem, parado, fica de lado (como andando); os outros olham para a tela.
-    deFrente: animacao === 'parado' && !morto && formaDo(p) !== 'golem',
+    // Parado, todos olham para a tela — o golem também (ele é um personagem, não um efeito).
+    deFrente: animacao === 'parado' && !morto,
   };
 }
 
@@ -689,6 +689,34 @@ export function poderCarregado(p: Personagem, i: number): boolean {
   if (p.poderes.recarga[i] > 0) return false;
   if (poder === 'golem' && p.golem.recarga > 0) return false;
   return p.energia >= custoDeEnergia(p, poder);
+}
+
+// Ficou sem energia pixy para o poder escolhido (acabou de gastar nele, ou de gastar em outro): o
+// quadrinho verde volta para trás, para o carregado anterior a ele — na Leslie e no Grow de gente,
+// até a arma (ou o soco), no começo da fileira. Sem nenhum antes, procura do fim da fileira para
+// trás (o Anjo de anjo e o golem, que não têm arma). Só o seu: o do outro online vem da rede.
+// A recarga sozinha não volta (o quadrinho mostra quanto falta), nem com o Vendaval soprando.
+export function voltarSeSemEnergia(p: Personagem): void {
+  if (p.daRede || p.canalizando) return;
+  if (p.heroi === 'anjo' && formaDo(p) !== 'anjo') return;
+  const comArma = p.heroi !== 'anjo' && formaDo(p) === 'base';
+  if (comArma && p.modo === 'arma') return;
+  const { poderes } = p;
+  if (p.energia >= custoDeEnergia(p, poderEscolhido(poderes))) return;
+  for (let i = poderes.selecionado - 1; i >= 0; i--) {
+    if (!poderCarregado(p, i)) continue;
+    poderes.selecionado = i;
+    return;
+  }
+  if (comArma) {
+    p.modo = 'arma';
+    return;
+  }
+  for (let i = poderes.lista.length - 1; i > poderes.selecionado; i--) {
+    if (!poderCarregado(p, i)) continue;
+    poderes.selecionado = i;
+    return;
+  }
 }
 
 // Botão direito: passa para o próximo quadrinho da fileira. Na Leslie e no Grow de gente a fileira

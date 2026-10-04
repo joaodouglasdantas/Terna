@@ -135,11 +135,31 @@ const FOLHAS = {
     // Reduzido, o vão entre as pedras (e entre o braço e o tronco) virava buraco: tapados com a
     // sombra (taparFrestas).
     taparFrestas: true,
+    // As manchas pretas grossas de dentro do corpo viram sombra marrom (clarearManchasPretas).
+    clarearManchasPretas: true,
     animacoes: {
-      // Parado, de lado como no andar (a fileira IDLE, na mesma escala): de frente (a coluna
-      // FRENTE) ele parecia outro golem ao parar. Um quadro só: os da fileira mudam o musgo de
-      // lugar de um para o outro, e alternados ele tremia.
-      parado: { alturaRef: 91, ancora: 'cabeca', pontos: [[167, 70]] },
+      // Parado, de frente (a coluna FRENTE), olhando para a tela como os outros personagens: o
+      // golem é um personagem, não um efeito. Um quadro só.
+      // O terceiro quadro da coluna FRENTE: o de braços mais abertos, que reduzido ainda mostra o vão
+      // entre os braços e o corpo e entre as pernas, como o de lado mostra o volume.
+      // Sem tapar as frestas (de frente, o vão entre os braços e o corpo e entre as pernas é de
+      // verdade: tapado, virava sombra preta) e com os olhos que a redução apagou, iguais ao olho de
+      // lado: uma pedrinha clara e o musgo ao lado dela, na órbita escura (as cores da folha).
+      parado: {
+        alturaRef: 104,
+        ancora: 'cabeca',
+        quadros: 1,
+        pontos: [[1080, 375], [1079, 258]],
+        semTaparFrestas: true,
+        olhos: [
+          // Como o olho de lado: uma pedrinha clara com o musgo do lado de fora, na órbita escura.
+          ...[[15, 13], [16, 13], [22, 13], [23, 13], [14, 14], [24, 14]].map(([x, y]) => [x, y, [12, 9, 7]]),
+          [15, 14, [110, 108, 50]],
+          [16, 14, [217, 195, 147]],
+          [22, 14, [217, 195, 147]],
+          [23, 14, [110, 108, 50]],
+        ],
+      },
       // Fileira WALK (não a RUN): o golem é pesado e anda; na corrida da folha a cabeça ia na
       // frente do corpo e, reduzida, parecia solta dele.
       andando: {
@@ -333,6 +353,44 @@ function tirarDoQuadro(folha, larguraFolha, x0, w, h, linhas) {
   }
 }
 
+// As manchas pretas de dentro do corpo (a sombra entre o braço e o tronco, entre as pernas, dentro
+// da mão), que reduzidas viravam buracos pretos: onde o preto tem mais de um pixel de grossura
+// (fora a beirada do corpo, que é o contorno), vira a cor das pedras em volta, escurecida, na
+// paleta. As linhas finas pretas entre as pedras ficam.
+function clarearManchasPretas(folha, lw, lh, paleta) {
+  const opaco = (x, y) => x >= 0 && y >= 0 && x < lw && y < lh && folha[(y * lw + x) * 4 + 3] > 0;
+  const soma = (x, y) => folha[(y * lw + x) * 4] + folha[(y * lw + x) * 4 + 1] + folha[(y * lw + x) * 4 + 2];
+  const preto = (x, y) => opaco(x, y) && soma(x, y) < 70;
+  const cruz = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  // O miolo da mancha: preto com os quatro vizinhos pretos; a mancha é ele e o preto em volta.
+  const miolo = new Uint8Array(lw * lh);
+  for (let y = 0; y < lh; y++) for (let x = 0; x < lw; x++) if (preto(x, y) && cruz.every(([dx, dy]) => preto(x + dx, y + dy))) miolo[y * lw + x] = 1;
+  const trocar = [];
+  for (let y = 0; y < lh; y++) {
+    for (let x = 0; x < lw; x++) {
+      if (!preto(x, y)) continue;
+      if (cruz.some(([dx, dy]) => !opaco(x + dx, y + dy))) continue; // a beirada: o contorno
+      let naMancha = false;
+      for (let dy = -1; dy <= 1 && !naMancha; dy++) for (let dx = -1; dx <= 1; dx++) if (miolo[(y + dy) * lw + x + dx] && x + dx >= 0 && x + dx < lw) naMancha = true;
+      if (!naMancha) continue;
+      // A cor das pedras em volta (até 2 pixels), escurecida.
+      const media = [0, 0, 0];
+      let n = 0;
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          if (!opaco(x + dx, y + dy) || preto(x + dx, y + dy)) continue;
+          const o = ((y + dy) * lw + x + dx) * 4;
+          for (let c = 0; c < 3; c++) media[c] += folha[o + c];
+          n++;
+        }
+      }
+      const alvo = n ? media.map((v) => (v / n) * 0.55) : [60, 48, 38];
+      trocar.push([(y * lw + x) * 4, paleta[maisProxima(paleta, alvo)]]);
+    }
+  }
+  for (const [o, cor] of trocar) folha.set(cor, o);
+}
+
 function gerar(nome) {
   const folhaRef = FOLHAS[nome];
   if (!folhaRef) throw new Error(`folha desconhecida: ${nome} (use ${Object.keys(FOLHAS).join(', ')})`);
@@ -349,6 +407,8 @@ function gerar(nome) {
         ancora: anim.ancora,
         soPaleta: i >= (anim.quadros ?? Infinity),
         foraDaPaleta: Boolean(anim.foraDaPaleta),
+        semTapar: Boolean(anim.semTaparFrestas),
+        olhos: anim.olhos,
       });
     });
   }
@@ -373,7 +433,7 @@ function gerar(nome) {
     const folha = Buffer.alloc(larguraFolha * alturaFolha * 4);
     const quadros = {};
     let cursor = 0;
-    for (const { nome: animacao, red: bruto, ancora } of naFolha) {
+    for (const { nome: animacao, red: bruto, ancora, semTapar, olhos } of naFolha) {
       // Na paleta, e depois limpo (pixel solto, furo de um pixel).
       const red = { lw: bruto.lw, lh: bruto.lh, px: Float32Array.from(bruto.px) };
       for (let i = 0; i < red.lw * red.lh; i++) {
@@ -382,7 +442,7 @@ function gerar(nome) {
         red.px.set(cor, i * 4);
       }
       limpar(red, paleta);
-      if (folhaRef.taparFrestas) taparFrestas(red, paleta);
+      if (folhaRef.taparFrestas && !semTapar) taparFrestas(red, paleta);
       for (let y = 0; y < red.lh; y++) {
         for (let x = 0; x < red.lw; x++) {
           const i = (y * red.lw + x) * 4;
@@ -394,6 +454,12 @@ function gerar(nome) {
           folha[o + 2] = cor[2];
           folha[o + 3] = 255;
         }
+      }
+      // Os olhos que a redução apagou (o brilho deles é menor que um pixel): pintados por cima, na
+      // cor deles (fora da paleta, para brilhar).
+      for (const [ox, oy, cor] of olhos ?? []) {
+        const o = (oy * larguraFolha + cursor + ox) * 4;
+        folha.set([...cor, 255], o);
       }
       const indice = quadros[animacao]?.length ?? 0;
       const ax = Math.round(ancoraX(red, ancora)); // antes de cortar: o corpo não pula ao trocar de folha
@@ -413,6 +479,7 @@ function gerar(nome) {
   };
 
   const { folha, quadros } = montar(false);
+  if (folhaRef.clarearManchasPretas) clarearManchasPretas(folha, larguraFolha, alturaFolha, paleta);
   const saidaPng = path.join(CLIENTE, 'assets', folhaRef.png);
   fs.mkdirSync(path.dirname(saidaPng), { recursive: true });
   escreverPng(saidaPng, larguraFolha, alturaFolha, folha);

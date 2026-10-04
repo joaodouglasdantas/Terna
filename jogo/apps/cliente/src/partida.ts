@@ -72,6 +72,7 @@ import {
   gesticular,
   maoDo,
   passarSelecao,
+  voltarSeSemEnergia,
   peitoDo,
   personagemLivre,
   podePegarArma,
@@ -426,6 +427,8 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
     if (mouse.usar) usarAcao(p, p.jogador, mouse.usar);
     if (mouse.descartar && descartarArma(p.arsenal, p.jogador)) p.remoto?.conexao.descartarArma();
   }
+  // Sem energia para o poder escolhido, o quadrinho volta para o anterior.
+  voltarSeSemEnergia(p.jogador);
   // Soltou o botão (ou abriu o menu, ou caiu): o Vendaval para.
   if (p.jogador.canalizando && !(livre && mouse.segurando)) pararVento(p.efeitos, p.jogador);
   atualizarPersonagem(p.jogador, livre ? teclado : PARADO, dt, tempo);
