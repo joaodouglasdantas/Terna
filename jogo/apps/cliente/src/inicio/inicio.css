@@ -313,22 +313,18 @@
   display: none;
 }
 
-/* A logo simples do carregamento. A imagem (1949×807) tem margem vazia em volta das letras
-   (1769×541, a partir de x 114 e y 196): a moldura tem a proporção só das letras e a imagem,
-   maior que ela, fica deslocada para as letras caberem certinho. */
+/* A logo simples do carregamento: só as letras, em branco (1342×443, já sem margem). */
 .inicio-logo-simples {
   position: relative;
   width: min(360px, 70cqw);
-  aspect-ratio: 1769 / 541;
-  overflow: hidden;
+  aspect-ratio: 1342 / 443;
   filter: drop-shadow(0 0 14px rgba(255, 196, 92, 0.45));
 }
 
 .inicio-logo-simples img {
-  position: absolute;
-  width: calc(100% * 1949 / 1769);
-  left: calc(-100% * 114 / 1769);
-  top: calc(-100% * 196 / 541);
+  display: block;
+  width: 100%;
+  height: 100%;
   user-select: none;
 }
 
@@ -339,15 +335,15 @@
   gap: 1rem;
 }
 
-/* A logo com os efeitos (logo-viva.ts). O palco tem a proporção exata da imagem (1101×931), para
-   as partículas e o reflexo caírem nos pontos certos da arte. */
+/* A logo com os efeitos (logo-viva.ts). O palco tem a proporção exata da imagem (1090×360), para
+   as folhas soltarem do musgo nos pontos certos da arte. */
 .inicio-logo-palco {
   position: relative;
   flex-shrink: 0;
-  /* Cabe com o nome e os dois botões embaixo (uns 290 px) na altura do quadro, com uma folga em
-     cima para o brilho do cristal. */
-  width: min(420px, 70cqw, max(180px, (100cqh - 360px) * 0.82 * 1101 / 931));
-  aspect-ratio: 1101 / 931;
+  /* Cabe com os dois botões embaixo na altura do quadro. */
+  width: min(560px, 70cqw, max(240px, (100cqh - 330px) * 0.9 * 1090 / 360));
+  aspect-ratio: 1090 / 360;
+  margin-bottom: 0.5rem;
   animation: inicio-flutua 4s ease-in-out infinite;
 }
 
@@ -360,46 +356,13 @@
   filter: drop-shadow(0 8px 24px rgba(16, 8, 32, 0.65));
 }
 
-/* Luz dourada do sol do verão atrás do cristal do pico (em 50% × 13,5% da arte), respirando. O
-   `top` em % é da altura do palco; a metade do tamanho, da largura (daí o 1101 / 931). */
-.inicio-logo-aura {
-  position: absolute;
-  left: calc(50% - 30%);
-  top: calc(13.5% - 30% * 1101 / 931);
-  width: 60%;
-  aspect-ratio: 1;
-  background: radial-gradient(closest-side, rgba(255, 206, 90, 0.55), rgba(255, 170, 60, 0.18) 55%, rgba(255, 170, 60, 0));
-  animation: inicio-aura 4s ease-in-out infinite;
-  pointer-events: none;
-}
-
-/* Raios de sol girando devagar atrás do cristal: só aparecem no céu em volta do pico, porque a
-   arte fica por cima. A máscara apaga as pontas. */
-.inicio-logo-raios {
-  position: absolute;
-  left: calc(50% - 44%);
-  top: calc(13.5% - 44% * 1101 / 931);
-  width: 88%;
-  aspect-ratio: 1;
-  background: repeating-conic-gradient(
-    from 0deg,
-    rgba(255, 214, 110, 0) 0deg 9deg,
-    rgba(255, 214, 110, 0.32) 13deg,
-    rgba(255, 214, 110, 0) 17deg 30deg
-  );
-  -webkit-mask: radial-gradient(closest-side, #000 12%, rgba(0, 0, 0, 0.5) 45%, transparent 100%);
-  mask: radial-gradient(closest-side, #000 12%, rgba(0, 0, 0, 0.5) 45%, transparent 100%);
-  animation: inicio-gira 60s linear infinite;
-  pointer-events: none;
-}
-
 /* O canvas das partículas passa da logo: igual a SOBRA em logo-viva.ts. */
 .inicio-logo-particulas {
   position: absolute;
-  top: -25%;
+  top: -30%;
   left: -10%;
   width: 120%;
-  height: 140%;
+  height: 200%;
   pointer-events: none;
 }
 
@@ -1298,24 +1261,8 @@ a.inicio-botao {
   }
 }
 
-@keyframes inicio-aura {
-  50% {
-    opacity: 0.55;
-    transform: scale(0.94);
-  }
-}
-
-/* O reflexo atravessa no começo do ciclo e espera o resto dele. */
-@keyframes inicio-gira {
-  to {
-    transform: rotate(1turn);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .inicio-logo-palco,
-  .inicio-logo-aura,
-  .inicio-logo-raios,
   .inicio-jogar,
   .inicio-jogar::before,
   .inicio-jogar::after,

@@ -51,8 +51,7 @@ export type Escolha = { modo: 'solo'; nome: string; heroi: Heroi } | { modo: 'tr
 // Saiu da conta na tela inicial: o jogo volta para a tela de entrar.
 export const SAIU_DA_CONTA = 'saiu-da-conta';
 
-// A logo simples (só as letras, em branco) do carregamento. A imagem tem margem vazia em volta
-// das letras: a moldura tem a proporção só das letras e corta o resto (ver inicio.css).
+// A logo simples (só as letras, em branco) do carregamento.
 export function logoSimples(): HTMLElement {
   const moldura = elemento('div', 'inicio-logo-simples');
   const img = elemento('img', '');

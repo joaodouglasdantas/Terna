@@ -102,7 +102,7 @@ export function emailDoCodigo({
         <tr>
           <td align="center" style="padding:0 0 8px;">
             <a href="${site}" target="_blank" style="text-decoration:none;">
-              <img src="${site}/email/logo.png" width="260" alt="TERNA" style="display:block;width:260px;max-width:70%;height:auto;border:0;font-family:${LETRA};font-size:40px;letter-spacing:6px;color:${COR.dourado};">
+              <img src="${site}/email/logo.png" width="300" alt="TERNA" style="display:block;width:300px;max-width:70%;height:auto;border:0;font-family:${LETRA};font-size:40px;letter-spacing:6px;color:${COR.dourado};">
             </a>
           </td>
         </tr>
