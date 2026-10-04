@@ -1,7 +1,7 @@
 {
   "name": "Terna",
   "short_name": "Terna",
-  "description": "Jogo de plataforma e luta 2D em pixel art: Leslie e Grow na Floresta da Divisa.",
+  "description": "Jogo de plataforma e luta 2D em pixel art: escolha a Leslie ou o Grow e lute sozinho ou online.",
   "lang": "pt-BR",
   "start_url": "./",
   "scope": "./",

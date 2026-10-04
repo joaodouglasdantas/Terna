@@ -1,7 +1,8 @@
-// Os e-mails do jogo, com a cara do Terna: a noite da floresta no fundo, a caixa de madeira com
-// a moldura dourada das telas do jogo e o código em blocos, um número em cada. Feito do jeito que
-// os leitores de e-mail aceitam: tabelas e estilo direto em cada peça (o Gmail e o Outlook
-// ignoram quase todo o resto). A letra é a Tiny5, a do jogo, onde o leitor carrega fontes; nos
+// Os e-mails do jogo, com a cara do Terna: o fundo escuro, a caixa de madeira com a moldura
+// dourada das telas do jogo e o código em blocos, um número em cada. Nada da temporada (o tema
+// muda a cada uma): a logo é a de pedra, sem o musgo da floresta, e as frases são gerais.
+// Feito do jeito que os leitores de e-mail aceitam: tabelas e estilo direto em cada peça (o Gmail
+// e o Outlook ignoram quase todo o resto). A letra é a Tiny5, a do jogo, onde o leitor carrega fontes; nos
 // outros, uma monoespaçada. A logo vem do site publicado (`urlDoJogo`/email/logo.png); com as
 // imagens bloqueadas, aparece o nome em texto no lugar.
 
@@ -37,7 +38,7 @@ const escapar = (s: string): string =>
 const TEXTOS: Record<MotivoCodigo, { assunto: string; titulo: string; frase: string; acao: string }> = {
   confirmar: {
     assunto: 'Seu código para entrar no Terna',
-    titulo: 'Bem-vindo à floresta!',
+    titulo: 'Bem-vindo ao Terna!',
     frase: 'Falta só um passo para a sua conta ficar pronta. Digite este código no jogo:',
     acao: 'Depois disso, você já cai direto numa partida de treino para aprender a jogar.',
   },
