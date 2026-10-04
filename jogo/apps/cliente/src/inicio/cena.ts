@@ -6,6 +6,8 @@
 // - o vento balança as copas e a bandeira, e a água das cachoeiras e do rio ondula: esses pedaços
 //   da arte são redesenhados por cima dela em faixas finas, cada faixa um pouco deslocada por uma
 //   onda que corre (com a borda esfumada, para não mostrar o recorte);
+// - o céu (ceu.ts): as nuvens de cima andam devagar e as estrelas piscam; o sol solta raios que
+//   giram devagar (CSS);
 // - as luzes da fogueira, das tochas e das lanternas tremulam, e o sol pulsa;
 // - da fogueira e das tochas sobem fagulhas; bandos de pássaros cruzam o céu batendo as asas,
 //   por trás das árvores das beiradas;
@@ -23,6 +25,7 @@
 import urlArvores from '../assets/tela-inicial-arvores.png';
 import urlArte from '../assets/tela-inicial.webp';
 import { carregarDecodificada, contexto2d, novoCanvas, umaVez } from '../motor/imagens';
+import { desenharCeu } from './ceu';
 import { atualizarConversa, desenharConversa } from './conversa';
 import { elemento, palco } from './dom';
 import {
@@ -285,7 +288,9 @@ export function prepararCena(): void {
     return luz;
   });
   tela = elemento('canvas', 'inicio-cena-folhas');
-  arte.append(fundo, tela, ...luzesDaArte);
+  // Os raios do sol, girando devagar em volta dele (por cima de tudo: é luz).
+  const raios = elemento('div', 'inicio-cena-raios');
+  arte.append(fundo, tela, ...luzesDaArte, raios);
   camada.append(arte);
   palcoDaCena = elemento('div', 'inicio-cena-palco');
   palcoDaCena.hidden = true;
@@ -576,6 +581,8 @@ function desenhar(tempo: number): void {
   c.imageSmoothingEnabled = true;
   if (!semMovimento()) mexer(c, tempo);
   c.imageSmoothingEnabled = false;
+  // O céu (ceu.ts): as nuvens andando por trás das copas e das montanhas e as estrelas piscando.
+  desenharCeu(c, largura, altura, tempo, semMovimento());
   desenharConversa(c, largura, altura);
 
   // Os pássaros, lá longe no céu.
