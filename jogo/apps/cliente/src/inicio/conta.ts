@@ -36,7 +36,7 @@ import { guardarSessao } from '../save/sessao';
 import { VERSAO } from '../versao';
 import { criarCaverna } from './caverna';
 import { esconderCena } from './cena';
-import { botao, elemento, mostrarTela, sairComEsmaecer } from './dom';
+import { botao, elemento, mostrarTela, sairComEsmaecer, TELA_OPACA } from './dom';
 import { botaoDaMusica } from './musica';
 import { criarTocha } from './tocha';
 
@@ -227,7 +227,9 @@ const relogio = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60).p
 
 export function telaConta(aviso = ''): Promise<Entrou> {
   return new Promise((resolver) => {
-    const tela = elemento('section', 'inicio-tela inicio-multi-tela inicio-conta-tela');
+    // Opaca (dom.ts): a caverna cobre o jogo todo e aparece do escuro. Sem isso a cortina abria antes
+    // de a caverna chegar e a partida que roda atrás aparecia por um instante.
+    const tela = elemento('section', `inicio-tela ${TELA_OPACA} inicio-multi-tela inicio-conta-tela`);
     const caixa = elemento('div', 'inicio-caixa inicio-conta-caixa');
     const centro = elemento('div', 'inicio-conta-centro');
     centro.append(caixa);

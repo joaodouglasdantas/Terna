@@ -14,9 +14,12 @@ type Jeito = 'costas' | 'esquerda' | 'direita';
 
 // Onde cada um senta (fração do quadro: o meio do corpo e a grama embaixo dele) e para que lado
 // fica o outro.
+// O meio da dupla fica fixo no quadro e cada um senta a `lado` pixels do desenho dele: crescendo
+// os dois, a distância entre eles cresce junto (sem um entrar no outro).
+const MEIO_DA_DUPLA = 0.6745;
 const LUGARES = {
-  leslie: { x: 0.65, y: 0.888, outro: 'direita' as const },
-  grow: { x: 0.699, y: 0.888, outro: 'esquerda' as const },
+  leslie: { lado: -10, y: 0.888, outro: 'direita' as const },
+  grow: { lado: 10, y: 0.888, outro: 'esquerda' as const },
 };
 type Quem = keyof typeof LUGARES;
 
@@ -75,7 +78,7 @@ export function desenharConversa(c: CanvasRenderingContext2D, largura: number, a
   const passo = passos[noPasso];
   // Um pixel do desenho: grande o bastante para eles ficarem do tamanho de gente perto da tocha e do
   // baú do cenário (sentados, mais altos que a tocha).
-  const u = Math.max(2, Math.round(altura / 225));
+  const u = Math.max(2, Math.round(altura / 188));
   c.save();
   c.imageSmoothingEnabled = false;
   c.globalAlpha = visivel;
@@ -83,42 +86,47 @@ export function desenharConversa(c: CanvasRenderingContext2D, largura: number, a
     const lugar = LUGARES[quem];
     const jeito: Jeito = passo.virados.includes(quem) ? lugar.outro : 'costas';
     const i = ORDEM.indexOf(`${quem}-${jeito}`);
-    const x = Math.round(lugar.x * largura - (QUADRO * u) / 2);
+    const meio = Math.round(MEIO_DA_DUPLA * largura) + lugar.lado * u;
+    const x = meio - (QUADRO * u) / 2;
     const chao = Math.round(lugar.y * altura);
     const falando = passo.fala === quem;
     // A sombra na grama.
     c.globalAlpha = visivel * 0.35;
     c.fillStyle = '#0d0a14';
     c.beginPath();
-    c.ellipse(lugar.x * largura, chao - u, 8 * u, 2 * u, 0, 0, Math.PI * 2);
+    c.ellipse(meio, chao - u, 8 * u, 2 * u, 0, 0, Math.PI * 2);
     c.fill();
     c.globalAlpha = visivel;
     c.drawImage(folha, i * QUADRO, 0, QUADRO, QUADRO, x, chao - QUADRO * u, QUADRO * u, QUADRO * u);
-    if (falando) desenharBalao(c, lugar.x * largura + (lugar.outro === 'direita' ? 4 : -4) * u, chao - 34 * u, u, tempoNoPasso);
+    if (falando) desenharBalao(c, meio + (lugar.outro === 'direita' ? 4 : -4) * u, chao - 29 * u, u, tempoNoPasso);
   }
   c.restore();
 }
 
-// O balãozinho com reticências que vão aparecendo, uma por vez.
+// O balãozinho: pequeno, com as três reticências no meio dele — uma de cada vez fica mais escura,
+// como quem está falando. `x` é o meio do balão e `y` a linha de baixo da caixa.
 function desenharBalao(c: CanvasRenderingContext2D, x: number, y: number, u: number, tempo: number): void {
-  const w = 11;
-  const h = 6;
-  const x0 = Math.round(x - (w * u) / 2);
-  const y0 = Math.round(y - h * u);
+  const dentro = 7; // largura de dentro: 1 de folga, os três pontos com 1 entre eles, 1 de folga
+  const alto = 3; // altura de dentro: os pontos na linha do meio
+  const x0 = Math.round(x - ((dentro + 2) * u) / 2); // a borda da esquerda
+  const y0 = Math.round(y - alto * u); // o alto de dentro
+  // A borda (sem os cantos, que ficam arredondados) e o branco de dentro.
   c.fillStyle = '#1a1020';
-  c.fillRect(x0 + u, y0 - u, (w - 2) * u, u);
-  c.fillRect(x0 + u, y0 + h * u, (w - 2) * u, u);
-  c.fillRect(x0 - u + u, y0, u, h * u);
-  c.fillRect(x0 + (w - 1) * u, y0, u, h * u);
+  c.fillRect(x0 + u, y0 - u, dentro * u, u);
+  c.fillRect(x0 + u, y0 + alto * u, dentro * u, u);
+  c.fillRect(x0, y0, u, alto * u);
+  c.fillRect(x0 + (dentro + 1) * u, y0, u, alto * u);
   c.fillStyle = '#fff4e2';
-  c.fillRect(x0 + u, y0, (w - 2) * u, h * u);
-  // A pontinha, apontando para quem fala.
+  c.fillRect(x0 + u, y0, dentro * u, alto * u);
+  // A pontinha, bem no meio de baixo.
+  const ponta = x0 + u + 3 * u;
+  c.fillRect(ponta, y0 + alto * u, u, u);
   c.fillStyle = '#1a1020';
-  c.fillRect(x0 + 4 * u, y0 + (h + 1) * u, 2 * u, u);
-  c.fillStyle = '#fff4e2';
-  c.fillRect(x0 + 4 * u, y0 + h * u, 2 * u, u);
-  // As reticências: uma, duas, três, e de novo.
-  const pontos = 1 + (Math.floor(tempo * 3) % 3);
-  c.fillStyle = '#6a4a3a';
-  for (let k = 0; k < pontos; k++) c.fillRect(x0 + (2 + k * 3) * u, y0 + 2 * u, 2 * u, 2 * u);
+  c.fillRect(ponta, y0 + (alto + 1) * u, u, u);
+  // As reticências, centradas: 1, 3 e 5 dentro da caixa de 7.
+  const aceso = Math.floor(tempo * 3) % 3;
+  for (let k = 0; k < 3; k++) {
+    c.fillStyle = k === aceso ? '#4a2e22' : '#b89a84';
+    c.fillRect(x0 + u + (1 + k * 2) * u, y0 + u, u, u);
+  }
 }
