@@ -4378,14 +4378,22 @@ a.inicio-botao {
   justify-content: center;
   align-items: center;
   width: 100%;
-  /* Altura fixa: o quadro do Google nasce com a altura padrão do navegador (150 px) e só depois
-     encolhe para a do botão; sem isto, a caixa crescia e voltava num piscar a cada troca de aba. */
-  height: 44px;
+  /* Exatamente o tamanho do botão grande do Google (40 px de altura, a largura do Entrar), e o que
+     passar fica escondido. O Google desenha o botão num quadro 10 px mais largo de cada lado e 2 px
+     mais alto, puxado para fora com margem negativa: essa sobra aparecia como uma faixa branca em
+     volta do botão, encostada na borda da caixa. A altura fixa também segura a caixa: o quadro nasce
+     com a altura padrão do navegador (150 px) e só depois encolhe; sem ela, a caixa crescia e
+     voltava num piscar a cada troca de aba. */
+  height: 40px;
   overflow: hidden;
   margin-bottom: 0.35rem;
-  padding: 0 0.6rem;
-  /* Sem isto, o quadro do Google aparece com um fundo branco em volta do botão escuro (o esquema
-     de cores da página e o do quadro não batem). */
+  border-radius: 4px;
+  /* O esquema de cores igual ao do quadro do Google: sem isto, o navegador pinta um fundo branco
+     atrás dele. */
+  color-scheme: light;
+}
+
+.inicio-google iframe {
   color-scheme: light;
 }
 

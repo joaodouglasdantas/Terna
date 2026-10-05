@@ -87,10 +87,9 @@ export function botaoDoGoogle(entrou: (credencial: string) => void, aoFalhar: ()
         });
         iniciado = true;
       }
-      // A largura do lugar, menos o respiro dos lados (o Google aceita de 200 a 400 px).
-      const estilo = getComputedStyle(lugar);
-      const dentro = lugar.clientWidth - parseFloat(estilo.paddingLeft) - parseFloat(estilo.paddingRight);
-      const largura = Math.round(Math.max(200, Math.min(400, dentro || 320)));
+      // Da largura do botão Entrar (o Google aceita de 200 a 400 px). O quadro dele passa 10 px de
+      // cada lado e o lugar esconde a sobra (inicio.css).
+      const largura = Math.round(Math.max(200, Math.min(400, lugar.clientWidth || 320)));
       google.accounts.id.renderButton(lugar, {
         type: 'standard',
         theme: 'filled_black',
