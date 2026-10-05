@@ -50,12 +50,16 @@ const CORES_DO_FOGO: [number, number, number, number][] = [
 ];
 const PASSO_DO_FOGO = 1 / 24;
 
-// As brasas na boca do colar, na frente do pé do fogo: a altura de cada coluna (da esquerda para
-// a direita, x de 6 a 15, passando um pouco da boca), uns pedaços de carvão mais altos que outros.
-const BRASAS = [1, 2, 2, 1, 3, 2, 1, 2, 3, 1];
-const BRASAS_X = COLAR.x + 1;
-const BRASAS_Y = COLAR.y + 1; // a linha de baixo delas (o tampo do colar)
-const CARVAO = ['#140804', '#21100a', '#33140a']; // segundos entre um desenho do fogo e outro
+// A boca do colar: a borda da frente dela é curva (mais baixa no meio, como a beirada de um copo
+// visto de cima) e o pé do fogo acaba logo acima dela — o fogo sai de dentro da boca em vez de
+// pousar numa linha reta. A borda é pintada na madeira (por baixo da escuridão), não na camada do
+// fogo: assim a luz da caverna a clareia junto com o resto do colar quando o fogo cresce.
+// `curva`: quanto cada coluna da borda desce (o meio, no MEIO do fogo, desce mais), em ponta suave
+// para não sobrar trecho reto.
+const BOCA = { x: MEIO - 4, y: COLAR.y + 1, curva: [0, 1, 1, 2, 3, 2, 1, 1, 0] };
+const FUNDO_DA_BOCA = Math.max(...BOCA.curva);
+// O alto da borda na coluna `x` da tocha (fora da boca, o tampo do colar).
+const altoDaBoca = (x: number): number => BOCA.y + (BOCA.curva[x - BOCA.x] ?? 0);
 
 interface Fagulha {
   x: number;
@@ -120,8 +124,9 @@ function pintarMadeira(ctx: CanvasRenderingContext2D): void {
   for (let yy = y + 3; yy < ALTURA - 4; yy++) {
     if (sorteio(3, yy) < 0.12) pixel(ctx, x + 2 + Math.floor(sorteio(yy, 5) * (w - 4)), yy, 1, 1, VEIO);
   }
-  // A sombra do colar no topo do poste.
-  pixel(ctx, x + 1, y, w - 2, 1, CILINDRO[0]);
+  // A sombra do colar no topo do poste: um tom abaixo da madeira, não preto (perto do fogo, um
+  // risco preto vira furo).
+  cilindro(ctx, x + 1, y, w - 2, 1, -1);
 
   // O colar: um cilindro mais largo, mais claro (perto do fogo), com o tampo redondo.
   const c = COLAR;
@@ -131,7 +136,9 @@ function pintarMadeira(ctx: CanvasRenderingContext2D): void {
   // O tampo: a boca de onde sai o fogo, acesa por ele.
   pixel(ctx, c.x + 2, c.y + 1, c.w - 4, 1, '#c8702a');
   pixel(ctx, c.x + 3, c.y + 1, c.w - 6, 1, '#ffb040');
-  pixel(ctx, c.x + 1, c.y + c.h - 2, c.w - 2, 1, CILINDRO[1]);
+  cilindro(ctx, c.x + 1, c.y + c.h - 2, c.w - 2, 1);
+  // Embaixo, onde o colar encosta no poste, a borda escura fica só nas pontas (a silhueta).
+  cilindro(ctx, c.x + 2, c.y + c.h - 1, c.w - 4, 1, -1);
 }
 
 // A pedra do pé, coberta de musgo; o musgo subindo pelo poste e no colar; os fios pendurados; as
@@ -172,16 +179,41 @@ function pintarMusgo(ctx: CanvasRenderingContext2D, lado: 'esquerda' | 'direita'
     const grosso = 3 + Math.round(ruido(x * 0.4 + s, 9) * 3);
     for (let y = topo; y < topo + grosso; y++) marcar(x, y);
   }
-  // No poste: sobe do chão em tufos, mais cheio embaixo e do lado da sombra, passando um pixel
-  // da silhueta de cada lado.
+  // No pé do poste: o musgo do chão sobe só um pouco, passando um pixel da silhueta (mais alto,
+  // os tufos que subiam pelo poste viravam bloco). O limite sobe e desce de coluna em coluna:
+  // uma linha reta ali acendia como um risco. Mais acima, só o ramo fino (mais abaixo).
   for (let y = 54; y < PEDRA_Y + 2; y++) {
     const subida = Math.max(0, (PEDRA_Y - y) / (PEDRA_Y - 54)); // 0 embaixo, 1 no alto
     for (let x = px - 1; x <= px + pw; x++) {
+      if (y < PEDRA_Y - 2 - Math.round(ruido(x * 1.3 + s, 5) * 5)) continue;
       const lado = (x - px) / pw; // 0 à esquerda (sombra), 1 à direita
       const n = ruido(x * 0.7 + s, y * 0.32);
       if (n > 0.12 + subida * 0.95 + lado * 0.15) marcar(x, y);
     }
   }
+  // Só fica o musgo do poste que encosta no do chão (um caminho de musgo até a pedra): sem
+  // quadradinho solto no meio da madeira.
+  {
+    const ligado = new Uint8Array(LARGURA * ALTURA);
+    const fila: number[] = [];
+    for (let x = 0; x < LARGURA; x++) for (let y = PEDRA_Y - 3; y < ALTURA; y++) if (ha(x, y)) fila.push(y * LARGURA + x);
+    for (const i of fila) ligado[i] = 1;
+    while (fila.length) {
+      const i = fila.pop()!;
+      const x = i % LARGURA;
+      const y = (i - x) / LARGURA;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const v = (y + dy) * LARGURA + x + dx;
+        if (ha(x + dx, y + dy) && !ligado[v]) {
+          ligado[v] = 1;
+          fila.push(v);
+        }
+      }
+    }
+    for (let y = 0; y < COLAR.y; y++) for (let x = 0; x < LARGURA; x++) if (!ligado[y * LARGURA + x]) tem[y * LARGURA + x] = 0;
+    for (let y = COLAR.y + COLAR.h + 1; y < PEDRA_Y - 3; y++) for (let x = 0; x < LARGURA; x++) if (!ligado[y * LARGURA + x]) tem[y * LARGURA + x] = 0;
+  }
+
   // No colar: um tapete no tampo de um lado e escorrendo pela borda.
   for (let x = COLAR.x - 1; x <= COLAR.x + COLAR.w; x++) {
     for (let y = COLAR.y; y < COLAR.y + COLAR.h + 1; y++) {
@@ -198,27 +230,31 @@ function pintarMusgo(ctx: CanvasRenderingContext2D, lado: 'esquerda' | 'direita'
       let tom: number;
       if (!ha(x, y - 1)) tom = pinta > 0.5 ? 6 : 5; // a beirada de cima, na luz
       else if (!ha(x, y - 2)) tom = 4;
-      else if (!ha(x, y + 1)) tom = 1; // a beirada de baixo, na sombra
+      else if (!ha(x, y + 1)) tom = y < POSTE.y + 3 ? 2 : 1; // a beirada de baixo, na sombra (no colar, perto do fogo, menos)
       else tom = pinta > 0.84 ? 4 : pinta < 0.18 ? 2 : 3; // o miolo, com pintas
       if (!ha(x - 1, y) && tom > 2) tom -= 1; // o lado esquerdo, mais escuro
       pixel(ctx, x, y, 1, 1, tomDe(MUSGO, tom));
       // A sombra do musgo na madeira logo abaixo.
-      if (!ha(x, y + 1) && y + 1 < PEDRA_Y && x >= px && x < px + pw) pixel(ctx, x, y + 1, 1, 1, '#1a0d06');
+      // (No colar e no alto do poste, perto do fogo, não: ali a madeira está acesa e a sombra
+      // virava pontinhos pretos.)
+      if (!ha(x, y + 1) && y + 1 < PEDRA_Y && y >= POSTE.y + 3 && x >= px && x < px + pw) pixel(ctx, x, y + 1, 1, 1, '#1a0d06');
     }
   }
 
-  // Fios de musgo pendurados no colar (como os da caverna): ondulam, com a ponta clara.
-  const fios = lado === 'esquerda' ? [COLAR.x, COLAR.x + 2, COLAR.x + 10] : [COLAR.x + 1, COLAR.x + 9, COLAR.x + 11];
-  fios.forEach((fx, i) => {
-    const comprimento = [6, 11, 4][i] + Math.round(sorteio(fx + s, 3) * 3);
-    const y0 = COLAR.y + COLAR.h;
-    for (let k = 0; k < comprimento; k++) {
-      const x = fx + Math.round(Math.sin(k * 0.6 + i) * 0.6);
-      const tom = k >= comprimento - 2 ? 5 : k % 3 === 0 ? 4 : 3;
-      pixel(ctx, x, y0 + k, 1, 1, tomDe(MUSGO, tom));
-      if (k % 3 === 1 && k < comprimento - 2) pixel(ctx, x + (i % 2 ? 1 : -1), y0 + k, 1, 1, tomDe(MUSGO, 2));
+  // O ramo que sobe pelo poste do lado da sombra: um fio de musgo grudado na beirada, com botões
+  // de 2 pixels de tempos em tempos, afinando até acabar numa pontinha clara.
+  const sombraEsq = lado === 'esquerda';
+  const ramoX = sombraEsq ? px : px + pw - 1;
+  const ramoTopo = PEDRA_Y - 23 - Math.round(sorteio(2 + s, 8) * 3);
+  for (let y = PEDRA_Y - 10; y >= ramoTopo; y--) {
+    const k = PEDRA_Y - 10 - y;
+    pixel(ctx, ramoX, y, 1, 1, tomDe(MUSGO, y === ramoTopo ? 5 : 2 + (k % 4 === 0 ? 1 : 0)));
+    if (k % 5 === 2 && y > ramoTopo + 2) {
+      const dentro = sombraEsq ? 1 : -1;
+      pixel(ctx, ramoX + dentro, y, 1, 1, tomDe(MUSGO, 4));
+      pixel(ctx, ramoX + dentro, y + 1, 1, 1, tomDe(MUSGO, 2));
     }
-  });
+  }
 
   // As samambaias: folhas arqueadas saindo do musgo, com folíolos dos dois lados.
   const samambaia = (x0: number, y0: number, dir: number, tamanho: number): void => {
@@ -238,6 +274,19 @@ function pintarMusgo(ctx: CanvasRenderingContext2D, lado: 'esquerda' | 'direita'
   samambaia(px - 1, PEDRA_Y - 1, -1, 10);
   samambaia(px - 2, PEDRA_Y + 1, -1, 6);
   samambaia(px + pw, PEDRA_Y, 1, 9);
+
+  // Fios de musgo pendurados no colar (como os da caverna): ondulam, com a ponta clara.
+  const fios = lado === 'esquerda' ? [COLAR.x, COLAR.x + 2, COLAR.x + 10] : [COLAR.x + 1, COLAR.x + 9, COLAR.x + 11];
+  fios.forEach((fx, i) => {
+    const comprimento = [6, 11, 4][i] + Math.round(sorteio(fx + s, 3) * 3);
+    const y0 = COLAR.y + COLAR.h;
+    for (let k = 0; k < comprimento; k++) {
+      const x = fx + Math.round(Math.sin(k * 0.6 + i) * 0.6);
+      const tom = k >= comprimento - 2 ? 5 : k % 3 === 0 ? 4 : 3;
+      pixel(ctx, x, y0 + k, 1, 1, tomDe(MUSGO, tom));
+      if (k % 3 === 1 && k < comprimento - 2) pixel(ctx, x + (i % 2 ? 1 : -1), y0 + k, 1, 1, tomDe(MUSGO, 2));
+    }
+  });
 
   // Cogumelos vermelhos na pedra, como os da arte: chapéu com pintas e o pé claro.
   const cogumelo = (cx: number, base: number, grande: boolean): void => {
@@ -261,21 +310,15 @@ function pintarMusgo(ctx: CanvasRenderingContext2D, lado: 'esquerda' | 'direita'
   }
 }
 
-// As brasas: carvão escuro na frente do pé do fogo (quebra a linha reta de onde ele sai), com o
-// alto de cada pedaço aceso em vermelho e laranja, pulsando devagar e cada um no seu ritmo.
-function desenharBrasas(ctx: CanvasRenderingContext2D, alturas: number[], tempo: number, acesa: number): void {
-  alturas.forEach((h, i) => {
-    const x = BRASAS_X + i;
-    for (let k = 0; k < h; k++) {
-      const y = BRASAS_Y - k;
-      const topo = k === h - 1;
-      const calor = ruido(x * 1.7 + k * 3.1, tempo * (1.4 + (i % 3) * 0.35)) * acesa;
-      let cor: string;
-      if (topo) cor = calor > 0.6 ? '#ffb02e' : calor > 0.44 ? '#ff6a10' : calor > 0.28 ? '#d4380a' : '#7a1c08';
-      // As rachaduras do carvão também acendem de vez em quando.
-      else cor = calor > 0.66 ? '#e2470c' : calor > 0.56 ? '#8f240a' : tomDe(CARVAO, sorteio(x, y) * CARVAO.length - 0.5);
-      pixel(ctx, x, y, 1, 1, cor);
-    }
+// A borda da frente da boca, na madeira: em cada coluna, do alto da curva até o corpo do colar.
+// O alto é o fio que o fogo de dentro acende; abaixo, a madeira nos tons do meio para o claro.
+function pintarBoca(ctx: CanvasRenderingContext2D): void {
+  const n = BOCA.curva.length;
+  BOCA.curva.forEach((desce, i) => {
+    const x = BOCA.x + i;
+    const topo = BOCA.y + desce;
+    pixel(ctx, x, topo, 1, 1, desce > 0 && desce < 3 ? '#e8923a' : '#c8702a');
+    for (let y = topo + 1; y <= COLAR.y + FUNDO_DA_BOCA; y++) pixel(ctx, x, y, 1, 1, tomDe(CILINDRO, 3 + (i / (n - 1)) * 3));
   });
 }
 
@@ -307,6 +350,7 @@ export function criarTocha(lado: 'esquerda' | 'direita'): Tocha {
   madeira.width = LARGURA;
   madeira.height = ALTURA;
   pintarMadeira(contexto2d(madeira));
+  pintarBoca(contexto2d(madeira));
   const musgo = elemento('canvas', '');
   musgo.width = LARGURA;
   musgo.height = ALTURA;
@@ -337,10 +381,10 @@ export function criarTocha(lado: 'esquerda' | 'direita'): Tocha {
         const i = (y * FOGO.w + x) * 4;
         pixels.data[i + 3] = 0;
         if (t > 1.2 || acesa <= 0) continue;
-        // O pé não é reto: arredondado, mais baixo no meio e subindo nas beiradas, com línguas que
-        // descem e sobem entre as brasas (a linha muda com o tempo).
+        // O pé desce para dentro da boca até a borda da frente (curva) e sobe nas beiradas, com
+        // línguas que mudam com o tempo: não sobra linha reta.
         const dx = Math.abs(x - meio);
-        const pe = Math.min(base, base + 0.5 - (dx / 3.2) ** 2 * 2.2 + (ruido(x * 0.9 + 3, tempo * 5) - 0.55) * 2.2);
+        const pe = Math.min(altoDaBoca(x + FOGO.x) - 1 - FOGO.y, base + FUNDO_DA_BOCA + 0.5 - (dx / 3) ** 2 * 2 + (ruido(x * 0.9 + 3, tempo * 5) - 0.55) * 1.6);
         if (y > pe) continue;
         const tt = Math.max(0, t);
         // A gota: redonda embaixo, afinando em ponta, balançando mais em cima.
@@ -408,7 +452,6 @@ export function criarTocha(lado: 'esquerda' | 'direita'): Tocha {
 
       chamaCtx.clearRect(0, 0, LARGURA, ALTURA);
       chamaCtx.drawImage(fogo, FOGO.x, FOGO.y);
-      desenharBrasas(chamaCtx, lado === 'esquerda' ? BRASAS : [...BRASAS].reverse(), tempo, acesa);
       for (const f of fagulhas) {
         const t = f.vida / f.total;
         chamaCtx.globalAlpha = Math.min(1, t * 1.8);
