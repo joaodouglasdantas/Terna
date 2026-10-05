@@ -39,7 +39,7 @@ import { ehDono, exigirJogador, jogadorPublico, nomeLivreEm, validar } from '../
 //   POST /contas/confirmar  { email, codigo }        → 200 sessão
 //   POST /contas/reenviar   { email }                → 200 { email, reenviarEm }
 //   POST /sessoes           { login, senha }         → 200 sessão (403 sem o e-mail confirmado)
-//   POST /sessoes/google    { credencial, nome? }    → 200 sessão (a conta Google já tem conta,
+//   POST /sessoes/google    { acesso | credencial, nome? } → 200 sessão (a conta Google já tem conta,
 //                             ou o e-mail dela tem: as duas se ligam) | 200 { precisaDeNome,
 //                             sugestao, email } (conta nova sem `nome`) | 201 sessão (conta nova,
 //                             com `nome`) | 401 token inválido | 503 sem GOOGLE_CLIENT_ID
@@ -202,7 +202,7 @@ export function rotasContas(app: FastifyInstance, banco: Banco, opcoes: OpcoesCo
     if (!conferirGoogle) return reply.code(503).send({ erro: 'o login pelo Google não está ligado neste servidor' });
     const dados = validar(EntrarComGoogle, request.body, reply);
     if (!dados) return;
-    const google = await conferirGoogle(dados.credencial);
+    const google = await conferirGoogle({ credencial: dados.credencial, acesso: dados.acesso });
     if (!google) return reply.code(401).send({ erro: 'não conseguimos confirmar sua conta Google; tente de novo' });
     const senhaQueNinguemSabe = () => gerarHashSenha(randomBytes(32).toString('base64url'));
 

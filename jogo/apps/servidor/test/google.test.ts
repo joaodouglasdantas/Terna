@@ -49,28 +49,63 @@ describe('conferir o token do Google', () => {
   const conferir = conferidorGoogle(CLIENT_ID, { buscar, agora: () => agora });
 
   it('aceita o token certo e devolve a conta (e-mail em minúsculas)', async () => {
-    expect(await conferir(token(a.privada, 'chave-a', corpoBom()))).toEqual({ sub: '1234567890', email: 'maria@gmail.com', nome: 'Maria da Silva' });
+    expect(await conferir({ credencial: token(a.privada, 'chave-a', corpoBom()) })).toEqual({ sub: '1234567890', email: 'maria@gmail.com', nome: 'Maria da Silva' });
   });
 
   it('recusa outro jogo, vencido, e-mail não verificado, outro emissor e assinatura falsa', async () => {
-    expect(await conferir(token(a.privada, 'chave-a', corpoBom({ aud: 'outro-jogo' })))).toBeNull();
-    expect(await conferir(token(a.privada, 'chave-a', corpoBom({ exp: AGORA / 1000 - 3600 })))).toBeNull();
-    expect(await conferir(token(a.privada, 'chave-a', corpoBom({ email_verified: false })))).toBeNull();
-    expect(await conferir(token(a.privada, 'chave-a', corpoBom({ iss: 'https://mal.example' })))).toBeNull();
+    expect(await conferir({ credencial: token(a.privada, 'chave-a', corpoBom({ aud: 'outro-jogo' })) })).toBeNull();
+    expect(await conferir({ credencial: token(a.privada, 'chave-a', corpoBom({ exp: AGORA / 1000 - 3600 })) })).toBeNull();
+    expect(await conferir({ credencial: token(a.privada, 'chave-a', corpoBom({ email_verified: false })) })).toBeNull();
+    expect(await conferir({ credencial: token(a.privada, 'chave-a', corpoBom({ iss: 'https://mal.example' })) })).toBeNull();
     // Assinado com outra chave, mas dizendo que é a "chave-a".
-    expect(await conferir(token(b.privada, 'chave-a', corpoBom()))).toBeNull();
-    expect(await conferir('isso.nao.e-um-token')).toBeNull();
+    expect(await conferir({ credencial: token(b.privada, 'chave-a', corpoBom()) })).toBeNull();
+    expect(await conferir({ credencial: 'isso.nao.e-um-token' })).toBeNull();
   });
 
   it('guarda as chaves e busca de novo quando o Google troca', async () => {
     const antes = buscas;
-    await conferir(token(a.privada, 'chave-a', corpoBom()));
+    await conferir({ credencial: token(a.privada, 'chave-a', corpoBom()) });
     expect(buscas).toBe(antes); // ainda valem
 
     publicadas = [a.jwk, b.jwk];
     agora += 2 * 60_000; // passou o minuto mínimo entre buscas
-    expect(await conferir(token(b.privada, 'chave-b', corpoBom()))).not.toBeNull();
+    expect(await conferir({ credencial: token(b.privada, 'chave-b', corpoBom()) })).not.toBeNull();
     expect(buscas).toBe(antes + 1);
+  });
+});
+
+describe('conferir o acesso da janelinha do Google', () => {
+  // O Google de mentira: o tokeninfo e o userinfo de alguns acessos.
+  const infos: Record<string, Record<string, unknown>> = {
+    'acesso-bom-1234567890': { aud: CLIENT_ID, azp: CLIENT_ID, sub: '42', email: 'Zeca@Gmail.com', email_verified: 'true', expires_in: '3500' },
+    'acesso-de-outro-app-12': { aud: 'outro-app', azp: 'outro-app', sub: '42', email: 'zeca@gmail.com', email_verified: 'true', expires_in: '3500' },
+    'acesso-sem-verificar-1': { aud: CLIENT_ID, sub: '43', email: 'x@gmail.com', email_verified: 'false', expires_in: '3500' },
+    'acesso-vencido-1234567': { aud: CLIENT_ID, sub: '44', email: 'y@gmail.com', email_verified: 'true', expires_in: '0' },
+  };
+  const buscar = (async (url: string | URL | Request, opcoes?: RequestInit) => {
+    const endereco = String(url);
+    if (endereco.startsWith('https://oauth2.googleapis.com/tokeninfo')) {
+      const acesso = new URL(endereco).searchParams.get('access_token') ?? '';
+      const info = infos[acesso];
+      return info ? Response.json(info) : new Response('{}', { status: 400 });
+    }
+    if (endereco === 'https://openidconnect.googleapis.com/v1/userinfo') {
+      const acesso = String((opcoes?.headers as Record<string, string>).authorization).replace('Bearer ', '');
+      return infos[acesso] ? Response.json({ sub: infos[acesso].sub, name: 'Zeca Pagodinho' }) : new Response('{}', { status: 401 });
+    }
+    return new Response('{}', { status: 404 });
+  }) as typeof fetch;
+  const conferir = conferidorGoogle(CLIENT_ID, { buscar });
+
+  it('aceita o acesso do Terna e pega o nome da conta', async () => {
+    expect(await conferir({ acesso: 'acesso-bom-1234567890' })).toEqual({ sub: '42', email: 'zeca@gmail.com', nome: 'Zeca Pagodinho' });
+  });
+
+  it('recusa o acesso de outro app, sem e-mail verificado, vencido ou que o Google não conhece', async () => {
+    expect(await conferir({ acesso: 'acesso-de-outro-app-12' })).toBeNull();
+    expect(await conferir({ acesso: 'acesso-sem-verificar-1' })).toBeNull();
+    expect(await conferir({ acesso: 'acesso-vencido-1234567' })).toBeNull();
+    expect(await conferir({ acesso: 'acesso-inventado-12345' })).toBeNull();
   });
 });
 
@@ -97,7 +132,8 @@ describe('POST /sessoes/google', () => {
     app.inject({ method: 'POST', url: '/api/sessoes/google', payload: nome ? { credencial, nome } : { credencial } });
 
   beforeAll(async () => {
-    ({ app, conexao } = await novoServidor({ conferirGoogle: async (c) => contas[c] ?? null }));
+    ({ app, conexao } = await novoServidor({ conferirGoogle: async ({ credencial, acesso }) =>
+        (acesso === 'acesso-da-ana-123456' ? contas['cred-ana-google-123456'] : credencial ? contas[credencial] : undefined) ?? null }));
   });
   afterAll(async () => {
     await app.close();
@@ -110,6 +146,14 @@ describe('POST /sessoes/google', () => {
     expect(r.statusCode).toBe(503);
     await sem.close();
     await c.fechar();
+  });
+
+  it('aceita o acesso da janelinha do Google no lugar da credencial', async () => {
+    const r = await app.inject({ method: 'POST', url: '/api/sessoes/google', payload: { acesso: 'acesso-da-ana-123456' } });
+    expect(r.statusCode).toBe(200);
+    expect(r.json().precisaDeNome).toBe(true);
+    const nada = await app.inject({ method: 'POST', url: '/api/sessoes/google', payload: {} });
+    expect(nada.statusCode).toBe(400);
   });
 
   it('recusa o token que o Google não confirma', async () => {

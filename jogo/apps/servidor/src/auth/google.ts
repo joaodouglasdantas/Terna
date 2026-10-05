@@ -1,6 +1,9 @@
-// Entrar com o Google: o botão do Google, no jogo, devolve um "ID token" (um JWT assinado pelo
-// Google com a conta da pessoa). Aqui o servidor confere esse token sem biblioteca nova, só com o
-// crypto do Node:
+// Entrar com o Google. Duas provas servem, e as duas são conferidas com o Google:
+// - o `acesso` (access token) que a janelinha do Google devolve ao botão do jogo: o servidor pergunta
+//   ao próprio Google (tokeninfo) de que app ele é — tem que ser do Terna (`aud` = o Client ID), não
+//   vencido e com o e-mail verificado — e pega o nome da conta (userinfo);
+// - a `credencial` (ID token, um JWT assinado pelo Google) do botão pronto do Google, conferida
+//   aqui sem biblioteca nova, só com o crypto do Node:
 // - a assinatura (RS256) bate com uma das chaves públicas do Google (o JWKS, guardado pelo tempo
 //   que o Google manda no Cache-Control; uma chave desconhecida busca de novo, no máximo a cada
 //   minuto);
@@ -16,10 +19,16 @@ export interface IdentidadeGoogle {
   nome: string; // o nome da conta Google (pode vir vazio)
 }
 
-// Confere a credencial; null se não for um token válido do Google para este jogo.
-export type ConferirGoogle = (credencial: string) => Promise<IdentidadeGoogle | null>;
+// Confere a prova; null se não for de uma conta Google para este jogo.
+export interface ProvaGoogle {
+  credencial?: string;
+  acesso?: string;
+}
+export type ConferirGoogle = (prova: ProvaGoogle) => Promise<IdentidadeGoogle | null>;
 
 const ENDERECO_DAS_CHAVES = 'https://www.googleapis.com/oauth2/v3/certs';
+const ENDERECO_DO_TOKENINFO = 'https://oauth2.googleapis.com/tokeninfo';
+const ENDERECO_DO_USERINFO = 'https://openidconnect.googleapis.com/v1/userinfo';
 const EMISSORES = new Set(['accounts.google.com', 'https://accounts.google.com']);
 const FOLGA_S = 60; // diferença aceita entre o relógio do servidor e o do Google
 const BUSCA_MINIMA_MS = 60_000; // chave desconhecida: no máximo uma busca por minuto
@@ -83,7 +92,37 @@ export function conferidorGoogle(
     return chaves?.porId.get(kid) ?? null;
   };
 
-  return async (credencial) => {
+  // O acesso da janelinha: o Google diz de que app é e de quem é.
+  const conferirAcesso = async (acesso: string): Promise<IdentidadeGoogle | null> => {
+    try {
+      const resposta = await buscar(`${ENDERECO_DO_TOKENINFO}?access_token=${encodeURIComponent(acesso)}`);
+      if (!resposta.ok) return null;
+      const info = (await resposta.json()) as Record<string, unknown>;
+      if (info.aud !== clientId) return null; // um acesso de outro app não entra aqui
+      if (info.azp !== undefined && info.azp !== clientId) return null;
+      if (Number(info.expires_in ?? 0) <= 0) return null;
+      if (typeof info.sub !== 'string' || !info.sub) return null;
+      if (typeof info.email !== 'string' || !(info.email_verified === true || info.email_verified === 'true')) return null;
+      // O nome não vem no tokeninfo: vem do userinfo (sem ele, a sugestão sai do e-mail).
+      let nome = '';
+      try {
+        const perfil = await buscar(ENDERECO_DO_USERINFO, { headers: { authorization: `Bearer ${acesso}` } });
+        if (perfil.ok) {
+          const dados = (await perfil.json()) as Record<string, unknown>;
+          if (dados.sub === info.sub && typeof dados.name === 'string') nome = dados.name;
+        }
+      } catch {
+        // fica sem o nome
+      }
+      return { sub: info.sub, email: info.email.trim().toLowerCase(), nome };
+    } catch {
+      return null;
+    }
+  };
+
+  return async ({ credencial, acesso }) => {
+    if (acesso) return conferirAcesso(acesso);
+    if (!credencial) return null;
     const partes = credencial.split('.');
     if (partes.length !== 3) return null;
     const [cabecaB64, corpoB64, assinaturaB64] = partes;

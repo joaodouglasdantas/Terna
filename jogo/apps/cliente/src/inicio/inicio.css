@@ -4374,27 +4374,46 @@ a.inicio-botao {
 }
 
 .inicio-google {
+  /* O padrão do Google para fundo escuro (google.ts): fundo #131314, borda #8E918F de 1 px, 12 px
+     antes do G e 10 px depois, texto #E3E3E3 em 14 px médio. Da largura do botão Entrar. */
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+  gap: 10px;
   width: 100%;
-  /* Exatamente o tamanho do botão grande do Google (40 px de altura, a largura do Entrar), e o que
-     passar fica escondido. O Google desenha o botão num quadro 10 px mais largo de cada lado e 2 px
-     mais alto, puxado para fora com margem negativa: essa sobra aparecia como uma faixa branca em
-     volta do botão, encostada na borda da caixa. A altura fixa também segura a caixa: o quadro nasce
-     com a altura padrão do navegador (150 px) e só depois encolhe; sem ela, a caixa crescia e
-     voltava num piscar a cada troca de aba. */
   height: 40px;
-  overflow: hidden;
   margin-bottom: 0.35rem;
+  padding: 0 12px;
+  border: 1px solid #8e918f;
   border-radius: 4px;
-  /* O esquema de cores igual ao do quadro do Google: sem isto, o navegador pinta um fundo branco
-     atrás dele. */
-  color-scheme: light;
+  background: #131314;
+  color: #e3e3e3;
+  font: 500 14px/20px Roboto, 'Google Sans', Arial, sans-serif;
+  letter-spacing: 0.25px;
+  text-transform: none;
+  cursor: pointer;
+  transition: background-color 0.15s;
 }
 
-.inicio-google iframe {
-  color-scheme: light;
+.inicio-google:hover:not(:disabled) {
+  background: #2a2a2b; /* a camada de 8% do texto por cima, como no botão do Google */
+}
+
+.inicio-google:focus-visible {
+  outline: 2px solid #e3e3e3;
+  outline-offset: 2px;
+}
+
+.inicio-google:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.inicio-google-logo {
+  display: flex;
+  width: 20px;
+  height: 20px;
+  flex: none;
 }
 
 .inicio-google[data-esperando] {

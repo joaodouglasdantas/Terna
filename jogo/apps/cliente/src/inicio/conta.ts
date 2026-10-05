@@ -2,8 +2,8 @@
 // chega no e-mail e o "esqueci a senha". O Terna é online e a conta é obrigatória. Termina com a
 // pessoa dentro da conta; `nova` diz se ela acabou de confirmar o cadastro (aí vem o tutorial).
 //
-// Entrar com o Google (nas duas abas, embaixo do botão principal, depois de um "ou"): o botão
-// oficial do Google (google.ts). A conta Google que já tem conta (ou cujo e-mail já tem) entra
+// Entrar com o Google (nas duas abas, embaixo do botão principal, depois de um "ou"): o botão no
+// padrão do Google, que abre a janelinha oficial dele (google.ts). A conta Google que já tem conta (ou cujo e-mail já tem) entra
 // direto; a nova escolhe o nome de jogador (com a sugestão do nome da conta Google) e entra.
 //
 // Criar conta: nome, e-mail, senha e a senha de novo → o servidor manda um código de 6 números →
@@ -366,19 +366,22 @@ export function telaConta(aviso = ''): Promise<Entrou> {
       const ou = elemento('p', 'inicio-conta-ou');
       ou.append(elemento('span', '', 'ou'));
       const lugar = botaoDoGoogle(
-        (credencial) => {
+        (acesso) => {
           erro().textContent = '';
           lugar.dataset.esperando = 'true';
-          api.entrarComGoogle({ credencial }).then(
+          api.entrarComGoogle({ acesso }).then(
             (r) => {
               delete lugar.dataset.esperando;
-              seguirComGoogle(r, credencial, lembrar());
+              seguirComGoogle(r, acesso, lembrar());
             },
             (e: unknown) => {
               delete lugar.dataset.esperando;
               erro().textContent = mensagemDoErro(e);
             },
           );
+        },
+        (mensagem) => {
+          if (mensagem) erro().textContent = mensagem;
         },
         () => {
           ou.hidden = true;
@@ -389,13 +392,13 @@ export function telaConta(aviso = ''): Promise<Entrou> {
     };
 
     // Entrou (a conta já existia) ou, conta nova, a vista do nome.
-    const seguirComGoogle = (r: RespostaGoogle, credencial: string, lembrar: boolean): void => {
+    const seguirComGoogle = (r: RespostaGoogle, acesso: string, lembrar: boolean): void => {
       if ('token' in r) return terminar(r, false, lembrar);
-      nomeDoGoogle(credencial, r.email, r.sugestao, lembrar);
+      nomeDoGoogle(acesso, r.email, r.sugestao, lembrar);
     };
 
     // ---- Conta nova pelo Google: o nome de jogador ----
-    const nomeDoGoogle = (credencial: string, email: string, sugestao: string, lembrar: boolean): void => {
+    const nomeDoGoogle = (acesso: string, email: string, sugestao: string, lembrar: boolean): void => {
       const nome = campo('Nome de jogador', 'text', 'nickname', { maxLength: 12, placeholder: 'Como te chamam?', value: sugestao });
       const contador = elemento('span', 'inicio-campo-contador', `${sugestao.length}/12`);
       nome.rotulo.querySelector('.inicio-campo-cabeca')?.append(contador);
@@ -413,9 +416,9 @@ export function telaConta(aviso = ''): Promise<Entrou> {
         enviar: (pronto) => {
           const errado = problema(NomeJogador, nome.entrada.value);
           if (errado) return pronto(errado);
-          api.entrarComGoogle({ credencial, nome: NomeJogador.parse(nome.entrada.value) }).then(
+          api.entrarComGoogle({ acesso, nome: NomeJogador.parse(nome.entrada.value) }).then(
             (r) => ('token' in r ? terminar(r, true, lembrar) : pronto('Algo deu errado; tente de novo.')),
-            // O token do Google vence em uma hora: vencido, volta para entrar e clicar de novo.
+            // O acesso do Google vence em uma hora: vencido, volta para entrar e clicar de novo.
             (e: unknown) =>
               e instanceof ErroApi && e.status === 401 ? entrar('', 'O tempo para criar a conta acabou. Clique em Continuar com o Google de novo.') : pronto(mensagemDoErro(e)),
           );

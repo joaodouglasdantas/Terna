@@ -36,13 +36,17 @@ export const Entrar = z.object({
 });
 export type Entrar = z.infer<typeof Entrar>;
 
-// Entrar com o Google: `credencial` é o token que o botão do Google devolve (o servidor confere a
-// assinatura). Conta nova pede o nome de jogador: a primeira resposta é `precisaDeNome` (com uma
+// Entrar com o Google: o jogo manda o `acesso` que a janelinha do Google devolve (o botão do jogo,
+// google.ts) ou a `credencial` (o ID token do botão pronto do Google); o servidor confere com o
+// Google. Conta nova pede o nome de jogador: a primeira resposta é `precisaDeNome` (com uma
 // sugestão tirada do nome da conta Google) e o jogo manda de novo com o `nome`.
-export const EntrarComGoogle = z.object({
-  credencial: z.string().min(20).max(4096),
-  nome: NomeJogador.optional(),
-});
+export const EntrarComGoogle = z
+  .object({
+    credencial: z.string().min(20).max(4096).optional(),
+    acesso: z.string().min(20).max(4096).optional(),
+    nome: NomeJogador.optional(),
+  })
+  .refine((d) => Boolean(d.credencial ?? d.acesso), 'faltou a resposta do Google');
 export type EntrarComGoogle = z.infer<typeof EntrarComGoogle>;
 
 // O Client ID do "Entrar com o Google" do Terna (Google Cloud Console → Google Auth Platform →
