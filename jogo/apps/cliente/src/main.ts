@@ -51,6 +51,7 @@ import { desenharEtiquetas } from './interface/etiqueta';
 import { criarContadorDeQuadros, desenharMedidor } from './interface/medidor';
 import { aplicarMira } from './interface/mira';
 import { desenharPainel } from './interface/painel';
+import { desenharCorte } from './interface/ult';
 import { contexto2d } from './motor/imagens';
 import { suavizar } from './motor/matematica';
 import type { Luz, Vista } from './motor/tipos';
@@ -457,6 +458,8 @@ function desenhar(tempo: number): void {
   const minhaMetade = !dividida ? [0, LARGURA] : p.jogador.x <= p.outro.x ? [0, METADE] : [METADE, METADE];
   desenharBordas(ctx, bordas, p.jogador, minhaMetade[0], minhaMetade[1], ALTURA, tempo);
   if (p.jogador.encanto) desenharBordaDoEncanto(ctx, p.jogador.encanto, LARGURA, ALTURA, tempo);
+  // A cena de ult: por cima do jogo e das bordas, por baixo dos painéis (a vida continua à vista).
+  desenharCorte(ctx, p.corte, LARGURA, ALTURA);
   // Os painéis ficam sempre no mesmo canto: o seu à esquerda, o do outro à direita.
   desenharPainel(ctx, p.jogador, p.eu, 'esquerda', LARGURA, tempo, true);
   desenharPainel(ctx, p.outro, p.ele, 'direita', LARGURA, tempo);

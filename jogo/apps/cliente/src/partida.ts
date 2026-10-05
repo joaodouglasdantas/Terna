@@ -104,6 +104,7 @@ import { criarCerebroSosia, pensarSosia, type CerebroSosia } from './entidades/s
 import type { Escolha } from './inicio/inicio';
 import type { Etiqueta } from './interface/etiqueta';
 import type { CorDoJogador } from './interface/painel';
+import { atualizarCorte, comecarCorte, type CorteDeUlt, type QualUlt } from './interface/ult';
 import type { ConexaoPartida } from './rede/partida';
 
 export type Identidade = Etiqueta & CorDoJogador;
@@ -189,6 +190,10 @@ export interface Partida {
   fim: { vencedor: Personagem | null; ha: number } | null;
   cpu: CerebroSosia | null;
   remoto: Remoto | null;
+  // A cena de ult passando na tela (interface/ult.ts) e, de cada um (você, o outro), se no quadro
+  // anterior ele já estava virando golem ou anjo — o começo da transformação dispara a cena.
+  corte: CorteDeUlt | null;
+  virandoAntes: [boolean, boolean];
   // `venceu`: no fim por morte, se foi você quem ficou de pé; nos outros fins, null.
   aoFim: (motivo: FimDaPartida, venceu: boolean | null) => void;
 }
@@ -227,6 +232,8 @@ export function criarPartida(
     fim: null,
     cpu: escolha.modo === 'solo' ? criarCerebroSosia(AO_LADO) : null,
     remoto: null,
+    corte: null,
+    virandoAntes: [false, false],
     aoFim,
   };
 
@@ -293,6 +300,7 @@ export function criarPartida(
           } else {
             gesticular(p.outro, { x: m.uso.alvoX, y: m.uso.alvoY }, m.uso.poder === 'julgamento');
             lancarPoder(p.efeitos, p.outro, m.uso);
+            if (m.uso.poder === 'flor') mostrarUlt(p, p.outro, 'flor');
             if (m.uso.poder === 'vento') p.outro.canalizando = true;
           }
         }
@@ -360,8 +368,35 @@ function usarPoder(p: Partida, corpo: Personagem, alvo: { x: number; y: number }
   uso.x = Math.max(0, Math.min(MUNDO, mao.x));
   uso.y = mao.y;
   lancarPoder(p.efeitos, corpo, uso);
+  if (uso.poder === 'flor') mostrarUlt(p, corpo, 'flor');
   if (uso.poder === 'vento') corpo.canalizando = true;
   if (corpo === p.jogador) p.remoto?.conexao.enviarPoder(uso);
+}
+
+// A cena de ult de `corpo` (você ou o outro). Uma nova no meio de outra toma o lugar dela: a
+// mais nova é a ameaça de agora.
+function mostrarUlt(p: Partida, corpo: Personagem, ult: QualUlt): void {
+  const meu = corpo === p.jogador;
+  const quem = meu ? p.eu : p.ele;
+  p.corte = comecarCorte(corpo.heroi, ult, quem.texto, quem.cor, meu);
+}
+
+// Começando a virar golem ou anjo (só a ida: a volta para a forma base não tem cena).
+function virandoUlt(corpo: Personagem): QualUlt | null {
+  if (corpo.heroi === 'grow' && corpo.golem.fase === 'formando' && corpo.golem.forma === 'base') return 'golem';
+  if (corpo.heroi === 'anjo' && corpo.anjo.fase === 'acendendo' && corpo.anjo.forma === 'base') return 'anjo';
+  return null;
+}
+
+// A cena das transformações sai do começo delas, venha de onde vier (você, a CPU ou o outro pela
+// rede); e a que está passando anda.
+function cuidarDoCorte(p: Partida, dt: number): void {
+  [p.jogador, p.outro].forEach((corpo, i) => {
+    const ult = virandoUlt(corpo);
+    if (ult && !p.virandoAntes[i] && !p.acabou) mostrarUlt(p, corpo, ult);
+    p.virandoAntes[i] = ult !== null;
+  });
+  p.corte = atualizarCorte(p.corte, dt);
 }
 
 // O clique esquerdo: com os poderes na mão (a Leslie no modo poderes, o Anjo de anjo), o poder
@@ -450,6 +485,7 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
     atualizarRemoto(p.remoto, p.outro, dt, tempo);
     if (!p.acabou) enviarEstado(p.remoto, p.jogador, livre ? teclado : PARADO);
   }
+  cuidarDoCorte(p, dt);
 
   if (!p.acabou) {
     cuidarDaArma(p, p.jogador, dt);
