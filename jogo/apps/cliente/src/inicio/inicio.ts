@@ -38,6 +38,51 @@ interface Etapa {
 }
 
 const TEMPO_MINIMO_ETAPA = 700; // ms que cada frase fica na tela, mesmo que a checagem seja instantânea
+
+// Enquanto uma etapa espera (o servidor grátis pode levar até um minuto para acordar), a frase não
+// fica parada: troca sozinha por coisas que o mundo está fazendo, sem repetir até passar por todas,
+// cada uma por um tempo diferente (entre FRASE_SOLTA_MS[0] e [1]). Genéricas, sem temporada.
+const FRASE_SOLTA_MS = [1200, 3200] as const;
+const FRASES_DO_MUNDO = [
+  'Regando as sementes',
+  'Acordando os golens',
+  'Penteando as samambaias',
+  'Contando os cogumelos',
+  'Ensinando as águias a voar',
+  'Polindo os cristais',
+  'Esticando as raízes',
+  'Afinando o canto dos pássaros',
+  'Varrendo as folhas do caminho',
+  'Enchendo os rios',
+  'Acendendo os vagalumes',
+  'Dobrando os mapas',
+  'Alimentando a Flor Carnívora',
+  'Empilhando as pedras',
+  'Desembaraçando os cipós',
+  'Chamando o vento',
+  'Arrumando as nuvens no céu',
+  'Lixando os cajados',
+  'Acordando os bonecos de treino',
+  'Tirando a poeira das espadas',
+  'Contando as estrelas',
+  'Esquentando a fogueira',
+  'Pintando o pôr do sol',
+  'Escondendo os baús',
+  'Medindo a altura dos pulos',
+  'Calibrando os socos',
+  'Plantando árvores novas',
+  'Ensaiando os golpes especiais',
+  'Recolhendo o orvalho',
+  'Acalmando as minhocas',
+  'Ajeitando as asas do anjo',
+  'Abrindo os portões',
+  'Varrendo a arena',
+  'Equilibrando as plataformas',
+  'Desenrolando os pergaminhos',
+  'Assoprando as brasas',
+  'Afinando os tambores',
+  'Separando as flechas',
+];
 const AVISO_DEMORA = 6000; // ms numa etapa até avisar que o mundo pode estar acordando
 const PAUSA_PRONTO = 450; // ms com a barra cheia antes de abrir a tela inicial
 
@@ -159,6 +204,30 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
       let feitas = 0;
       let inicioEtapa = performance.now();
       let parada = false;
+
+      // As frases soltas: começam depois da frase da etapa e param quando ela acaba (ou falha).
+      let baralho: string[] = [];
+      let ultima = '';
+      let girando = 0;
+      const pararDeGirar = (): void => {
+        clearTimeout(girando);
+        frase.setAttribute('aria-live', 'polite');
+      };
+      const girarFrases = (): void => {
+        clearTimeout(girando);
+        // Trocando o tempo todo, o leitor de tela não anuncia cada uma (a etapa vai na barra).
+        frase.setAttribute('aria-live', 'off');
+        const [min, max] = FRASE_SOLTA_MS;
+        girando = window.setTimeout(() => {
+          if (esta !== rodada || parada) return;
+          if (!baralho.length) baralho = [...FRASES_DO_MUNDO].sort(() => Math.random() - 0.5);
+          let nova = baralho.pop() ?? FRASES_DO_MUNDO[0];
+          if (nova === ultima && baralho.length) nova = baralho.pop() ?? nova;
+          ultima = nova;
+          frase.textContent = `${nova}…`;
+          girarFrases();
+        }, min + Math.random() * (max - min));
+      };
       const animar = (agora: number): void => {
         if (esta !== rodada) return;
         const correndo = parada ? 0 : 0.85 * (1 - Math.exp(-(agora - inicioEtapa) / 1500));
@@ -175,9 +244,12 @@ export function carregar<C, H>(opcoes: Opcoes<C, H>): Promise<{ cenario: C; hero
 
       for (const etapa of etapas) {
         frase.textContent = `${etapa.frase}…`;
+        ultima = etapa.frase;
         barra.setAttribute('aria-valuetext', etapa.frase);
         inicioEtapa = performance.now();
+        girarFrases();
         const [resultado] = await Promise.all([etapa.resultado, esperar(TEMPO_MINIMO_ETAPA)]);
+        pararDeGirar();
         aviso.textContent = '';
         if (!resultado.ok) {
           parada = true;
