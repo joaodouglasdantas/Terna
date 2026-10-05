@@ -4376,8 +4376,17 @@ a.inicio-botao {
 .inicio-google {
   display: flex;
   justify-content: center;
+  align-items: center;
   width: 100%;
-  min-height: 44px; /* o botão grande do Google: a caixa não pula quando ele aparece */
+  /* Altura fixa: o quadro do Google nasce com a altura padrão do navegador (150 px) e só depois
+     encolhe para a do botão; sem isto, a caixa crescia e voltava num piscar a cada troca de aba. */
+  height: 44px;
+  overflow: hidden;
+  margin-bottom: 0.35rem;
+  padding: 0 0.6rem;
+  /* Sem isto, o quadro do Google aparece com um fundo branco em volta do botão escuro (o esquema
+     de cores da página e o do quadro não batem). */
+  color-scheme: light;
 }
 
 .inicio-google[data-esperando] {
