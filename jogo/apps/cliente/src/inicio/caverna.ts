@@ -1,6 +1,6 @@
 // O fundo da tela da conta: a caverna do musgo, com a cachoeira lá no fundo saindo pela boca dela
 // (assets/tela-conta-caverna.webp), viva como a floresta dos menus (cena.ts):
-// - a arte respira devagar e segue de leve o mouse (paralaxe);
+// - a arte respira devagar (sem seguir o mouse: parada no quadro, como a tela inicial);
 // - o musgo pendurado no teto e a cortina de musgo balançam, as samambaias mexem, as cachoeiras
 //   tremem e o lago ondula (pedaços da arte redesenhados em faixas finas, cada faixa deslocada por
 //   uma onda, com a borda esfumada);
@@ -102,9 +102,6 @@ const FOLHAS_POR_SEGUNDO = 0.35; // por trecho de musgo
 const ESCURIDAO = 0.9;
 const ESCURECE_EM = 0.7;
 const ESCURECE_POR = 1.8;
-// A paralaxe: até quanto (fração do quadro) a arte anda seguindo o mouse, e quão depressa chega.
-const PARALAXE = 0.012;
-const SEGUE = 2.5; // por segundo
 
 interface FolhaCaindo extends Queda {
   desenho: DesenhoDeFolha;
@@ -113,7 +110,7 @@ interface FolhaCaindo extends Queda {
 
 interface Luz {
   tipo: 'vagalume' | 'poeira' | 'espuma' | 'fio' | 'brilho' | 'gota';
-  x: number; // em pixels do quadro da arte (antes da paralaxe)
+  x: number; // em pixels do quadro da arte (antes da respiração)
   y: number;
   vx: number;
   vy: number;
@@ -201,26 +198,15 @@ export function criarCaverna(tochas: Tocha[]): Caverna {
     }
   };
 
-  // A paralaxe e a respiração: a arte anda para o lado contrário do mouse e cresce e encolhe
-  // devagar. `paraTela` leva um ponto da arte para onde ele aparece (os pontos de luz e a lua
-  // ficam fora da arte, por cima da escuridão, e precisam acompanhar).
-  const mouse = { x: 0, y: 0 };
-  const paralaxe = { x: 0, y: 0 };
+  // A respiração: a arte cresce e encolhe devagar, do meio (não segue mais o mouse). `paraTela`
+  // leva um ponto da arte para onde ele aparece (os pontos de luz e a lua ficam fora da arte, por
+  // cima da escuridão, e precisam acompanhar).
   let escala = 1.04;
   const paraTela = (x: number, y: number): Ponto => ({
-    x: largura / 2 + (x - largura / 2) * escala + paralaxe.x * largura,
-    y: altura / 2 + (y - altura / 2) * escala + paralaxe.y * altura,
+    x: largura / 2 + (x - largura / 2) * escala,
+    y: altura / 2 + (y - altura / 2) * escala,
   });
   const fracao = (p: Ponto): Ponto => paraTela(p.x * largura, p.y * altura);
-  const vigia = new AbortController();
-  window.addEventListener(
-    'pointermove',
-    (evento) => {
-      mouse.x = Math.max(-1, Math.min(1, (evento.clientX / innerWidth) * 2 - 1));
-      mouse.y = Math.max(-1, Math.min(1, (evento.clientY / innerHeight) * 2 - 1));
-    },
-    { signal: vigia.signal },
-  );
 
   let folhas: FolhaCaindo[] = [];
   let luzes: Luz[] = [];
@@ -475,22 +461,16 @@ export function criarCaverna(tochas: Tocha[]): Caverna {
   return {
     el,
     quadro(dt) {
-      if (!el.isConnected) {
-        vigia.abort();
-        return;
-      }
+      if (!el.isConnected) return;
       medir();
       if (largura === 0 || altura === 0) return;
       tempo += dt;
       if (!semMovimento()) {
         soltar(dt);
         atualizar(dt);
-        const k = 1 - Math.exp(-SEGUE * dt);
-        paralaxe.x += (-mouse.x * PARALAXE - paralaxe.x) * k;
-        paralaxe.y += (-mouse.y * PARALAXE - paralaxe.y) * k;
         escala = 1.04 + 0.012 * Math.sin((tempo * Math.PI * 2) / 26);
       }
-      arte.style.transform = `translate(${(paralaxe.x * largura).toFixed(2)}px, ${(paralaxe.y * altura).toFixed(2)}px) scale(${escala.toFixed(4)})`;
+      arte.style.transform = `scale(${escala.toFixed(4)})`;
       desenhar(semMovimento() ? 1 : suave((tempo - ESCURECE_EM) / ESCURECE_POR));
     },
   };
