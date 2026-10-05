@@ -3,3 +3,6 @@ node_modules/
 
 # Configuração pessoal do Claude Code (o launch.json é versionado).
 .claude/settings.local.json
+
+# A chave secreta do cliente OAuth do Google (o jogo não usa; nunca vai para o Git).
+client_secret*.json

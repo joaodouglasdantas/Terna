@@ -4352,3 +4352,35 @@ a.inicio-botao {
     padding-right: 0.8rem;
   }
 }
+
+/* Entrar com o Google (google.ts): o "ou" entre duas linhas, e o lugar do botão oficial do Google
+   (ele desenha o botão dentro, num quadro). */
+.inicio-conta-ou {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0.9rem 0 0.7rem;
+  font-size: 0.9rem;
+  color: var(--suave);
+  text-transform: lowercase;
+}
+
+.inicio-conta-ou::before,
+.inicio-conta-ou::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  background: #4e3a22;
+}
+
+.inicio-google {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px; /* o botão grande do Google: a caixa não pula quando ele aparece */
+}
+
+.inicio-google[data-esperando] {
+  opacity: 0.55;
+  pointer-events: none;
+}

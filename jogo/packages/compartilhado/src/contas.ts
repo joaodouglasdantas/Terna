@@ -36,6 +36,22 @@ export const Entrar = z.object({
 });
 export type Entrar = z.infer<typeof Entrar>;
 
+// Entrar com o Google: `credencial` é o token que o botão do Google devolve (o servidor confere a
+// assinatura). Conta nova pede o nome de jogador: a primeira resposta é `precisaDeNome` (com uma
+// sugestão tirada do nome da conta Google) e o jogo manda de novo com o `nome`.
+export const EntrarComGoogle = z.object({
+  credencial: z.string().min(20).max(4096),
+  nome: NomeJogador.optional(),
+});
+export type EntrarComGoogle = z.infer<typeof EntrarComGoogle>;
+
+// O Client ID do "Entrar com o Google" do Terna (Google Cloud Console → Google Auth Platform →
+// Clientes, projeto do ternaofcl@gmail.com). Não é segredo: vai no próprio botão, no navegador de
+// todo jogador. O jogo e o servidor usam este; VITE_GOOGLE_CLIENT_ID (jogo) e GOOGLE_CLIENT_ID
+// (servidor) trocam por outro, e GOOGLE_CLIENT_ID=desligado desliga o login pelo Google no servidor.
+// (A "chave secreta do cliente" que o Google mostra junto não é usada pelo jogo e nunca vai aqui.)
+export const GOOGLE_CLIENT_ID = '507398645212-p3ld577428bt8b6rlv5rj20hqtcl9r9l.apps.googleusercontent.com';
+
 export const ConfirmarEmail = z.object({ email: Email, codigo: CodigoEmail });
 export type ConfirmarEmail = z.infer<typeof ConfirmarEmail>;
 
@@ -127,6 +143,12 @@ export const NivelResgatado = z.object({
   subiuPara: z.number().int().nullable(),
 });
 export type NivelResgatado = z.infer<typeof NivelResgatado>;
+
+// A resposta de entrar com o Google: a sessão, ou o pedido do nome (a conta ainda não existe).
+export const PrecisaDeNome = z.object({ precisaDeNome: z.literal(true), sugestao: z.string(), email: z.string() });
+export type PrecisaDeNome = z.infer<typeof PrecisaDeNome>;
+export const RespostaGoogle = z.union([Sessao, PrecisaDeNome]);
+export type RespostaGoogle = z.infer<typeof RespostaGoogle>;
 
 export const Erro = z.object({ erro: z.string() });
 export type Erro = z.infer<typeof Erro>;

@@ -109,6 +109,39 @@ e sem o Brevo; no site publicado essa faixa não existe).
 Para receber o e-mail de verdade testando em casa, crie `jogo/apps/servidor/.env` (copie o
 `.env.exemplo`) com `BREVO_API_KEY` e `EMAIL_REMETENTE` preenchidos e suba o servidor de novo.
 
+### 6. Entrar com o Google
+
+O botão **Continuar com o Google** da tela da conta usa o *Client ID* do projeto **Terna** no
+Google Cloud (conta ternaofcl@gmail.com). Ele já está no código (`GOOGLE_CLIENT_ID`, em
+`packages/compartilhado/src/contas.ts`): não é segredo e vale para o jogo e o servidor, sem variável
+nenhuma. Os passos abaixo são para refazer o projeto no Google, se um dia precisar.
+
+1. Em <https://console.cloud.google.com>, crie um projeto (ex.: **Terna**).
+2. **APIs e serviços → Tela de consentimento OAuth** (ou **Google Auth Platform → Branding**):
+   tipo **Externo**, nome do app **Terna**, o e-mail de suporte e o de contato. Os escopos são os
+   básicos (e-mail e perfil): não precisa pedir verificação ao Google. Em **Público-alvo**, publique
+   o app (**Publicar app**) para qualquer conta Google poder entrar, não só as de teste.
+3. **APIs e serviços → Credenciais → Criar credenciais → ID do cliente OAuth**, tipo
+   **Aplicativo da Web**. Em **Origens JavaScript autorizadas**, ponha `https://terna.pages.dev` e,
+   para testar em casa, `http://localhost:5173` e `http://localhost`. Não precisa de URI de
+   redirecionamento. Copie o **ID do cliente** (termina em `.apps.googleusercontent.com`).
+4. Troque o `GOOGLE_CLIENT_ID` de `packages/compartilhado/src/contas.ts` por ele e publique. (Para
+   usar outro só num lugar: `VITE_GOOGLE_CLIENT_ID` no jogo, `GOOGLE_CLIENT_ID` no servidor;
+   `GOOGLE_CLIENT_ID=desligado` desliga o login pelo Google no servidor.)
+
+A **chave secreta do cliente** (o arquivo `client_secret_...json` que o Google oferece para baixar)
+não é usada pelo jogo: não a coloque no projeto (o `.gitignore` já barra esse arquivo).
+
+A tela de consentimento pede a **página inicial** (`https://terna.pages.dev`), a **política de
+privacidade** (`https://terna.pages.dev/privacidade`) e os **termos** (`https://terna.pages.dev/termos`),
+páginas que ficam em `jogo/apps/cliente/public/`, e o domínio autorizado `terna.pages.dev`. Sem
+logotipo, o app não precisa passar pela verificação de marca do Google.
+
+Como funciona: quem entra com o Google e já tem conta com aquele e-mail entra na mesma conta (as
+duas ficam ligadas, e a senha continua valendo). Quem não tem escolhe o nome de jogador e a conta
+nasce com o e-mail já confirmado (o Google confirmou), sem senha: se um dia quiser entrar com e-mail
+e senha, é só usar o **Esqueci a senha**.
+
 ### Conta mestre
 
 A conta do e-mail oficial do jogo, **ternaofcl@gmail.com**, é mestre: depois de confirmar o e-mail

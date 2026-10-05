@@ -2,6 +2,10 @@
 // chega no e-mail e o "esqueci a senha". O Terna é online e a conta é obrigatória. Termina com a
 // pessoa dentro da conta; `nova` diz se ela acabou de confirmar o cadastro (aí vem o tutorial).
 //
+// Entrar com o Google (nas duas abas, embaixo do botão principal, depois de um "ou"): o botão
+// oficial do Google (google.ts). A conta Google que já tem conta (ou cujo e-mail já tem) entra
+// direto; a nova escolhe o nome de jogador (com a sugestão do nome da conta Google) e entra.
+//
 // Criar conta: nome, e-mail, senha e a senha de novo → o servidor manda um código de 6 números →
 // digitado o código, a conta está pronta e já entra. Entrar com um cadastro que nunca confirmou o
 // e-mail também cai na tela do código (o servidor manda um novo). Esqueceu a senha: o código do
@@ -28,6 +32,7 @@ import {
   Senha,
   TAMANHO_CODIGO_EMAIL,
   type Jogador,
+  type RespostaGoogle,
   type Sessao,
 } from '@terna/compartilhado';
 import type { z } from 'zod';
@@ -37,6 +42,7 @@ import { VERSAO } from '../versao';
 import { criarCaverna } from './caverna';
 import { esconderCena } from './cena';
 import { botao, elemento, mostrarTela, sairComEsmaecer, TELA_OPACA } from './dom';
+import { botaoDoGoogle, googleLigado } from './google';
 import { botaoDaMusica } from './musica';
 import { criarTocha } from './tocha';
 
@@ -352,6 +358,72 @@ export function telaConta(aviso = ''): Promise<Entrou> {
 
     const link = (texto: string, aoClicar: () => void): HTMLButtonElement => botao(texto, 'inicio-link', aoClicar);
 
+    // ---- Com o Google ----
+    // O "ou" e o botão do Google, embaixo do botão principal (nada, sem o Client ID). `erro`: onde
+    // a vista mostra o erro; `lembrar`: o "Manter conectado" da vista.
+    const comGoogle = (erro: () => HTMLParagraphElement, lembrar: () => boolean): HTMLElement[] => {
+      if (!googleLigado()) return [];
+      const ou = elemento('p', 'inicio-conta-ou');
+      ou.append(elemento('span', '', 'ou'));
+      const lugar = botaoDoGoogle(
+        (credencial) => {
+          erro().textContent = '';
+          lugar.dataset.esperando = 'true';
+          api.entrarComGoogle({ credencial }).then(
+            (r) => {
+              delete lugar.dataset.esperando;
+              seguirComGoogle(r, credencial, lembrar());
+            },
+            (e: unknown) => {
+              delete lugar.dataset.esperando;
+              erro().textContent = mensagemDoErro(e);
+            },
+          );
+        },
+        () => {
+          ou.hidden = true;
+          lugar.hidden = true;
+        },
+      );
+      return [ou, lugar];
+    };
+
+    // Entrou (a conta já existia) ou, conta nova, a vista do nome.
+    const seguirComGoogle = (r: RespostaGoogle, credencial: string, lembrar: boolean): void => {
+      if ('token' in r) return terminar(r, false, lembrar);
+      nomeDoGoogle(credencial, r.email, r.sugestao, lembrar);
+    };
+
+    // ---- Conta nova pelo Google: o nome de jogador ----
+    const nomeDoGoogle = (credencial: string, email: string, sugestao: string, lembrar: boolean): void => {
+      const nome = campo('Nome de jogador', 'text', 'nickname', { maxLength: 12, placeholder: 'Como te chamam?', value: sugestao });
+      const contador = elemento('span', 'inicio-campo-contador', `${sugestao.length}/12`);
+      nome.rotulo.querySelector('.inicio-campo-cabeca')?.append(contador);
+      nome.aviso.textContent = 'Aparece em cima do seu personagem. A primeira troca depois é grátis.';
+      nome.entrada.addEventListener('input', () => (contador.textContent = `${nome.entrada.value.length}/12`));
+      const sub = elemento('p', 'inicio-sub');
+      sub.append('Falta só o nome para a conta de ', elemento('strong', 'inicio-conta-email', email), '.');
+      vista({
+        titulo: 'Escolha seu nome',
+        sub,
+        campos: [nome],
+        principal: 'Criar conta',
+        voltarPara: () => entrar(),
+        depois: [botao('Voltar', 'inicio-botao inicio-botao-claro', () => entrar())],
+        enviar: (pronto) => {
+          const errado = problema(NomeJogador, nome.entrada.value);
+          if (errado) return pronto(errado);
+          api.entrarComGoogle({ credencial, nome: NomeJogador.parse(nome.entrada.value) }).then(
+            (r) => ('token' in r ? terminar(r, true, lembrar) : pronto('Algo deu errado; tente de novo.')),
+            // O token do Google vence em uma hora: vencido, volta para entrar e clicar de novo.
+            (e: unknown) =>
+              e instanceof ErroApi && e.status === 401 ? entrar('', 'O tempo para criar a conta acabou. Clique em Continuar com o Google de novo.') : pronto(mensagemDoErro(e)),
+          );
+        },
+      });
+      nome.entrada.select();
+    };
+
     // ---- Entrar ----
     const entrar = (emailInicial = '', avisoInicial = ''): void => {
       const email = campo('E-mail', 'email', 'username', { placeholder: 'voce@exemplo.com', value: emailInicial, maxLength: 254 });
@@ -370,6 +442,7 @@ export function telaConta(aviso = ''): Promise<Entrou> {
         sub: 'Bem-vindo de volta! Entre para jogar.',
         campos: [email, senha, manter],
         principal: 'Entrar',
+        depois: comGoogle(() => erro, () => marca.checked),
         enviar: (pronto) => {
           const login = email.entrada.value.trim();
           if (!login) return pronto('Escreva seu e-mail.');
@@ -402,12 +475,13 @@ export function telaConta(aviso = ''): Promise<Entrou> {
       senha.aviso.replaceWith(medidorDeForca(senha));
       const repetida = campoDeSenha('Repetir a senha', 'new-password', 'A mesma senha de novo');
       ligarRepetida(senha, repetida);
-      vista({
+      const { erro } = vista({
         abas: abas('criar', () => email.entrada.value.trim()),
         sub: 'Crie sua conta: leva menos de um minuto.',
         campos: [nome, email, senha, repetida],
         principal: 'Criar conta',
         longa: true,
+        depois: comGoogle(() => erro, () => true),
         voltarPara: () => entrar(email.entrada.value.trim()),
         enviar: (pronto) => {
           const dados = { nome: nome.entrada.value, email: email.entrada.value, senha: senha.entrada.value };

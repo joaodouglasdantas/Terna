@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 import type { FastifyInstance } from 'fastify';
 import { inject } from 'vitest';
-import { criarApp } from '../src/app';
+import { criarApp, type OpcoesApp } from '../src/app';
 import { conexaoPglite, type ConexaoBanco } from '../src/banco/conexao';
 import { correioDeTeste } from '../src/email/correio';
 import { PASTA_MIGRACOES } from './banco-modelo';
@@ -13,13 +13,13 @@ export type CorreioDeTeste = ReturnType<typeof correioDeTeste>;
 const correios = new WeakMap<FastifyInstance, CorreioDeTeste>();
 
 // Servidor de teste com um banco novo, só na memória, já migrado: uma cópia do banco-modelo
-// que o setup global (banco-modelo.ts) preparou.
-export async function novoServidor(): Promise<{ app: FastifyInstance; conexao: ConexaoBanco; correio: CorreioDeTeste }> {
+// que o setup global (banco-modelo.ts) preparou. `extra`: opções a mais do servidor (o Google).
+export async function novoServidor(extra: Partial<OpcoesApp> = {}): Promise<{ app: FastifyInstance; conexao: ConexaoBanco; correio: CorreioDeTeste }> {
   const modelo = new Blob([readFileSync(inject('bancoModelo'))]);
   const conexao = await conexaoPglite(new PGlite({ loadDataDir: modelo }), PASTA_MIGRACOES);
   const correio = correioDeTeste();
   // Limite de tentativas alto: os testes criam muitas contas seguidas do mesmo "IP".
-  const app = await criarApp({ banco: conexao.banco, origens: [], diasSessao: 30, tentativasPorMinuto: 1000, correio });
+  const app = await criarApp({ banco: conexao.banco, origens: [], diasSessao: 30, tentativasPorMinuto: 1000, correio, ...extra });
   correios.set(app, correio);
   return { app, conexao, correio };
 }

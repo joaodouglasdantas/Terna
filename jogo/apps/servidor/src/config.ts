@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { GOOGLE_CLIENT_ID } from '@terna/compartilhado';
 import { fileURLToPath } from 'node:url';
 
 export interface Config {
@@ -27,6 +28,9 @@ export interface Config {
   mestres: Set<string>;
   // O servidor em casa (sem DATABASE_URL) e sem o Brevo: o jogo mostra o código na tela.
   codigosNaTela: boolean;
+  // O Client ID do "Entrar com o Google": o do Terna (@terna/compartilhado), ou outro em
+  // GOOGLE_CLIENT_ID. GOOGLE_CLIENT_ID=desligado: null, o login pelo Google responde 503.
+  googleClientId: string | null;
 }
 
 // Pasta do pacote do servidor (onde está o package.json), venha o código de src/ ou de dist/.
@@ -76,6 +80,7 @@ export function lerConfig(env: NodeJS.ProcessEnv = process.env): Config {
         .filter(Boolean),
     ),
     codigosNaTela: !env.DATABASE_URL && !(env.BREVO_API_KEY && env.EMAIL_REMETENTE),
+    googleClientId: env.GOOGLE_CLIENT_ID?.trim() === 'desligado' ? null : env.GOOGLE_CLIENT_ID?.trim() || GOOGLE_CLIENT_ID,
   };
 }
 

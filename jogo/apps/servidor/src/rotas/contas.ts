@@ -3,6 +3,7 @@ import {
   CriarConta,
   ERRO_EMAIL_NAO_CONFIRMADO,
   Entrar,
+  EntrarComGoogle,
   ModoMestre,
   PedirCodigo,
   TrocarIcone,
@@ -20,7 +21,9 @@ import {
   novoCodigo,
   type MotivoCodigo,
 } from '../auth/codigos';
+import { sugerirNome, type ConferirGoogle } from '../auth/google';
 import { conferirSenha, gastarTempoComoSeConferisse, gerarHashSenha } from '../auth/senha';
+import { randomBytes } from 'node:crypto';
 import { criarSessao, encerrarSessao, tokenDoCabecalho } from '../auth/sessoes';
 import type { Banco } from '../banco/conexao';
 import { jogadores, sessoes } from '../banco/schema';
@@ -36,6 +39,10 @@ import { ehDono, exigirJogador, jogadorPublico, nomeLivreEm, validar } from '../
 //   POST /contas/confirmar  { email, codigo }        → 200 sessão
 //   POST /contas/reenviar   { email }                → 200 { email, reenviarEm }
 //   POST /sessoes           { login, senha }         → 200 sessão (403 sem o e-mail confirmado)
+//   POST /sessoes/google    { credencial, nome? }    → 200 sessão (a conta Google já tem conta,
+//                             ou o e-mail dela tem: as duas se ligam) | 200 { precisaDeNome,
+//                             sugestao, email } (conta nova sem `nome`) | 201 sessão (conta nova,
+//                             com `nome`) | 401 token inválido | 503 sem GOOGLE_CLIENT_ID
 //   POST /senha/esqueci     { email }                → 200 { email, reenviarEm }
 //   POST /senha/trocar      { email, codigo, senha } → 200 sessão
 //   DELETE /sessoes, GET /eu
@@ -55,12 +62,14 @@ export interface OpcoesContas {
   mestres?: ReadonlySet<string>;
   // Liga /teste/codigo: só no servidor em casa (PGlite) e sem o Brevo. Nunca em produção.
   codigosNaTela?: boolean;
+  // Confere o token do Google (auth/google.ts); sem ele, /sessoes/google responde 503.
+  conferirGoogle?: ConferirGoogle;
 }
 
 type Jogador = typeof jogadores.$inferSelect;
 
 export function rotasContas(app: FastifyInstance, banco: Banco, opcoes: OpcoesContas): void {
-  const { diasSessao, tentativasPorMinuto, correio, urlDoJogo, mestres = new Set<string>(), codigosNaTela = false } = opcoes;
+  const { diasSessao, tentativasPorMinuto, correio, urlDoJogo, mestres = new Set<string>(), codigosNaTela = false, conferirGoogle } = opcoes;
   const publico = (jogador: Jogador) => jogadorPublico(jogador, mestres);
   // Poucas tentativas por minuto, por IP: segura quem tenta adivinhar senha ou código e quem
   // quer usar o jogo para encher a caixa de e-mail dos outros.
@@ -182,6 +191,60 @@ export function rotasContas(app: FastifyInstance, banco: Banco, opcoes: OpcoesCo
       return reply.code(403).send({ erro: ERRO_EMAIL_NAO_CONFIRMADO });
     }
     return reply.send(await sessaoDe(jogador));
+  });
+
+  // Entrar com o Google. O Google já verificou o e-mail, então não há código: a conta entra (e
+  // fica com o e-mail confirmado). Achando a conta pelo e-mail, liga a conta Google a ela. Se era
+  // um cadastro que nunca confirmou o e-mail, a senha dele é trocada por uma que ninguém sabe (quem
+  // começou o cadastro com o e-mail dos outros não entra depois com aquela senha) e as sessões
+  // caem. A conta nova pelo Google nasce sem senha conhecida: o "Esqueci a senha" cria uma.
+  app.post('/sessoes/google', LIMITE, async (request, reply) => {
+    if (!conferirGoogle) return reply.code(503).send({ erro: 'o login pelo Google não está ligado neste servidor' });
+    const dados = validar(EntrarComGoogle, request.body, reply);
+    if (!dados) return;
+    const google = await conferirGoogle(dados.credencial);
+    if (!google) return reply.code(401).send({ erro: 'não conseguimos confirmar sua conta Google; tente de novo' });
+    const senhaQueNinguemSabe = () => gerarHashSenha(randomBytes(32).toString('base64url'));
+
+    const [pelaConta] = await banco.select().from(jogadores).where(eq(jogadores.googleId, google.sub)).limit(1);
+    if (pelaConta) return reply.send(await sessaoDe(pelaConta));
+
+    const pelaEmail = await porEmail(google.email);
+    if (pelaEmail) {
+      const nuncaConfirmou = !pelaEmail.emailConfirmadoEm;
+      const [ligada] = await banco
+        .update(jogadores)
+        .set({
+          googleId: google.sub,
+          emailConfirmadoEm: pelaEmail.emailConfirmadoEm ?? new Date(),
+          ...(nuncaConfirmou ? { senhaHash: await senhaQueNinguemSabe() } : {}),
+        })
+        .where(eq(jogadores.id, pelaEmail.id))
+        .returning();
+      if (nuncaConfirmou) {
+        await banco.delete(sessoes).where(eq(sessoes.jogadorId, pelaEmail.id));
+        await apagarCodigo(banco, pelaEmail.id, 'confirmar');
+      }
+      return reply.send(await sessaoDe(ligada));
+    }
+
+    // Conta nova: primeiro o jogo pergunta o nome (com uma sugestão), depois cria.
+    if (!dados.nome) return reply.send({ precisaDeNome: true, sugestao: sugerirNome(google.nome, google.email), email: google.email });
+    const nomeNormalizado = dados.nome.toLowerCase();
+    const [outro] = await banco.select({ id: jogadores.id }).from(jogadores).where(eq(jogadores.nomeNormalizado, nomeNormalizado)).limit(1);
+    if (outro) return reply.code(409).send({ erro: 'esse nome já está em uso' });
+    const [nova] = await banco
+      .insert(jogadores)
+      .values({
+        nome: dados.nome,
+        nomeNormalizado,
+        email: google.email,
+        googleId: google.sub,
+        senhaHash: await senhaQueNinguemSabe(),
+        emailConfirmadoEm: new Date(),
+      })
+      .returning();
+    return reply.code(201).send(await sessaoDe(nova));
   });
 
   // Esqueceu a senha. Responde igual com ou sem conta (não revela quais e-mails têm conta).

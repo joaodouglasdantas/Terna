@@ -26,6 +26,10 @@ export const jogadores = pgTable('jogadores', {
   // Quando o código do e-mail foi conferido. Sem isso a conta não entra (o cadastro ficou pela
   // metade). As contas de antes da confirmação valem como confirmadas (migração 0001).
   emailConfirmadoEm: timestamp({ withTimezone: true }),
+  // A conta Google ligada (o `sub` do token do Google, que não muda nem se o e-mail mudar). Quem
+  // entra com o Google tem isto; a conta de e-mail e senha ganha na primeira vez que entrar com o
+  // Google o mesmo e-mail.
+  googleId: text().unique(),
   // O perfil: o ícone (um dos ICONES de @terna/compartilhado), quando o nome foi trocado pela
   // última vez (a regra dos DIAS_ENTRE_TROCAS_DE_NOME) e se o modo mestre está ligado (só vale
   // para a conta dona, a de EMAILS_MESTRE; ela pode desligar para jogar como uma conta comum).

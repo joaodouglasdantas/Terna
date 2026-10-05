@@ -3,6 +3,7 @@ import rateLimit from '@fastify/rate-limit';
 import websocket from '@fastify/websocket';
 import { sql } from 'drizzle-orm';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import type { ConferirGoogle } from './auth/google';
 import type { Banco } from './banco/conexao';
 import { correioDoTerminal, type Correio } from './email/correio';
 import { ipDoPedido } from './http';
@@ -32,6 +33,9 @@ export interface OpcoesApp {
   // As contas mestre e a rota que mostra o código no jogo em casa (rotas/contas.ts).
   mestres?: ReadonlySet<string>;
   codigosNaTela?: boolean;
+  // Confere o token do "Entrar com o Google" (auth/google.ts); sem ele, o login pelo Google fica
+  // desligado.
+  conferirGoogle?: ConferirGoogle;
 }
 
 // Monta o servidor sem abrir porta: o index.ts chama listen, os testes usam inject.
@@ -47,6 +51,7 @@ export async function criarApp({
   urlDoJogo = 'https://terna.pages.dev',
   mestres,
   codigosNaTela = false,
+  conferirGoogle,
 }: OpcoesApp): Promise<FastifyInstance> {
   const app = Fastify({ logger, bodyLimit: 256 * 1024, trustProxy: confiarProxy });
 
@@ -90,6 +95,7 @@ export async function criarApp({
         urlDoJogo,
         mestres,
         codigosNaTela,
+        conferirGoogle,
       });
       rotasProgresso(api, banco, mestres);
       rotasSaves(api, banco);

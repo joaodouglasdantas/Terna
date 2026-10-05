@@ -7,6 +7,7 @@ import {
   Jogador,
   NivelResgatado,
   PartidaDaConta,
+  RespostaGoogle,
   LinhaRanking,
   Save,
   Sessao,
@@ -14,6 +15,7 @@ import {
   type CriarConta,
   type DadosSave,
   type Entrar,
+  type EntrarComGoogle,
   type EnviarPontuacao,
   type IdIcone,
   type ModoDaPartidaDaConta,
@@ -81,6 +83,12 @@ export const api = {
   reenviarCodigo: (email: string): Promise<CodigoEnviado> => pedir('POST', '/contas/reenviar', CodigoEnviado, { email }),
   // 403: o e-mail ainda não foi confirmado (o servidor manda um código novo).
   entrar: (dados: Entrar): Promise<Sessao> => abrirSessao('/sessoes', dados),
+  // Entrar com o Google: a sessão, ou o pedido do nome (conta nova: manda de novo com o `nome`).
+  async entrarComGoogle(dados: EntrarComGoogle): Promise<RespostaGoogle> {
+    const resposta = await pedir('POST', '/sessoes/google', RespostaGoogle, dados);
+    if ('token' in resposta) definirToken(resposta.token);
+    return resposta;
+  },
   esqueciSenha: (email: string): Promise<CodigoEnviado> => pedir('POST', '/senha/esqueci', CodigoEnviado, { email }),
   trocarSenha: (dados: TrocarSenha): Promise<Sessao> => abrirSessao('/senha/trocar', dados),
   async sair(): Promise<void> {
