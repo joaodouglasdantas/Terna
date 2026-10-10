@@ -30,7 +30,7 @@ export const PODERES_LESLIE = ['chicote', 'raizes', 'flor'] as const;
 
 export const CHICOTE = {
   nome: 'Chicote de Espinhos',
-  dano: 11, // no acerto; o veneno tira o resto aos poucos
+  dano: 13, // no acerto; o veneno tira o resto aos poucos
   recarga: 1.4,
   alcance: 130, // até onde a vinha estica, da mão
   estica: 0.2, // segundos para esticar tudo
@@ -38,19 +38,19 @@ export const CHICOTE = {
   raio: 3, // da ponta, para o acerto
 };
 
-// O veneno do chicote: tira `dano` a cada `intervalo`, por `duracao` segundos (5 × 5 = 25). Um novo
+// O veneno do chicote: tira `dano` a cada `intervalo`, por `duracao` segundos (6 × 5 = 30). Um novo
 // acerto recomeça a contagem (não soma). A cada pinguinho, a Leslie recupera `cura` do que ele
-// tirou (5 de veneno, 2 de cura; no golem, que segura parte, 3 passam e 1 volta).
+// tirou (6 de veneno, 2 de cura; no golem, que segura parte, 4 passam e 2 voltam).
 export const VENENO = {
   duracao: 2.5,
   intervalo: 0.5,
-  dano: 5, // por tique: 25 no total
+  dano: 6, // por tique: 30 no total
   cura: 0.4, // da vida que o veneno tirou, volta para a Leslie (arredondado: 2 a cada pinguinho)
 };
 
 export const RAIZES = {
   nome: 'Raízes',
-  dano: 18, // por roda da fileira
+  dano: 22, // por roda da fileira
   recarga: 9,
   alcance: 140, // da Leslie até o centro da primeira roda, na horizontal
   perto: 30, // a primeira nunca fica mais perto que isto dela
@@ -86,7 +86,8 @@ export const RAIZES = {
 //
 // Balanceamento (BALANCEAMENTO.md): mais tempo de pé (14 s, eram 10), a bola mais rápida (320
 // px/s, eram 230) e o par (alta e baixa: o pulo simples não escapa) acertam bem mais; cada
-// cusparada tira 23 (eram 45) e a Leslie continua perto de 50% contra o Grow no simulador.
+// cusparada tira 40 (eram 45, e 29 antes de a luta encurtar para até 3 min) e a Leslie continua
+// perto de 50% contra o Grow no simulador.
 export const FLOR = {
   nome: 'Flor Carnívora',
   recarga: 3, // curta: quem segura o especial é a barra de energia
@@ -104,6 +105,6 @@ export const FLOR = {
   // ele está) e outra na altura de quem pula (`alturas[1]`): parado, a baixa pega; num pulo
   // simples (até ~45 px), a alta. Só o pulo duplo, na hora, passa por cima das duas. O par fere
   // uma vez só: acertando uma, a outra atravessa quem foi acertado (o golem, alto, pegaria as duas).
-  tiro: { dano: 29, velocidade: 320, alcance: 420, raio: 3, alturas: [6, 42] }, // ~9 × 29 = 261, e envenena
+  tiro: { dano: 40, velocidade: 320, alcance: 420, raio: 3, alturas: [6, 42] }, // ~9 × 40 = 360, e envenena
   toca: { longe: 140, espera: 2.5, afunda: 0.45, velocidade: 220, aviso: 0.45, sobe: 0.4 },
 };

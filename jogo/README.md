@@ -62,8 +62,9 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
 
 Sem arma na mão (no modo arma), o clique esquerdo dá um **soco**: curto, o ataque mais fraco do
 jogo, que enche bem pouco a energia. A vida é 2500, e os danos, as recargas e a energia foram
-acertados juntos para uma luta durar uns 2 minutos e meio a 3 e quase nunca passar de 4 (os 5 do
-relógio são a exceção); se ele zerar, vence quem tiver mais vida. A tabela anotada e o porquê de cada número estão em **[BALANCEAMENTO.md](BALANCEAMENTO.md)**
+acertados juntos para a luta quase sempre acabar em até 3 minutos (as partidas rápidas e médias);
+os 3 a 5 do relógio ficam para as difíceis ou peculiares, e passar de 4 é raro. Se o relógio zerar,
+vence quem tiver mais vida. A tabela anotada e o porquê de cada número estão em **[BALANCEAMENTO.md](BALANCEAMENTO.md)**
 (o simulador usado: `python3 ferramentas/simular-duelo.py`).
 
 A escolha é feita na tela de seleção, depois do Singleplayer (a CPU espera a sua escolha e fica com

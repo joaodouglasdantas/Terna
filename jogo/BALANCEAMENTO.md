@@ -1,14 +1,17 @@
 # Balanceamento
 
-A tabela de danos do jogo, anotada, e como os números foram acertados para uma partida de 5 minutos.
+A tabela de danos do jogo, anotada, e como os números foram acertados para as lutas acabarem em até
+3 minutos (o relógio da partida segue em 5).
 Os números ficam em `packages/compartilhado/src/conteudo/` (`poderes.ts`, `armas.ts`, `leslie.ts`,
 `grow.ts`, `anjo.ts`). O simulador usado para acertá-los está em `ferramentas/simular-duelo.py`.
 
 ## O que se buscou
 
-- **Duração:** uma luta entre dois jogadores do mesmo nível dura **uns 2 minutos e meio a 3** e
-  quase nunca passa de **4**. Os 5 minutos do relógio são a exceção, uma luta muito dura (veja
-  **Dano +25%**, logo abaixo).
+- **Duração:** uma luta entre dois jogadores do mesmo nível acaba **em até 3 minutos** quase
+  sempre: são as partidas **rápidas e médias** (a mediana fica entre 1 min 40 s e 2 min 30 s). Os
+  **3 a 5 minutos** do relógio ficam para as partidas **difíceis ou peculiares** (muito controle,
+  muita fuga, quase sempre com o Grow), e passar de **4** é raro (veja **Luta de até 3 minutos**,
+  logo abaixo).
 - **Fim por tempo:** se o relógio zera, **vence quem tiver mais vida**. Com a vida igual, dá
   empate. Online, cada um avisa a própria vida ao servidor, e é ele quem decide.
 - **Armas como complemento:** os poderes são o principal. A espada e o arco ajudam e enchem a
@@ -19,23 +22,66 @@ Os números ficam em `packages/compartilhado/src/conteudo/` (`poderes.ts`, `arma
   cada lado.
 - **O Anjo**, mesmo escondido, entrou na conta e está pronto para quando voltar.
 
-## Dano +25% (outubro de 2026)
+## Luta de até 3 minutos (outubro de 2026)
 
-Com os números de antes, a luta durava 3 a 4 minutos e uma boa parte passava de 4 (Leslie × Grow,
-o único duelo possível hoje: 44% passavam de 4 min e 3% chegavam ao fim do relógio). Todo o dano
-subiu **~25%**, a vida continua 2 500 e a cura do veneno ficou igual (2 por pinguinho).
+A meta mudou: a luta entre dois do mesmo nível deve acabar **em até 3 minutos** na grande maioria
+das vezes (as partidas **rápidas e médias**), e os **3 a 5 minutos** do relógio ficam para as
+**difíceis ou peculiares**. Com os números de antes, só 63% das Leslie × Grow e 44% das
+Grow × Grow acabavam em até 3 min. O dano subiu de novo, **~20%** em média; a vida continua 2 500,
+o relógio continua em 5 min e a cura do veneno continua em 2 por pinguinho.
+
+| Duelo (2 000 de cada) | Mediana | 9 de 10 até | Acabam em até 3 min | Passam de 4 min | Vence |
+|---|---|---|---|---|---|
+| Leslie × Grow, antes → **agora** | 170 s → **127 s** | 207 s → **161 s** | 63% → **98%** | 1,1% → **0%** | 50% × 50% → **49% × 51%** |
+| Grow × Grow (quando houver) | 186 s → **148 s** | 242 s → **193 s** | 44% → **82%** | 11% → **0,5%** | 50% × 50% → **49% × 51%** |
+| Leslie × Leslie (quando houver) | 140 s → **100 s** | 170 s → **123 s** | 95% → **100%** | 0% → **0%** | 50% × 50% → **51% × 49%** |
+| Leslie × Anjo (quando houver) | 152 s → **114 s** | 191 s → **145 s** | 82% → **99%** | 0,5% → **0%** | 49% × 51% → **47% × 53%** |
+| Grow × Anjo (quando houver) | 172 s → **131 s** | 225 s → **171 s** | 57% → **94%** | 4,8% → **0,1%** | 58% × 42% → **52% × 48%** |
+| Anjo × Anjo (quando houver) | 154 s → **120 s** | 209 s → **160 s** | 73% → **97%** | 2,7% → **0%** | 50% × 50% → **48% × 52%** |
+
+Nenhuma luta do modelo chega aos 5 min do relógio. No modelo, os 3 a 5 min ficam com o Grow (o
+Grow × Grow é o duelo mais longo: 18% passam de 3 min, e quase nenhum de 4). O resto das lutas
+"difíceis ou peculiares" é o que o simulador não vê: ele não sabe de mira, de leitura de jogo nem
+da CPU, então só jogando de verdade dá para saber quanto da cauda de 3 a 5 min aparece.
+
+Subir tudo igual (×1,2) desequilibrava: a Leslie caía para 44% contra o Grow e o Grow ganhava 58%
+do Anjo. O golem dura 30 s fixos e pesa mais numa luta curta, e a cura do veneno é fixa (2 por
+pinguinho) e vale menos quando tudo bate mais forte. Por isso tudo subiu ×1,2, **menos a Flor
+(29 → 40, em vez de 35) e o Anjo (×1,3)**, que subiram um pouco mais. Como a energia pixy vem do
+dano dado, as ults (a Flor e o golem) também chegam antes, e isso já está na conta.
+
+| Ataque | Antes | Agora |
+|---|---|---|
+| Espada / Arco / Soco | 33 / 28 / 5 | **40 / 34 / 6** |
+| Chicote (acerto) / veneno (por pinguinho, ×5) | 11 / 5 | **13 / 6** (a cura segue 2 por pinguinho: 0,4 × 6 = 2,4, arredonda para 2) |
+| Raízes (por roda) | 18 | **22** |
+| Flor (por cusparada) | 29 | **40** |
+| Revoada (tombo / bicada no golem) | 69 / 8 | **83 / 10** |
+| Vendaval (por lasquinha) | 6 | **7** |
+| Salto / Investida | 175 / 163 | **210 / 196** |
+| Pedra (em cheio / lascas) | 156 / 81 | **187 / 97** |
+| Anjo: Impacto / Rajada / Julgamento | 100 / 75 / 400 | **130 / 98 / 520** |
+
+`python3 ferramentas/simular-duelo.py antes3min` roda os números de antes desta subida (e `mais`,
+no fim, usa 2 000 duelos de cada em vez de 600).
+
+## Dano +25% (outubro de 2026, antes da luta de até 3 minutos)
+
+Etapa anterior, mantida como história (os números de agora estão na seção acima). Com os números
+de antes dela, a luta durava 3 a 4 minutos e uma boa parte passava de 4 (Leslie × Grow, o único
+duelo possível hoje: 44% passavam de 4 min e 3% chegavam ao fim do relógio). Todo o dano subiu
+**~25%**, a vida continuou 2 500 e a cura do veneno ficou igual (2 por pinguinho).
 
 | Duelo (2 400 de cada) | Mediana | 9 de 10 até | 99 de 100 até | Passam de 4 min | Chegam aos 5 min |
 |---|---|---|---|---|---|
 | Leslie × Grow, antes | 234 s | 281 s | 300 s | 44% | 2,6% |
-| **Leslie × Grow, agora** | **169 s** | **208 s** | **245 s** | **1,4%** | **0,1%** |
-| Grow × Grow (quando houver), agora | 186 s | 241 s | 283 s | 10% | 0,4% |
-| Leslie × Leslie (quando houver), agora | 140 s | 168 s | 201 s | 0% | 0% |
+| **Leslie × Grow, depois do +25%** | **169 s** | **208 s** | **245 s** | **1,4%** | **0,1%** |
+| Grow × Grow (quando houver), depois do +25% | 186 s | 241 s | 283 s | 10% | 0,4% |
+| Leslie × Leslie (quando houver), depois do +25% | 140 s | 168 s | 201 s | 0% | 0% |
 
-Quem vence continua perto de 50% × 50% (Leslie × Grow: 49% × 51%). Como a energia pixy vem do
-dano dado, as ults (a Flor e o golem) também chegam um pouco antes, e isso já está na conta.
+Quem vencia continuou perto de 50% × 50% (Leslie × Grow: 49% × 51%).
 
-| Ataque | Antes | Agora |
+| Ataque | Antes | Depois do +25% |
 |---|---|---|
 | Espada / Arco / Soco | 26 / 22 / 4 | **33 / 28 / 5** |
 | Chicote (acerto) / veneno (por pinguinho, ×5) | 8 / 4 | **11 / 5** (a cura: 0,4 do que tira = 2, igual) |
@@ -48,7 +94,7 @@ dano dado, as ults (a Flor e o golem) também chegam um pouco antes, e isso já 
 | Anjo: Impacto / Rajada / Julgamento | 80 / 60 / 320 | **100 / 75 / 400** |
 
 As tabelas abaixo contam a história do primeiro balanceamento, com os números daquela época.
-`python3 ferramentas/simular-duelo.py anterior` roda os números de antes desta subida.
+`python3 ferramentas/simular-duelo.py anterior` roda os números de antes do +25%.
 
 ## Como foi medido
 
@@ -194,9 +240,10 @@ Antes:
 
 ## Para acompanhar
 
-- **Grow × Grow** ficou a luta mais longa (252 s na mediana; 14% chegam ao fim do relógio, e aí
-  vence quem tem mais vida). Se incomodar, a Revoada pode subir um pouco.
-- **Grow × Anjo** deu 60% × 40%. O Anjo está escondido; quando ele voltar, vale medir de novo.
+- **Grow × Grow** continua a luta mais longa (148 s na mediana; 82% acabam em até 3 min e só 0,5%
+  passam de 4). Se na prática passar muito de 3 min, a Revoada ou o Vendaval podem subir um pouco.
+- **Grow × Anjo** deu 52% × 48% (era 58% × 42% com tudo ×1,2). O Anjo está escondido; quando ele
+  voltar, vale medir de novo.
 - O modelo não sabe de mira, de leitura de jogo nem da CPU. Depois de umas partidas de verdade,
   ajuste pelo que sentir e rode `python3 ferramentas/simular-duelo.py` de novo. Mudou um número
   no jogo, mude também em `NUMEROS`, no começo do simulador. (`simular-duelo.py furia` roda com a
