@@ -11,20 +11,72 @@ Os números ficam em `packages/compartilhado/src/conteudo/` (`poderes.ts`, `arma
   sempre: são as partidas **rápidas e médias** (a mediana fica entre 1 min 40 s e 2 min 30 s). Os
   **3 a 5 minutos** do relógio ficam para as partidas **difíceis ou peculiares** (muito controle,
   muita fuga, quase sempre com o Grow), e passar de **4** é raro (veja **Luta de até 3 minutos**,
-  logo abaixo).
+  logo abaixo, e **Armas abaixo dos poderes**, que é a etapa mais nova).
 - **Fim por tempo:** se o relógio zera, **vence quem tiver mais vida**. Com a vida igual, dá
   empate. Online, cada um avisa a própria vida ao servidor, e é ele quem decide.
-- **Armas como complemento:** os poderes são o principal. A espada e o arco ajudam e enchem a
-  energia, mas deixaram de ser o que mais tira dano no jogo.
+- **Armas como segunda opção:** os poderes é que carregam a luta. A espada e o arco ajudam e
+  enchem a energia, mas o golpe de uma arma, **até no crítico na cabeça**, tira menos que **um uso
+  inteiro de qualquer poder** (veja **Armas abaixo dos poderes**, logo abaixo). Um teste confere
+  essa regra a cada mudança de número (`packages/compartilhado/test/armas-vs-poderes.test.ts`).
 - **Soco:** sem arma na mão, o clique esquerdo dá um soco. É o ataque mais fraco do jogo e o que
   menos enche a energia.
+- **Golem e armas:** de golem, o Grow só tem os poderes: nem o soco (o quadrinho do punho), nem
+  arma do chão (ele não pega, e a da mão cai ao virar). A Leslie, até ultando, continua na forma
+  humana e usa arma e soco. Um teste confere isso (`apps/cliente/test/golem-sem-arma.test.ts`).
 - **Nenhum personagem sobrando:** entre dois do mesmo nível, cada duelo fica perto de 50% para
   cada lado.
 - **O Anjo**, mesmo escondido, entrou na conta e está pronto para quando voltar.
 
-## Luta de até 3 minutos (outubro de 2026)
+## Armas abaixo dos poderes (outubro de 2026)
 
-A meta mudou: a luta entre dois do mesmo nível deve acabar **em até 3 minutos** na grande maioria
+A regra: as armas do chão são a **segunda opção** e os poderes são o foco. Por isso o golpe de uma
+arma, **até no crítico na cabeça** (×1,5), tem que tirar menos que **um uso inteiro de qualquer
+poder**. "Um uso inteiro" é tudo acertando: o Chicote com o veneno, as três rodas das Raízes,
+todas as cusparadas da Flor, o tombo da Revoada, o Vendaval soprando o tempo todo, e os golpes do
+golem e do Anjo. O soco continua o ataque mais fraco de todos.
+
+Antes, o poder mais fraco era o Chicote (13 + veneno 6 × 5 = **43**), e o crítico da espada (**60**)
+e do arco (**51**) passavam dele; as armas davam de 30% a 33% do dano da Leslie. Agora a espada é
+26 (crítico **39**), o arco é 22 (crítico **33**), o soco é 4, e o Chicote inteiro tira **50**.
+
+Só baixar as armas desequilibrava: sem compensar, a Leslie caía para 41% contra o Grow e o Anjo
+para 32% contra ele (a forma base do Anjo só tem arma e soco, então a energia dele demorava a
+encher). Por isso
+os poderes subiram ~15%, a energia por ponto de dano da Leslie foi de 0,2 para **0,215** e a do
+Anjo de 0,45 para **0,62**.
+
+| Ataque | Antes | Agora |
+|---|---|---|
+| Espada / Arco / Soco | 40 / 34 / 6 | **26 / 22 / 4** |
+| Crítico (cabeça ×1,5) da espada / do arco | 60 / 51 | **39 / 33** |
+| Chicote (acerto) / veneno (por pinguinho, ×5) | 13 / 6 | **15 / 7** (a cura segue 2 por pinguinho: 0,3 × 7 = 2,1, arredonda para 2) |
+| Raízes (por roda) | 22 | **25** |
+| Flor (por cusparada) | 40 | **46** |
+| Revoada (tombo / bicada no golem) | 83 / 10 | **95 / 12** |
+| Vendaval (por lasquinha) | 7 | **8** |
+| Salto / Investida | 210 / 196 | **241 / 225** |
+| Pedra (em cheio / lascas) | 187 / 97 | **215 / 112** |
+| Anjo: Impacto / Rajada / Julgamento | 130 / 98 / 520 | **150 / 113 / 598** |
+| Energia por ponto de dano: Leslie / Anjo | 0,2 / 0,45 | **0,215 / 0,62** |
+
+| Duelo (2 000 de cada) | Mediana | Acabam em até 3 min | Passam de 4 min | Vence | Armas (% do dano do 1º) |
+|---|---|---|---|---|---|
+| Leslie × Grow, antes → **agora** | 127 s → **123 s** | 98% → **99%** | 0% → **0,1%** | 49% × 51% → **50% × 50%** | 33% → **19%** |
+| Grow × Grow (quando houver) | 148 s → **145 s** | 82% → **86%** | 0,5% → **0,7%** | 49% × 51% → **51% × 49%** | 17% → **11%** |
+| Leslie × Leslie (quando houver) | 100 s → **100 s** | 100% → **100%** | 0% → **0%** | 51% × 49% → **49% × 51%** | 30% → **18%** |
+| Leslie × Anjo (quando houver) | 114 s → **113 s** | 99% → **99%** | 0% → **0%** | 47% × 53% → **48% × 52%** | 33% → **20%** |
+| Grow × Anjo (quando houver) | 131 s → **129 s** | 94% → **93%** | 0,1% → **0,1%** | 52% × 48% → **55% × 45%** | 16% → **10%** |
+| Anjo × Anjo (quando houver) | 120 s → **117 s** | 97% → **96%** | 0% → **0,1%** | 48% × 52% → **50% × 50%** | 21% → **14%** |
+
+A duração e o equilíbrio ficaram onde estavam; o que mudou foi quem carrega a luta (as armas
+davam de 16% a 33% do dano e agora dão de 10% a 20%). O Grow × Anjo é o duelo mais desigual: nas
+várias rodadas do simulador o Grow ganhou de 52% a 55%. O Anjo está escondido, então o duelo que
+existe hoje é o Leslie × Grow, em 50% × 50%. `python3 ferramentas/simular-duelo.py antesarmas` roda
+os números de antes desta etapa.
+
+## Luta de até 3 minutos (outubro de 2026, antes das armas abaixo dos poderes)
+
+Etapa anterior, mantida como história (os números de agora estão na seção acima). A meta mudou: a luta entre dois do mesmo nível deve acabar **em até 3 minutos** na grande maioria
 das vezes (as partidas **rápidas e médias**), e os **3 a 5 minutos** do relógio ficam para as
 **difíceis ou peculiares**. Com os números de antes, só 63% das Leslie × Grow e 44% das
 Grow × Grow acabavam em até 3 min. O dano subiu de novo, **~20%** em média; a vida continua 2 500,
@@ -240,9 +292,9 @@ Antes:
 
 ## Para acompanhar
 
-- **Grow × Grow** continua a luta mais longa (148 s na mediana; 82% acabam em até 3 min e só 0,5%
+- **Grow × Grow** continua a luta mais longa (145 s na mediana; 86% acabam em até 3 min e só 0,7%
   passam de 4). Se na prática passar muito de 3 min, a Revoada ou o Vendaval podem subir um pouco.
-- **Grow × Anjo** deu 52% × 48% (era 58% × 42% com tudo ×1,2). O Anjo está escondido; quando ele
+- **Grow × Anjo** deu 55% × 45% (de 52% a 55% nas rodadas; era 58% × 42% com tudo ×1,2). O Anjo está escondido; quando ele
   voltar, vale medir de novo.
 - O modelo não sabe de mira, de leitura de jogo nem da CPU. Depois de umas partidas de verdade,
   ajuste pelo que sentir e rode `python3 ferramentas/simular-duelo.py` de novo. Mudou um número

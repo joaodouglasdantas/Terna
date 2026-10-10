@@ -1,6 +1,7 @@
 """Simulador de duelo do Terna, para o balanceamento (BALANCEAMENTO.md explica).
 
-Uso (na pasta jogo/):  python3 ferramentas/simular-duelo.py            # os números de agora (lutas de até 3 min)
+Uso (na pasta jogo/):  python3 ferramentas/simular-duelo.py            # os números de agora (lutas de até 3 min, armas abaixo dos poderes)
+                       python3 ferramentas/simular-duelo.py antesarmas # os de antes de as armas ficarem abaixo dos poderes (crítico da espada: 60)
                        python3 ferramentas/simular-duelo.py antes3min  # os de antes de a luta encurtar para até 3 min (2,5 a 3 min, até 4)
                        python3 ferramentas/simular-duelo.py anterior   # os de antes do dano subir ~25% (lutas de 3 a 4 min)
                        python3 ferramentas/simular-duelo.py antes      # os de antes do primeiro balanceamento
@@ -31,38 +32,40 @@ import copy
 import statistics
 
 NUMEROS = {'vida': 2500,
- 'porDano': 0.2,
+ 'porDano': 0.215,
  'porDano_grow': 0.3,
  'duracaoPartida': 300,
  'engajado': 4.0,
  'longe': 3.0,
  'pegarArma': 0.125,
- 'espada': {'dano': 40, 'recarga': 1.15, 'ocupa': 0.34, 'p': 0.45},
- 'arco': {'dano': 34, 'recarga': 1.4, 'ocupa': 0.4, 'p': 0.35},
+ # As armas são a segunda opção: o crítico delas (x1,5 na cabeça: 39 e 33) fica abaixo de um uso
+ # inteiro de qualquer poder (o mais fraco, o Chicote com o veneno: 15 + 7 x 5 = 50).
+ 'espada': {'dano': 26, 'recarga': 1.15, 'ocupa': 0.34, 'p': 0.45},
+ 'arco': {'dano': 22, 'recarga': 1.4, 'ocupa': 0.4, 'p': 0.35},
  'durabilidade': 30,
- 'soco': {'dano': 6, 'recarga': 0.45, 'ocupa': 0.25, 'p': 0.45},
- 'chicote': {'dano': 13, 'recarga': 1.4, 'ocupa': 0.44, 'p': 0.4, 'custo': 2},
- # cura 1/3: no jogo, cada pinguinho de 6 devolve 2 (VENENO.cura 0,4, arredondado).
- 'veneno': {'dano': 6, 'intervalo': 0.5, 'duracao': 2.5, 'cura': 1 / 3},
- 'raizes': {'dano': 22, 'rodas': 3, 'recarga': 9, 'ocupa': 0.5, 'p': 0.35, 'custo': 6, 'prende': 2.4},
+ 'soco': {'dano': 4, 'recarga': 0.45, 'ocupa': 0.25, 'p': 0.45},
+ 'chicote': {'dano': 15, 'recarga': 1.4, 'ocupa': 0.44, 'p': 0.4, 'custo': 2},
+ # cura 2/7: no jogo, cada pinguinho de 7 devolve 2 (VENENO.cura 0,3, arredondado).
+ 'veneno': {'dano': 7, 'intervalo': 0.5, 'duracao': 2.5, 'cura': 2 / 7},
+ 'raizes': {'dano': 25, 'rodas': 3, 'recarga': 9, 'ocupa': 0.5, 'p': 0.35, 'custo': 6, 'prende': 2.4},
  'furia': {'dano': 250, 'recarga': 3, 'ocupa': 0.4, 'p': 0.35, 'pPreso': 0.9, 'custo': 100, 'cura': 100},
  # A Flor Carnívora (a ult da Leslie no lugar da Fúria): brota, segue o outro (longe, por baixo
  # da terra) e cospe de longe, esteja a luta perto ou não. 'antes': segundos até a primeira
  # cusparada. 'p' 0,6 (era 0,35): cada cusparada é um par de bolas, uma baixa e uma alta, a
  # 320 px/s (era uma, a 230) — o pulo simples não escapa; só o pulo duplo na hora, ou sair do
  # alcance. O par fere uma vez só.
- 'flor': {'dano': 40, 'envenena': True, 'duracao': 14, 'intervalo': 1.6, 'antes': 1.6, 'recarga': 3, 'ocupa': 0.4, 'p': 0.6, 'custo': 100},
- 'aves': {'dano': 83, 'bicada': 10, 'recarga': 6.5, 'ocupa': 0.35, 'p': 0.35, 'custo': 2, 'tira': 2.0},
- 'vento': {'tique': 0.3, 'dano': 7, 'duracao': 3.6, 'recarga': 8, 'p': 0.5, 'custo': 3, 'atrapalha': 0.5},
+ 'flor': {'dano': 46, 'envenena': True, 'duracao': 14, 'intervalo': 1.6, 'antes': 1.6, 'recarga': 3, 'ocupa': 0.4, 'p': 0.6, 'custo': 100},
+ 'aves': {'dano': 95, 'bicada': 12, 'recarga': 6.5, 'ocupa': 0.35, 'p': 0.35, 'custo': 2, 'tira': 2.0},
+ 'vento': {'tique': 0.3, 'dano': 8, 'duracao': 3.6, 'recarga': 8, 'p': 0.5, 'custo': 3, 'atrapalha': 0.5},
  'golem': {'duracao': 30, 'recarga': 10, 'defesa': 0.4, 'custo': 100},
- 'salto': {'dano': 210, 'recarga': 5, 'ocupa': 1.25, 'p': 0.35},
- 'investida': {'dano': 196, 'recarga': 6, 'ocupa': 1.3, 'p': 0.35},
- 'pedra': {'dano': 187, 'lascas': 97, 'recarga': 5, 'ocupa': 0.6, 'p': 0.3, 'pLascas': 0.3},
+ 'salto': {'dano': 241, 'recarga': 5, 'ocupa': 1.25, 'p': 0.35},
+ 'investida': {'dano': 225, 'recarga': 6, 'ocupa': 1.3, 'p': 0.35},
+ 'pedra': {'dano': 215, 'lascas': 112, 'recarga': 5, 'ocupa': 0.6, 'p': 0.3, 'pLascas': 0.3},
  'anjo': {'duracao': 35, 'recarga': 8, 'custo': 100},
- 'impacto': {'dano': 130, 'explosoes': 3, 'recarga': 4, 'ocupa': 0.35, 'p': 0.3},
- 'rajada': {'dano': 98, 'coracoes': 2, 'recarga': 8, 'ocupa': 0.3, 'p': 0.3, 'encanto': 1.5},
- 'julgamento': {'dano': 520, 'recarga': 18, 'ocupa': 0.3, 'p': 0.35, 'pPreso': 0.9},
- 'porDano_anjo': 0.45}
+ 'impacto': {'dano': 150, 'explosoes': 3, 'recarga': 4, 'ocupa': 0.35, 'p': 0.3},
+ 'rajada': {'dano': 113, 'coracoes': 2, 'recarga': 8, 'ocupa': 0.3, 'p': 0.3, 'encanto': 1.5},
+ 'julgamento': {'dano': 598, 'recarga': 18, 'ocupa': 0.3, 'p': 0.35, 'pPreso': 0.9},
+ 'porDano_anjo': 0.62}
 
 
 class Lutador:
@@ -406,9 +409,24 @@ def relatorio(cfg, herois=('leslie', 'grow', 'anjo'), n=400, seed=1):
     return linhas
 
 
+# Os de antes de as armas ficarem abaixo dos poderes (a luta já era de até 3 min, mas o crítico da
+# espada, 60, e o do arco, 51, passavam do Chicote inteiro, 43, e as armas davam de 30% a 34% do
+# dano da Leslie e do Anjo).
+ANTES_DAS_ARMAS = copy.deepcopy(NUMEROS)
+for chave, valor in {
+    'espada': {'dano': 40}, 'arco': {'dano': 34}, 'soco': {'dano': 6}, 'chicote': {'dano': 13},
+    'veneno': {'dano': 6, 'cura': 1 / 3}, 'raizes': {'dano': 22}, 'flor': {'dano': 40},
+    'aves': {'dano': 83, 'bicada': 10}, 'vento': {'dano': 7}, 'salto': {'dano': 210}, 'investida': {'dano': 196},
+    'pedra': {'dano': 187, 'lascas': 97}, 'impacto': {'dano': 130}, 'rajada': {'dano': 98}, 'julgamento': {'dano': 520},
+}.items():
+    ANTES_DAS_ARMAS[chave].update(valor)
+ANTES_DAS_ARMAS['porDano'] = 0.2
+ANTES_DAS_ARMAS['porDano_anjo'] = 0.45
+
+
 # Os de antes de a luta encurtar para até 3 min (o dano de ~25% a mais: a luta durava 2,5 a 3 min e
 # quase nunca passava de 4, mas só 66% das Leslie × Grow acabavam em até 3 min, e 45% das Grow × Grow).
-ANTES_DOS_3MIN = copy.deepcopy(NUMEROS)
+ANTES_DOS_3MIN = copy.deepcopy(ANTES_DAS_ARMAS)
 for chave, valor in {
     'espada': {'dano': 33}, 'arco': {'dano': 28}, 'soco': {'dano': 5}, 'chicote': {'dano': 11},
     'veneno': {'dano': 5, 'cura': 0.4}, 'raizes': {'dano': 18}, 'flor': {'dano': 29},
@@ -468,6 +486,6 @@ def imprimir(cfg, n=600):
 if __name__ == '__main__':
     import sys
     args = sys.argv[1:]
-    conjuntos = {'antes3min': ANTES_DOS_3MIN, 'anterior': ANTERIOR, 'antes': ANTES, 'furia': FURIA}
+    conjuntos = {'antesarmas': ANTES_DAS_ARMAS, 'antes3min': ANTES_DOS_3MIN, 'anterior': ANTERIOR, 'antes': ANTES, 'furia': FURIA}
     escolhido = next((conjuntos[a] for a in args if a in conjuntos), NUMEROS)
     imprimir(escolhido, n=2000 if 'mais' in args else 600)

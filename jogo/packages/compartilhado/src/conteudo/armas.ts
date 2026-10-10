@@ -28,9 +28,13 @@ export const QUEDA_DE_ARMAS = {
   pegar: 10, // do eixo do corpo até a arma, para pegar
 };
 
+// As armas são a segunda opção: os poderes é que carregam a luta. Por isso o golpe de uma arma,
+// até no crítico na cabeça (`ZONAS.dano.cabeca`), tira menos que um uso inteiro de qualquer poder
+// (o mais fraco é o Chicote da Leslie, com o veneno); o soco, menos que as armas. O teste
+// `armas-vs-poderes.test.ts` confere essa regra a cada mudança de número.
 export const ESPADA = {
   nome: 'Espada',
-  dano: 40,
+  dano: 26,
   recarga: 1.15, // entre dois golpes
   durabilidade: 30, // segundos na mão até quebrar
   golpe: 0.26, // o movimento do golpe, de cima para a frente
@@ -38,7 +42,7 @@ export const ESPADA = {
 
 export const ARCO = {
   nome: 'Arco',
-  dano: 34,
+  dano: 22,
   recarga: 1.4, // entre duas flechas
   durabilidade: 30,
   velocidade: 340, // da flecha, ao sair
@@ -51,7 +55,7 @@ export const ARCO = {
 // como tira pouco, enche bem pouco a energia pixy.
 export const SOCO = {
   nome: 'Soco',
-  dano: 6,
+  dano: 4,
   recarga: 0.45, // entre dois socos
   golpe: 0.2, // o braço indo e voltando
   alcance: 9, // do ombro até o punho esticado

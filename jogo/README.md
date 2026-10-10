@@ -61,7 +61,10 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
   dele mora em `apps/cliente/src/entidades/anjo/` e os números em `conteudo/anjo.ts`.
 
 Sem arma na mão (no modo arma), o clique esquerdo dá um **soco**: curto, o ataque mais fraco do
-jogo, que enche bem pouco a energia. A vida é 2500, e os danos, as recargas e a energia foram
+jogo, que enche bem pouco a energia. As armas do chão são só a segunda opção: até no crítico na
+cabeça tiram menos que um uso inteiro de qualquer poder (o teste `armas-vs-poderes.test.ts`
+confere). O Grow transformado em golem só tem os poderes: sem soco e sem arma; a Leslie, que
+continua em forma humana ao ultar, pode usar. A vida é 2500, e os danos, as recargas e a energia foram
 acertados juntos para a luta quase sempre acabar em até 3 minutos (as partidas rápidas e médias);
 os 3 a 5 do relógio ficam para as difíceis ou peculiares, e passar de 4 é raro. Se o relógio zerar,
 vence quem tiver mais vida. A tabela anotada e o porquê de cada número estão em **[BALANCEAMENTO.md](BALANCEAMENTO.md)**

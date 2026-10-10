@@ -58,8 +58,8 @@ export const REVOADA = {
   altura: 125,
   leva: 130,
   levando: 1.15,
-  dano: 83, // o tombo lá de cima
-  bicada: 10, // no golem, que elas não levantam
+  dano: 95, // o tombo lá de cima
+  bicada: 12, // no golem, que elas não levantam
 };
 
 export const VENTO = {
@@ -73,7 +73,7 @@ export const VENTO = {
   pesado: 0.3, // o golem sente só isto do empurrão
   sustentar: 520, // px/s² para cima em quem está no ar dentro dela: flutua e vai longe
   tique: 0.3, // segundos entre uma lasquinha e outra
-  dano: 7, // por lasquinha: até 84 soprando o tempo todo
+  dano: 8, // por lasquinha: até 96 soprando o tempo todo
 };
 
 export const GOLEM = {
@@ -83,7 +83,7 @@ export const GOLEM = {
 
 export const SALTO = {
   nome: 'Salto Esmagador',
-  dano: 210,
+  dano: 241,
   recarga: 5,
   alcance: 170, // até onde ele pula, na horizontal
   perto: 20,
@@ -97,7 +97,7 @@ export const SALTO = {
 
 export const INVESTIDA = {
   nome: 'Investida',
-  dano: 196,
+  dano: 225,
   recarga: 6,
   preparo: 0.32, // bate o pé antes de correr: o aviso
   alcance: 280, // até onde ele corre (~1 s a 270 px/s)
@@ -109,8 +109,8 @@ export const INVESTIDA = {
 
 export const PEDRA = {
   nome: 'Pedra',
-  dano: 187, // em cheio
-  lascas: 97, // o estouro onde ela cai
+  dano: 215, // em cheio
+  lascas: 112, // o estouro onde ela cai
   recarga: 5,
   preparo: 0.5, // arrancando o pedregulho do chão e levantando
   velocidade: 270,
