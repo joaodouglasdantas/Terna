@@ -25,6 +25,10 @@ const CLIENTE = path.join(RAIZ, 'apps', 'cliente', 'src');
 // rachaduras e dobras), ganha o contorno escuro de volta (`contorno`: o quanto a borda escurece) e,
 // já na paleta, perde pixels soltos e furos de um pixel.
 const NITIDEZ = { afiar: 0.5, contorno: 0.6 };
+// O olho do ganso bravo, em (x, y) do quadro: vermelho, com a sobrancelha escura em cima, descendo
+// para o bico (à direita).
+const OLHO_BRAVO = { olho: [0xe0, 0x22, 0x22], sobrancelha: [0x22, 0x14, 0x10] };
+const olhoBravo = (x, y) => [[x, y, OLHO_BRAVO.olho], [x - 1, y - 1, OLHO_BRAVO.sobrancelha], [x, y - 1, OLHO_BRAVO.sobrancelha]];
 const FOLHAS = {
   // A Leslie, a dríade: 32 px em pé, como o Anjo.
   leslie: {
@@ -196,6 +200,91 @@ const FOLHAS = {
       brotando: { alturaRef: 185, ancora: 'caixa', pontos: [[110, 715]] },
       // Murchando no fim: debilitada, deitada, e a explosão de veneno.
       murchando: { alturaRef: 168, ancora: 'caixa', pontos: [[945, 735], [1330, 720]] },
+    },
+  },
+  // A Margo, a vovó do rolo de massa (fontes/margo.png: a folha dela já sem o ganso, que a
+  // ferramentas/separar-ganso.py tirou). 31 px em pé, um tico mais baixa que a Leslie e o Grow.
+  margo: {
+    fonte: 'margo.png',
+    png: path.join('margo', 'base.png'),
+    constante: 'QUADROS_MARGO',
+    alturaEmPe: 31,
+    cores: 32, // o cabelo branco-lilás, a pele, o azul do avental e a madeira do rolo
+    mediana: 0,
+    semFiapos: true, // as fitas do avental voando, na corrida, viravam riscos soltos de 1 px
+    // Sem o rolo na mão: no Bumerangue ele voa e volta. A variante tira a madeira dele dos mesmos
+    // quadros (tirarRolo), dentro do retângulo onde ele está em cada quadro [x0, y0, x1, y1) — fora
+    // dele, o laranja é da pele e dos sapatos. Na corrida (menos o último passo) o rolo some atrás
+    // das mãos e fica como está; o golpe e a caída não acontecem sem ele.
+    semRolo: {
+      png: path.join('margo', 'sem-rolo.png'),
+      retangulos: {
+        parado: [[0, 11, 5, 20]],
+        andando: [null, null, null, null, null, null, [16, 10, 20, 15]],
+        subindo: [[14, 9, 18, 15], [14, 10, 17, 17]],
+        caindo: [[13, 9, 18, 14], [14, 10, 19, 16]],
+        atacando: [[13, 9, 17, 15]],
+      },
+    },
+    animacoes: {
+      // Coluna FRENTE: um quadro só no jogo; os outros entram só na conta da paleta.
+      parado: { alturaRef: 104, ancora: 'cabeca', quadros: 1, pontos: [[1106, 148], [1103, 265], [1112, 382]] },
+      // Fileira RUN: correndo com o rolo junto do peito (anda na mesma velocidade dos outros).
+      andando: {
+        alturaRef: 100,
+        ancora: 'cabeca',
+        pontos: [[178, 307], [264, 312], [347, 311], [481, 310], [565, 308], [651, 311], [737, 310]],
+      },
+      // Fileira JUMP: os dois subindo (as pernas encolhidas) e os dois descendo.
+      subindo: { alturaRef: 100, ancora: 'cabeca', pontos: [[273, 420], [365, 424]] },
+      caindo: { alturaRef: 100, ancora: 'cabeca', pontos: [[540, 420], [649, 418]] },
+      // Fileira IDLE: de lado, com o rolo na mão — parada soltando um poder (o braço vai por cima).
+      atacando: { alturaRef: 100, ancora: 'cabeca', pontos: [[163, 86]] },
+      // Fileira ATTACK: a rolada, do rolo erguido atrás da cabeça ao golpe esticado para a frente e
+      // a volta (o golpe básico dela, no lugar do soco).
+      golpe: {
+        alturaRef: 100,
+        ancora: 'cabeca',
+        pontos: [[193, 772], [237, 776], [365, 779], [466, 780], [607, 781], [701, 779], [770, 783]],
+      },
+      // Caindo: encolhe (HURT), cai de lado e fica deitada com o rolo (DIE).
+      morto: { alturaRef: 100, ancora: 'caixa', pontos: [[642, 876], [264, 974], [541, 981]] },
+    },
+  },
+  // O ganso da Margo (fontes/ganso.png, separado da folha dela): uns 15 px, segue a Margo a pé.
+  // Olha para a direita, como os personagens.
+  ganso: {
+    fonte: 'ganso.png',
+    png: path.join('margo', 'ganso.png'),
+    constante: 'QUADROS_GANSO',
+    alturaEmPe: 15,
+    cores: 14, // o branco, a sombra creme, o laranja do bico e dos pés e o contorno
+    mediana: 0,
+    animacoes: {
+      // Parado do lado dela (fileira IDLE): dois quadros, ele mexe a cabeça.
+      parado: { alturaRef: 50, ancora: 'caixa', pontos: [[130, 112], [409, 114]] },
+      // Andando atrás dela (fileira WALK, os passos dele).
+      andando: { alturaRef: 50, ancora: 'caixa', pontos: [[116, 222], [217, 226], [318, 226], [419, 226], [494, 226], [587, 226], [684, 226]] },
+    },
+  },
+  // O Ganso Raivoso, a ult da Margo: o mesmo ganso, maior (uns 20 px) e bravo — correndo de asas
+  // abertas (os passos da fileira RUN) e bicando (o bote da mesma fileira: o pescoço esticado para a
+  // frente, rente ao chão). Os olhos ficam vermelhos, com a sobrancelha brava em cima (OLHO_BRAVO).
+  'ganso-bravo': {
+    fonte: 'ganso.png',
+    png: path.join('margo', 'ganso-bravo.png'),
+    constante: 'QUADROS_GANSO_BRAVO',
+    alturaEmPe: 22,
+    cores: 16,
+    mediana: 0,
+    animacoes: {
+      correndo: {
+        alturaRef: 46,
+        ancora: 'caixa',
+        pontos: [[208, 338], [331, 335], [425, 335]],
+        olhosPorQuadro: [olhoBravo(12, 2), olhoBravo(13, 3), olhoBravo(12, 4)],
+      },
+      bicando: { alturaRef: 46, ancora: 'caixa', pontos: [[118, 332]], olhosPorQuadro: [olhoBravo(13, 3)] },
     },
   },
   // As águias da Revoada do Grow (a folha "ÁGUIA - MOVIMENTO", de fundo azul-escuro): a fileira VOO,
@@ -391,6 +480,82 @@ function clarearManchasPretas(folha, lw, lh, paleta) {
   for (const [o, cor] of trocar) folha.set(cor, o);
 }
 
+// Os fiapos de 1 px que a redução deixa soltos (as fitas do avental voando, um fio de cabelo): o
+// pixel com no máximo um vizinho de lado sai, e de novo, até três vezes (a ponta, e o fio que ela
+// puxava). As partes de verdade têm pelo menos 2 px de grossura e ficam.
+function tirarFiapos(red) {
+  const { lw, lh, px } = red;
+  const cheio = (x, y) => x >= 0 && y >= 0 && x < lw && y < lh && px[(y * lw + x) * 4 + 3] > 0;
+  for (let volta = 0; volta < 3; volta++) {
+    const sair = [];
+    for (let y = 0; y < lh; y++) {
+      for (let x = 0; x < lw; x++) {
+        if (!cheio(x, y)) continue;
+        const lados = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => cheio(x + dx, y + dy)).length;
+        if (lados <= 1) sair.push((y * lw + x) * 4 + 3);
+      }
+    }
+    if (!sair.length) break;
+    for (const i of sair) px[i] = 0;
+  }
+}
+
+// A Margo sem o rolo na mão (ele foi arremessado, no Bumerangue): no retângulo dele, sai a madeira —
+// o laranja e o marrom do rolo e o contorno marrom-escuro dele (a pele clara da mão fica); onde o
+// corte encostou no corpo, a borda escurece (tirarDoQuadro, como o cajado do Grow).
+const ROLO = { matiz: [0.02, 0.1], saturacao: 0.45, brilho: 0.3, peleClara: [0.9, 0.45] };
+function daMadeira(r, g, b) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max !== r || max === min) return false;
+  const s = (max - min) / max;
+  const v = max / 255;
+  const h = (g - b) / (max - min) / 6;
+  if (v >= ROLO.peleClara[0] && s < ROLO.peleClara[1]) return false;
+  const madeira = h >= ROLO.matiz[0] && h <= ROLO.matiz[1] && s >= ROLO.saturacao && v >= ROLO.brilho;
+  const contorno = r > g && g >= b && r < 140 && s > 0.35;
+  return madeira || contorno;
+}
+function tirarRolo(folha, larguraFolha, x0, w, h, [rx0, ry0, rx1, ry1]) {
+  const linhas = [];
+  for (let y = ry0; y < Math.min(h, ry1); y++) {
+    for (let x = rx0; x < Math.min(w, rx1); x++) {
+      const i = (y * larguraFolha + x0 + x) * 4;
+      if (folha[i + 3] && daMadeira(folha[i], folha[i + 1], folha[i + 2])) linhas.push([y, x, x]);
+    }
+  }
+  // O contorno escuro que o rolo deixou pendurado (um risco de 1 px, sem a madeira do lado): sai o
+  // escuro do retângulo que fica com no máximo um vizinho de lado, e de novo, até três vezes.
+  const fora = new Set(linhas.map(([y, x]) => y * w + x));
+  const fica = (x, y) => x >= 0 && y >= 0 && x < w && y < h && folha[(y * larguraFolha + x0 + x) * 4 + 3] > 0 && !fora.has(y * w + x);
+  for (let volta = 0; volta < 3; volta++) {
+    const sair = [];
+    for (let y = ry0; y < Math.min(h, ry1 + 1); y++) {
+      for (let x = Math.max(0, rx0 - 1); x < Math.min(w, rx1 + 1); x++) {
+        if (!fica(x, y)) continue;
+        const i = (y * larguraFolha + x0 + x) * 4;
+        if (folha[i] * 0.3 + folha[i + 1] * 0.59 + folha[i + 2] * 0.11 > 70) continue;
+        if ([[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => fica(x + dx, y + dy)).length <= 1) sair.push([y, x]);
+      }
+    }
+    if (!sair.length) break;
+    for (const [y, x] of sair) {
+      fora.add(y * w + x);
+      linhas.push([y, x, x]);
+    }
+  }
+  // E o pixel que ficou sozinho (nenhum vizinho, nem na diagonal), perto do corte.
+  for (let y = Math.max(0, ry0 - 2); y < Math.min(h, ry1 + 2); y++) {
+    for (let x = Math.max(0, rx0 - 2); x < Math.min(w, rx1 + 2); x++) {
+      if (!fica(x, y)) continue;
+      let vizinhos = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && fica(x + dx, y + dy)) vizinhos++;
+      if (!vizinhos) linhas.push([y, x, x]);
+    }
+  }
+  tirarDoQuadro(folha, larguraFolha, x0, w, h, linhas);
+}
+
 function gerar(nome) {
   const folhaRef = FOLHAS[nome];
   if (!folhaRef) throw new Error(`folha desconhecida: ${nome} (use ${Object.keys(FOLHAS).join(', ')})`);
@@ -408,7 +573,7 @@ function gerar(nome) {
         soPaleta: i >= (anim.quadros ?? Infinity),
         foraDaPaleta: Boolean(anim.foraDaPaleta),
         semTapar: Boolean(anim.semTaparFrestas),
-        olhos: anim.olhos,
+        olhos: anim.olhosPorQuadro?.[i] ?? anim.olhos,
       });
     });
   }
@@ -443,6 +608,7 @@ function gerar(nome) {
       }
       limpar(red, paleta);
       if (folhaRef.taparFrestas && !semTapar) taparFrestas(red, paleta);
+      if (folhaRef.semFiapos) tirarFiapos(red);
       for (let y = 0; y < red.lh; y++) {
         for (let x = 0; x < red.lw; x++) {
           const i = (y * red.lw + x) * 4;
@@ -463,7 +629,10 @@ function gerar(nome) {
       }
       const indice = quadros[animacao]?.length ?? 0;
       const ax = Math.round(ancoraX(red, ancora)); // antes de cortar: o corpo não pula ao trocar de folha
-      if (semCajado) {
+      if (semCajado && folhaRef.semRolo) {
+        const retangulo = folhaRef.semRolo.retangulos[animacao]?.[indice];
+        if (retangulo) tirarRolo(folha, larguraFolha, cursor, red.lw, red.lh, retangulo);
+      } else if (semCajado) {
         const linhas = folhaRef.semCajado.cajado[animacao]?.[indice];
         if (linhas) tirarDoQuadro(folha, larguraFolha, cursor, red.lw, red.lh, linhas);
       } else {
@@ -488,12 +657,19 @@ function gerar(nome) {
     escreverPng(saida, larguraFolha, alturaFolha, montar(true).folha);
     console.log(`  sem o cajado -> ${path.relative(RAIZ, saida)}`);
   }
+  if (folhaRef.semRolo) {
+    const saida = path.join(CLIENTE, 'assets', folhaRef.semRolo.png);
+    escreverPng(saida, larguraFolha, alturaFolha, montar(true).folha);
+    console.log(`  sem o rolo -> ${path.relative(RAIZ, saida)}`);
+  }
+
   fs.writeFileSync(
     path.join(CLIENTE, 'gerado', `${nome}-quadros.ts`),
     `// Gerado por ferramentas/gerar-herois.cjs a partir de fontes/${folhaRef.fonte} — não editar à mão.\n` +
       `// x/y/w/h: recorte em assets/${folhaRef.png.split(path.sep).join('/')}; ax: eixo do corpo (os pés ficam na base do recorte)` +
       (folhaRef.musgo ? `;\n// pedra: a ponta do cajado no quadro (quem tem).\n` : `.\n`) +
       (folhaRef.semCajado ? `// A mesma tabela vale para assets/${folhaRef.semCajado.png.split(path.sep).join('/')}.\n` : '') +
+      (folhaRef.semRolo ? `// A mesma tabela vale para assets/${folhaRef.semRolo.png.split(path.sep).join('/')}.\n` : '') +
       `export const ${folhaRef.constante} = ${JSON.stringify(quadros, null, 2)};\n`,
   );
   console.log(`${naFolha.length} quadros -> ${path.relative(RAIZ, saidaPng)} (${larguraFolha}x${alturaFolha})`);
