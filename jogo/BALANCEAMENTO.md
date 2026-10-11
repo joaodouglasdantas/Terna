@@ -3,7 +3,7 @@
 A tabela de danos do jogo, anotada, e como os números foram acertados para as lutas acabarem em até
 3 minutos (o relógio da partida segue em 5).
 Os números ficam em `packages/compartilhado/src/conteudo/` (`poderes.ts`, `armas.ts`, `leslie.ts`,
-`grow.ts`, `anjo.ts`). O simulador usado para acertá-los está em `ferramentas/simular-duelo.py`.
+`grow.ts`, `margo.ts`, `anjo.ts`). O simulador usado para acertá-los está em `ferramentas/simular-duelo.py`.
 
 ## O que se buscou
 
@@ -24,8 +24,48 @@ Os números ficam em `packages/compartilhado/src/conteudo/` (`poderes.ts`, `arma
   arma do chão (ele não pega, e a da mão cai ao virar). A Leslie, até ultando, continua na forma
   humana e usa arma e soco. Um teste confere isso (`apps/cliente/test/golem-sem-arma.test.ts`).
 - **Nenhum personagem sobrando:** entre dois do mesmo nível, cada duelo fica perto de 50% para
-  cada lado.
+  cada lado — a Margo também, que entrou depois (veja **A Margo**, logo abaixo).
 - **O Anjo**, mesmo escondido, entrou na conta e está pronto para quando voltar.
+
+## A Margo (outubro de 2026)
+
+A Margo é a vovó do rolo de massa, com o ganso dela. Idosa, **não dá soco e não pega as armas do
+chão**: a arma dela é o rolo, e o primeiro quadrinho do painel (o do soco, nos outros) é a
+**rolada**. Os poderes: o **Bumerangue** (o rolo vai e volta, e acerta na ida e na volta; sem ele na
+mão, nada de rolada), a **Farinha** (o saco estoura numa nuvem que deixa quem está nela lento, sem
+arranco, perdendo um pouquinho de vida) e, com a barra cheia, o **Ganso Raivoso** (o ganso fica
+bravo, corre rápido atrás do outro e bica quem está perto do chão; ela continua lutando).
+
+| Ataque | Dano | Recarga | Energia | Um uso inteiro |
+|---|---|---|---|---|
+| Rolada (no lugar do soco) | **25** | 0,6 s | — | 25 (sem crítico) |
+| 1 · Bumerangue de Rolo | **48** por passada | 4 s | 2 | 96 (a ida e a volta) |
+| 2 · Saco de Farinha | **30** o saco + **8** a cada 0,5 s na nuvem (3,5 s) | 9 s | 6 | 86 |
+| 3 · Ganso Raivoso | **22** por bicada, a cada 0,38 s, por 9 s | 3 s | 100 (barra cheia) | ~506 |
+
+- **A rolada fica abaixo dos poderes**, como as armas do chão: menos que um uso inteiro de qualquer
+  poder (o mais fraco ainda é o Chicote, 50), e mais que o soco (o teste confere as duas coisas). É
+  mais forte que o golpe de espada porque é a única arma dela.
+- **A energia:** 0,27 por ponto de dano (a Leslie tem 0,215): sem arma do chão, a barra enche com
+  ~370 de dano dado.
+- **O Ganso Raivoso** é o que mais tira dela (como a Flor da Leslie): corre a 165 px/s (a gente anda a
+  90) e não dá para ferir; escapa-se pulando por cima dele. No simulador, cada bicada a mais ou a
+  menos mexe uns 5 pontos de vitória: com 15 ela perdia quase todas; com 24, ganhava 59% da Leslie.
+- **A Farinha** é controle: enfarinhado, o outro anda a 55% da velocidade e não dá o arranco (no
+  modelo, ela acerta 30% mais quem está lento).
+
+No simulador (2 000 duelos de cada):
+
+| Duelo | Mediana | Até 3 min | Vence |
+|---|---|---|---|
+| Leslie × Margo | 93 s | 100% | 46% × 53% |
+| Grow × Margo | 117 s | 99% | 51% × 49% |
+| Margo × Anjo | 107 s | 100% | 49% × 51% |
+| Margo × Margo | 89 s | 100% | 51% × 49% |
+
+A luta com ela fica entre as rápidas e médias, como a meta pede. O rolo dá de 27% a 31% do dano
+dela (as armas do chão dão de 10% a 20% nos outros): é a arma dela, mas os poderes seguem sendo a
+maior parte. Os números das lutas sem ela não mudaram.
 
 ## Armas abaixo dos poderes (outubro de 2026)
 
@@ -296,6 +336,9 @@ Antes:
   passam de 4). Se na prática passar muito de 3 min, a Revoada ou o Vendaval podem subir um pouco.
 - **Grow × Anjo** deu 55% × 45% (de 52% a 55% nas rodadas; era 58% × 42% com tudo ×1,2). O Anjo está escondido; quando ele
   voltar, vale medir de novo.
+- **A Margo** é nova: o modelo não sabe de quanto o ganso grudado acerta de verdade (pular por cima
+  dele, fugir com o arranco antes de ser enfarinhado). Se o Ganso Raivoso decidir as lutas demais (ou
+  de menos), o primeiro número a mexer é o dano da bicada (`GANSO.dano`).
 - O modelo não sabe de mira, de leitura de jogo nem da CPU. Depois de umas partidas de verdade,
   ajuste pelo que sentir e rode `python3 ferramentas/simular-duelo.py` de novo. Mudou um número
   no jogo, mude também em `NUMEROS`, no começo do simulador. (`simular-duelo.py furia` roda com a

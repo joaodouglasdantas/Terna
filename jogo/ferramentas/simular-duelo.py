@@ -11,6 +11,8 @@ Uso (na pasta jogo/):  python3 ferramentas/simular-duelo.py            # os núm
 A meta (outubro de 2026): a luta entre dois do mesmo nível quase sempre acaba em até 3 min (as
 rápidas e as médias, a coluna "até 3 min"); os 3 a 5 min do relógio ficam para as lutas difíceis ou
 peculiares, e passar de 4 é raro (a coluna "> 4 min"). Quem vence segue perto de 50% × 50%.
+A Margo (sem arma do chão nem soco: a rolada, o Bumerangue, a Farinha e o Ganso Raivoso) entra nos
+duelos dos números de agora; os conjuntos de antes são sem ela.
 
 Os números do jogo ficam em packages/compartilhado/src/conteudo/*.ts; aqui eles estão copiados em
 NUMEROS (mudou lá, mude aqui também). 'p' (a chance de acertar), 'ocupa', 'engajado', 'longe',
@@ -65,7 +67,19 @@ NUMEROS = {'vida': 2500,
  'impacto': {'dano': 150, 'explosoes': 3, 'recarga': 4, 'ocupa': 0.35, 'p': 0.3},
  'rajada': {'dano': 113, 'coracoes': 2, 'recarga': 8, 'ocupa': 0.3, 'p': 0.3, 'encanto': 1.5},
  'julgamento': {'dano': 598, 'recarga': 18, 'ocupa': 0.3, 'p': 0.35, 'pPreso': 0.9},
- 'porDano_anjo': 0.62}
+ 'porDano_anjo': 0.62,
+ # A Margo: sem arma do chão nem soco; a rolada (o rolo de massa) é a arma dela.
+ 'porDano_margo': 0.27,
+ 'rolo': {'dano': 25, 'recarga': 0.6, 'ocupa': 0.42, 'p': 0.45},
+ # Acerta na ida e na volta (a volta, um pouco menos: o outro já está esperto); sem o rolo na mão
+ # enquanto ele voa ('voando').
+ 'bumerangue': {'dano': 48, 'recarga': 4, 'ocupa': 0.35, 'p': 0.35, 'pVolta': 0.3, 'voando': 1.2, 'custo': 2},
+ # O saco ('p') e a nuvem: 'pNuvem' a chance de o outro ficar nela, 'dentro' quanto tempo fica
+ # (cada 'tique' tira 'danoTique') e, enfarinhado ('lento' s), ele é acertado mais ('mais').
+ 'farinha': {'dano': 30, 'recarga': 9, 'ocupa': 0.4, 'p': 0.3, 'custo': 6, 'pNuvem': 0.55, 'dentro': 1.6, 'tique': 0.5, 'danoTique': 8, 'lento': 2.0, 'mais': 1.3},
+ # O Ganso Raivoso: corre atrás (rápido: vale perto ou longe) e bica; 'p' por bicada, engajado ou
+ # não ('pLonge': o outro foge para longe e pula por cima mais).
+ 'ganso': {'duracao': 9, 'estufa': 0.45, 'intervalo': 0.38, 'dano': 22, 'p': 0.5, 'pLonge': 0.4, 'recarga': 3, 'ocupa': 0.4, 'custo': 100}}
 
 
 class Lutador:
@@ -90,6 +104,9 @@ class Lutador:
         self.flor = 0.0  # segundos que a flor carnívora ainda fica de pé
         self.florTique = 0.0
         self.canal = 0.0  # soprando
+        self.ganso = 0.0  # segundos que o Ganso Raivoso ainda fica bravo
+        self.gansoTique = 0.0
+        self.lento = 0.0  # enfarinhado: quem ataca acerta mais
         self.canalTique = 0.0
         self.danoFeito = 0.0
         self.porFonte = {}
@@ -137,7 +154,21 @@ def acoes(l):
                 n = d.get('explosoes', d.get('coracoes', 1))
                 out.append((k, d['dano'] * d['p'] * n, d['ocupa']))
         return out
-    # forma base: arma na mão, soco ou os poderes
+    # forma base: arma na mão, soco ou os poderes (a Margo: o rolo e os dela)
+    if l.h == 'margo':
+        if l.pronto('rolo'):
+            d = c['rolo']
+            out.append(('rolo', d['dano'] * d['p'], d['ocupa']))
+        d = c['bumerangue']
+        if l.pronto('bumerangue') and l.energia >= d['custo']:
+            out.append(('bumerangue', d['dano'] * (d['p'] + d['pVolta']), d['ocupa']))
+        d = c['farinha']
+        if l.pronto('farinha') and l.energia >= d['custo']:
+            out.append(('farinha', d['dano'] * d['p'] + d['pNuvem'] * d['dentro'] / d['tique'] * d['danoTique'] + 15, d['ocupa']))
+        d = c['ganso']
+        if l.energia >= d['custo'] and l.pronto('ganso') and l.ganso <= 0:
+            out.append(('ganso', 9999, d['ocupa']))
+        return out
     if l.arma:
         tipo = l.arma[0]
         if l.pronto('arma'):
@@ -177,6 +208,13 @@ def acoes(l):
     return out
 
 
+def pegou(o, p):
+    """A chance de acertar quem está enfarinhado (lento, sem arranco) sobe."""
+    if o.preso > 0:
+        return max(p, 0.9)
+    return min(0.9, p * o.cfg['farinha']['mais']) if o.lento > 0 else p
+
+
 def agir(l, o, nome, rng):
     c = l.cfg
     if voando(o, rng) and nome not in ('virar', 'vento'):
@@ -198,6 +236,13 @@ def agir(l, o, nome, rng):
         p = 0.9 if o.preso > 0 else d['p']
         if rng.random() < p:
             ferir(l, o, d['dano'], tipo)
+        return
+    if nome == 'rolo':
+        d = c['rolo']
+        l.rec['rolo'] = d['recarga']
+        l.ocupado = d['ocupa']
+        if rng.random() < pegou(o, d['p']):
+            ferir(l, o, d['dano'], 'rolo')
         return
     if nome == 'soco':
         d = c['soco']
@@ -246,6 +291,21 @@ def agir(l, o, nome, rng):
     elif nome == 'flor':
         l.flor = d['duracao'] + d['antes']
         l.florTique = d['antes']
+    elif nome == 'bumerangue':
+        for pp in (p, d['pVolta']):
+            if rng.random() < pegou(o, pp):
+                ferir(l, o, d['dano'], 'bumerangue')
+        l.rec['rolo'] = max(l.rec.get('rolo', 0), d['voando'])
+    elif nome == 'farinha':
+        if rng.random() < pegou(o, p):
+            ferir(l, o, d['dano'], 'farinha')
+        if rng.random() < d['pNuvem']:
+            for _ in range(int(d['dentro'] / d['tique'])):
+                ferir(l, o, d['danoTique'], 'farinha')
+            o.lento = max(o.lento, d['lento'])
+    elif nome == 'ganso':
+        l.ganso = d['duracao'] + d['estufa']
+        l.gansoTique = d['estufa']
     elif nome == 'aves':
         if rng.random() < p:
             if o.forma == 'golem':
@@ -289,6 +349,7 @@ def passo(l, o, dt, engajado, rng):
     l.ocupado = max(0, l.ocupado - dt)
     l.preso = max(0, l.preso - dt)
     l.fora = max(0, l.fora - dt)
+    l.lento = max(0, l.lento - dt)
     l.formaRecarga = max(0, l.formaRecarga - dt)
     if l.forma != 'base':
         l.formaResta -= dt
@@ -322,6 +383,15 @@ def passo(l, o, dt, engajado, rng):
                     o.veneno = c['veneno']['duracao']
                     o.venenoDono = l
                     o.venenoTique = c['veneno']['intervalo']
+    # o Ganso Raivoso bicando (corre atrás: vale perto ou longe)
+    if l.ganso > 0:
+        l.ganso -= dt
+        l.gansoTique -= dt
+        if l.gansoTique <= 0 and l.ganso > 0:
+            d = c['ganso']
+            l.gansoTique += d['intervalo']
+            if not voando(o, rng) and rng.random() < pegou(o, d['p'] if engajado else d['pLonge']):
+                ferir(l, o, d['dano'], 'ganso')
     # soprando
     if l.canal > 0:
         l.canal -= dt
@@ -339,7 +409,7 @@ def passo(l, o, dt, engajado, rng):
         t, dur = l.arma
         dur -= dt
         l.arma = (t, dur) if dur > 0 else None
-    elif l.forma == 'base' and rng.random() < c['pegarArma'] * dt:
+    elif l.forma == 'base' and l.h != 'margo' and rng.random() < c['pegarArma'] * dt:
         l.arma = (rng.choice(['espada', 'arco']), c['durabilidade'])
         l.rec['arma'] = 0
     if not engajado or l.ocupado > 0 or l.fora > 0 or l.vida <= 0:
@@ -380,7 +450,7 @@ def duelo(ha, hb, cfg, rng):
     return t, v, a.vida <= 0 or b.vida <= 0, a, b
 
 
-def relatorio(cfg, herois=('leslie', 'grow', 'anjo'), n=400, seed=1):
+def relatorio(cfg, herois=('leslie', 'grow', 'margo', 'anjo'), n=400, seed=1):
     rng = random.Random(seed)
     linhas = []
     for i, ha in enumerate(herois):
@@ -473,13 +543,14 @@ FURIA['chicote']['dano'] = 10
 
 def imprimir(cfg, n=600):
     print(f"{'duelo':16s} {'mediana':>8s} {'90%**':>7s} {'até 3 min':>10s} {'> 4 min':>8s} {'por KO':>7s} {'vence A':>8s} {'vence B':>8s} {'armas*':>7s}  dano de A por fonte (média)")
-    for l in relatorio(cfg, n=n):
+    herois = ('leslie', 'grow', 'margo', 'anjo') if cfg.get('rolo') else ('leslie', 'grow', 'anjo')  # os de antes não têm a Margo
+    for l in relatorio(cfg, herois, n=n):
         f = l['fontesA']
         tot = sum(f.values()) or 1
-        armas = (f.get('espada', 0) + f.get('arco', 0) + f.get('soco', 0)) / tot
+        armas = (f.get('espada', 0) + f.get('arco', 0) + f.get('soco', 0) + f.get('rolo', 0)) / tot
         fontes = ', '.join(f'{k} {v}' for k, v in sorted(f.items(), key=lambda x: -x[1]))
         print(f"{l['duelo']:16s} {l['mediana_s']:6.0f} s {l['p90_s']:5.0f} s {l['ate3_%']:9.0f}% {l['mais4_%']:7.1f}% {l['ko_%']:6.1f}% {l['vitA_%']:7.0f}% {l['vitB_%']:7.0f}% {100 * armas:6.0f}%  {fontes}")
-    print('* a parte do dano de A que veio da espada, do arco e do soco')
+    print('* a parte do dano de A que veio da espada, do arco e do soco (na Margo, do rolo)')
     print('** 9 de cada 10 lutas acabam até este tempo')
 
 
