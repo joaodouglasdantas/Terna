@@ -4,8 +4,10 @@ de ult (fontes/ult-margo.png, que ferramentas/ult.py reduz como as outras).
 
 Uso (na pasta jogo/):  python3 ferramentas/margo-artes.py  e depois  python3 ferramentas/ult.py
 
-- O retrato: a Margo de corpo inteiro, recortada pelo rosto e ampliada 3x sem suavizar (os outros
-  retratos têm 477x1513; a cena tem 512 de altura, então 504 linhas viram 1512).
+- O retrato: a Margo de corpo inteiro, recortada pelo rosto e ampliada 1,5x sem suavizar, para o rosto
+  ficar do tamanho do da Leslie e do Grow nos cartões (os retratos têm 477 de largura). Em cima, a
+  parede da cozinha continua (a primeira linha da cena, esticada para cima): o cartão alto da tela
+  dos personagens mostra um pouco acima da cabeça.
 - A ult: o rosto dela e o do ganso lado a lado (a cena reduzida à metade: o pixel dela fica perto
   do do cenário na tela), com o ganso de olho vermelho e sobrancelha brava — o Ganso Raivoso.
   Gravada em 3x (1536 de largura), como as artes que ult.py reduz a 1/3.
@@ -17,7 +19,7 @@ from PIL import Image
 RAIZ = os.path.join(os.path.dirname(__file__), '..')
 CENA = os.path.join(RAIZ, 'fontes', 'margo-cozinha.png')
 
-RETRATO = {'x': 851, 'largura': 159, 'y': 4, 'altura': 504}  # na cena: o meio do rosto em x ~930, os olhos em y ~150
+RETRATO = {'x': 771, 'largura': 318, 'acima': 80}  # na cena: o meio do rosto em x ~930, os olhos em y ~150
 ULT = {'x': 700, 'largura': 1024}  # a Margo (755 a 1015) e o ganso (1340 a 1615)
 # O olho do ganso na cena e a sobrancelha brava (em pixels da cena, já que ela é ampliada).
 OLHO_DO_GANSO = (1529, 146, 15, 19)
@@ -29,8 +31,11 @@ def main():
     cena = Image.open(CENA).convert('RGB')
 
     r = RETRATO
-    retrato = cena.crop((r['x'], r['y'], r['x'] + r['largura'], r['y'] + r['altura']))
-    retrato = retrato.resize((r['largura'] * 3, r['altura'] * 3), Image.NEAREST)
+    corte = cena.crop((r['x'], 0, r['x'] + r['largura'], cena.height))
+    corte = corte.resize((r['largura'] * 3 // 2, cena.height * 3 // 2), Image.NEAREST)
+    retrato = Image.new('RGB', (corte.width, corte.height + r['acima']))
+    retrato.paste(corte.crop((0, 0, corte.width, 1)).resize((corte.width, r['acima'])), (0, 0))
+    retrato.paste(corte, (0, r['acima']))
     destino = os.path.join(RAIZ, 'apps', 'cliente', 'src', 'assets', 'retratos', 'margo.webp')
     retrato.save(destino, 'WEBP', quality=92, method=6)
     print(f'-> {os.path.relpath(destino, RAIZ)} ({retrato.width}x{retrato.height})')
