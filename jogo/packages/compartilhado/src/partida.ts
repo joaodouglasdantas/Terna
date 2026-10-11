@@ -83,7 +83,7 @@ export const EstadoJogador = z.object({
   vy: z.number().min(-3000).max(3000),
   direcao: z.union([z.literal(1), z.literal(-1)]),
   noChao: z.boolean(),
-  forma: z.enum(['base', 'anjo', 'golem']), // o Anjo vira anjo, o Grow vira golem; a Leslie está sempre na base
+  forma: z.enum(['base', 'anjo', 'golem']), // o Anjo vira anjo, o Grow vira golem; a Leslie e a Margo estão sempre na base
   modo: z.enum(['arma', 'poderes']), // o que o clique esquerdo da Leslie e do Grow usa (a tecla R troca)
   esquerda: z.boolean(),
   direita: z.boolean(),
@@ -96,6 +96,7 @@ export const EstadoJogador = z.object({
   preso: z.number().min(0).max(10), // segundos que ainda faltam presos pelas Raízes (0 = livre)
   veneno: z.number().min(0).max(10), // segundos que ainda faltam do veneno do Chicote (0 = limpo)
   levado: z.number().min(0).max(10), // segundos que ainda faltam carregado pela Revoada do Grow
+  lento: z.number().min(0).max(10).default(0), // segundos que ainda faltam enfarinhado (a Farinha da Margo)
   empurrao: z.number().min(-1000).max(1000), // px/s de empurrão (vento, trombada), que vai sumindo
   canalizando: z.boolean(), // o Grow segurando o Vendaval
   energia: z.number().min(0).max(ENERGIA_PIXY.maxima), // a energia pixy, para o painel dele aqui
@@ -117,7 +118,7 @@ export type PoderUsado = z.infer<typeof PoderUsado>;
 // saiu (a mão) e para onde o cursor apontava. Quem recebe faz o golpe no corpo do outro e confere
 // se ele acerta o seu personagem.
 export const AtaqueUsado = z.object({
-  arma: z.enum(ATAQUES), // a arma da mão, ou 'soco' (sem arma)
+  arma: z.enum(ATAQUES), // a arma da mão, 'soco' (sem arma) ou 'rolo' (a rolada da Margo)
   x: z.number().min(0).max(MUNDO),
   y: z.number().min(-1000).max(1000),
   alvoX: z.number().min(-MUNDO).max(2 * MUNDO),

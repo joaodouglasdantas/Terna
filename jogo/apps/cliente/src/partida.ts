@@ -28,13 +28,14 @@
 // ele soprando.
 //
 // O treino (o tutorial: inicio/tutorial.ts): sem contagem e sem relógio, contra o boneco — o
-// outro personagem parado, que não ataca, não pega arma e nunca cai (apanhando muito, a vida
+// outro dos dois iniciais (o tutorial é sempre só com a Leslie e o Grow), parado, que não ataca, não pega arma e nunca cai (apanhando muito, a vida
 // dele volta). As armas não caem sozinhas: o tutorial solta a dele na hora certa.
 
 import {
   CARREGAMENTO_MS,
   CONTAGEM_MS,
   DURACAO_PARTIDA_MS,
+  HEROIS_DO_TUTORIAL,
   HEROIS_LIBERADOS,
   MUNDO,
   VIDA_MAXIMA,
@@ -94,6 +95,7 @@ import {
   mostrarCura,
   mostrarDano,
   pararVento,
+  roloVoando,
   soprando,
   tentarUsar,
   type Alvo,
@@ -204,7 +206,8 @@ export function criarPartida(
 ): Partida {
   const convidado = escolha.modo === 'online' && escolha.lado === 'convidado';
   const [meuX, meuLado, dele, ladoDele] = convidado ? [AO_LADO, -1, MEIO, 1] as const : [MEIO, 1, AO_LADO, -1] as const;
-  const heroiDele = escolha.modo === 'online' ? escolha.heroiOponente : heroiDaCpu(escolha.heroi);
+  // O boneco do treino é sempre o outro dos dois iniciais (o tutorial é só com a Leslie e o Grow).
+  const heroiDele = escolha.modo === 'online' ? escolha.heroiOponente : escolha.modo === 'treino' ? heroiDoBoneco(escolha.heroi) : heroiDaCpu(escolha.heroi);
   // Online, o relógio conta do aviso de que começou (o carregamento e a contagem vêm antes): os
   // dois lados terminam a contagem juntos, mesmo se um abriu o mapa um pouco depois.
   const agora = performance.now();
@@ -289,6 +292,7 @@ export function criarPartida(
           p.outro.encanto = m.estado.encanto > 0 ? { resta: m.estado.encanto, dono: p.jogador } : null;
           p.outro.preso = m.estado.preso;
           p.outro.veneno = m.estado.veneno;
+          p.outro.lento = m.estado.lento;
           p.outro.levado = m.estado.levado;
           p.outro.empurrao = m.estado.empurrao;
           if (!m.estado.canalizando) pararVento(p.efeitos, p.outro);
@@ -301,6 +305,7 @@ export function criarPartida(
             gesticular(p.outro, { x: m.uso.alvoX, y: m.uso.alvoY }, m.uso.poder === 'julgamento');
             lancarPoder(p.efeitos, p.outro, m.uso);
             if (m.uso.poder === 'flor') mostrarUlt(p, p.outro, 'flor');
+            if (m.uso.poder === 'ganso') mostrarUlt(p, p.outro, 'ganso');
             if (m.uso.poder === 'vento') p.outro.canalizando = true;
           }
         }
@@ -324,6 +329,11 @@ export function criarPartida(
     );
   }
   return p;
+}
+
+// O boneco do treino: o outro dos dois iniciais (a Leslie treina contra o Grow, e o Grow contra ela).
+function heroiDoBoneco(seu: Heroi): Heroi {
+  return HEROIS_DO_TUTORIAL.find((h) => h !== seu) ?? HEROIS_DO_TUTORIAL[0];
 }
 
 // A CPU: um personagem sorteado entre os liberados que não é o seu (sobrando só o seu, o seu).
@@ -369,6 +379,7 @@ function usarPoder(p: Partida, corpo: Personagem, alvo: { x: number; y: number }
   uso.y = mao.y;
   lancarPoder(p.efeitos, corpo, uso);
   if (uso.poder === 'flor') mostrarUlt(p, corpo, 'flor');
+  if (uso.poder === 'ganso') mostrarUlt(p, corpo, 'ganso');
   if (uso.poder === 'vento') corpo.canalizando = true;
   if (corpo === p.jogador) p.remoto?.conexao.enviarPoder(uso);
 }
@@ -511,6 +522,9 @@ export function atualizarPartida(p: Partida, teclado: Controles, mouse: AcoesMou
   // Sopra enquanto o Vendaval dele estiver no mapa.
   p.jogador.canalizando = soprando(p.efeitos, p.jogador);
   p.outro.canalizando = soprando(p.efeitos, p.outro);
+  // O rolo da Margo voando (o Bumerangue): a mão dela fica vazia até ele voltar.
+  p.jogador.roloFora = roloVoando(p.efeitos, p.jogador);
+  p.outro.roloFora = roloVoando(p.efeitos, p.outro);
   atualizarArsenal(p.arsenal, p.efeitos, dt, [p.jogador, p.outro], alvos, alvosDe);
   // Online, a energia do outro vem da rede e a sua sai da vida dele que chega (acima).
   if (!p.online) {
@@ -652,6 +666,7 @@ function enviarEstado(r: Remoto, corpo: Personagem, segurados: Controles, agora 
     preso: arredondar(Math.min(10, corpo.preso), 100),
     veneno: arredondar(Math.min(10, corpo.veneno), 100),
     levado: arredondar(Math.min(10, corpo.levado), 100),
+    lento: arredondar(Math.min(10, corpo.lento), 100),
     empurrao: arredondar(Math.max(-1000, Math.min(1000, corpo.empurrao)), 10),
     canalizando: corpo.canalizando,
     energia: arredondar(corpo.energia, 10),

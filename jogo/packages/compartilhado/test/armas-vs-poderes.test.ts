@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   ARCO,
+  BUMERANGUE,
+  FARINHA,
+  GANSO,
+  ROLO,
   CHICOTE,
   ESPADA,
   FLOR,
@@ -32,6 +36,9 @@ const USOS: Record<string, number> = {
   'Impacto Angelical (a fileira)': IMPACTO.dano * IMPACTO.explosoes,
   'Rajada de Amor (os dois corações)': RAJADA.dano * 2,
   'Julgamento Celestial': JULGAMENTO.dano,
+  'Bumerangue de Rolo (a ida e a volta)': BUMERANGUE.dano * 2,
+  'Saco de Farinha (o saco e a nuvem toda)': FARINHA.dano + FARINHA.danoTique * Math.floor(FARINHA.duracao / FARINHA.tique),
+  'Ganso Raivoso (bicando o tempo todo)': GANSO.dano * Math.floor(GANSO.duracao / GANSO.intervalo),
 };
 
 describe('as armas do chão são a segunda opção: os poderes é que carregam a luta', () => {
@@ -44,6 +51,11 @@ describe('as armas do chão são a segunda opção: os poderes é que carregam a
 
   it('o soco é o ataque mais fraco do jogo: menos que qualquer arma, até sem o crítico', () => {
     expect(SOCO.dano).toBeLessThan(Math.min(ESPADA.dano, ARCO.dano));
+  });
+
+  it('a rolada da Margo (a arma dela, no lugar do soco) também fica abaixo de qualquer poder', () => {
+    for (const [poder, uso] of Object.entries(USOS)) expect(ROLO.dano, poder).toBeLessThan(uso);
+    expect(ROLO.dano).toBeGreaterThan(SOCO.dano);
   });
 
   it('o poder mais fraco continua sendo o Chicote (é ele a régua das armas)', () => {

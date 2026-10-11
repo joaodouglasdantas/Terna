@@ -16,15 +16,22 @@
 //   (grow/cajado.ts). Quadros em assets/grow/base.png, grow/sem-cajado.png (o mesmo corpo sem o
 //   cajado na mão) e grow/golem.png, gerados de fontes/grow.png e fontes/golem.png por
 //   ferramentas/gerar-herois.cjs (que também gera os da Leslie).
+// - Margo, a vovó do rolo de massa: sempre de gente, sem soco e sem arma do chão — o clique esquerdo
+//   no primeiro quadrinho é a rolada (a fileira ATTACK da folha, `golpe`); no Bumerangue o rolo sai
+//   da mão (`roloFora`) e o corpo é o da folha sem ele. O ganso dela anda atrás (margo/ganso.ts) e,
+//   na ult, sai bravo atrás do outro (margo/poderes.ts). Quadros em assets/margo/base.png e
+//   margo/sem-rolo.png, gerados de fontes/margo.png por ferramentas/gerar-herois.cjs.
 // Os sprites são desenhados virados para a direita.
 
 import {
   CORPO_GOLEM,
   DEFESA_GOLEM,
   ENERGIA_PIXY,
+  FARINHA,
   MOVIMENTO_GOLEM,
   MUNDO,
   RAJADA,
+  ROLO,
   VIDA_MAXIMA,
   type Heroi,
   type IdPoder,
@@ -35,10 +42,13 @@ import urlGrowBase from '../assets/grow/base.png';
 import urlGrowGolem from '../assets/grow/golem.png';
 import urlGrowSemCajado from '../assets/grow/sem-cajado.png';
 import urlLeslie from '../assets/leslie.png';
+import urlMargoBase from '../assets/margo/base.png';
+import urlMargoSemRolo from '../assets/margo/sem-rolo.png';
 import { QUADROS_ANJO } from '../gerado/anjo-quadros';
 import { QUADROS_GOLEM } from '../gerado/golem-quadros';
 import { QUADROS_GROW } from '../gerado/grow-quadros';
 import { QUADROS_LESLIE } from '../gerado/leslie-quadros';
+import { QUADROS_MARGO } from '../gerado/margo-quadros';
 import { carregarImagem, contexto2d, novoCanvas } from '../motor/imagens';
 import type { Luz, Sprite } from '../motor/tipos';
 import { desenharSombra } from '../mundo/cenario';
@@ -59,10 +69,11 @@ import {
 } from './anjo/anjo';
 import { PAIRAR_NO_AR, criarVoo, decolar, voarNoAr, type Voo } from './anjo/voo';
 import { desenharArmaNaMao, desenharSoco, type ArmaNaMao, type Ataque } from './armas';
-import { BRACO_ANJO, BRACO_BASE, BRACO_GROW, BRACO_LESLIE, desenharBracoComMao, maisBraco, ombroDe, type CoresBraco } from './braco';
+import { BRACO_ANJO, BRACO_BASE, BRACO_GROW, BRACO_LESLIE, BRACO_MARGO, desenharBracoComMao, maisBraco, ombroDe, type CoresBraco } from './braco';
 import { CORPO, manobraAcabou, pontoDaManobra, type Manobra, type Medida } from './efeitos';
 import { carregarAguias } from './grow/aguia';
 import { carregarFlor } from './leslie/flor';
+import { atualizarCompanheiro, carregarGanso, criarCompanheiro, desenharCompanheiro, type Companheiro } from './margo/ganso';
 import { desenharCajadoNasCostas } from './grow/cajado';
 import {
   alternarGolem,
@@ -79,6 +90,7 @@ import {
   avisar,
   criarPoderes,
   desenharEncanto,
+  desenharEnfarinhado,
   desenharPreso,
   desenharVeneno,
   poderEscolhido,
@@ -95,7 +107,8 @@ export type NomeAnimacao = keyof typeof QUADROS_ANJO & keyof typeof QUADROS_LESL
 // `morto`: ajoelha, cai e fica deitado (quem perdeu). O Anjo não tem: caído, fica meio apagado.
 // `retrato`: a pose da foto do painel, quando a forma tem uma própria (o golem, na altura dos
 // outros); sem ela, a foto usa o primeiro quadro `parado`.
-export type AnimacoesPersonagem = Record<NomeAnimacao, Sprite[]> & { morto?: Sprite[]; retrato?: Sprite[] };
+// `golpe`: a rolada da Margo (só ela tem).
+export type AnimacoesPersonagem = Record<NomeAnimacao, Sprite[]> & { morto?: Sprite[]; retrato?: Sprite[]; golpe?: Sprite[] };
 export type Forma = 'base' | 'anjo' | 'golem';
 // O que o clique esquerdo da Leslie e do Grow (de gente) usa: a arma da mão ou os poderes (a
 // tecla R troca).
@@ -106,19 +119,19 @@ const SEM_ANCORAS = { olhos: [], ombro: [0, 0], tarja: [0, 0, 0, 0] } as const;
 
 export function quadroPersonagem(heroi: Heroi, animacao: NomeAnimacao, quadro: number, forma: Forma = 'base'): QuadroPersonagem {
   if (heroi === 'anjo') return QUADROS_ANJO[animacao][quadro];
-  const tabela = heroi === 'leslie' ? QUADROS_LESLIE : forma === 'golem' ? QUADROS_GOLEM : QUADROS_GROW;
+  const tabela = heroi === 'leslie' ? QUADROS_LESLIE : heroi === 'margo' ? QUADROS_MARGO : forma === 'golem' ? QUADROS_GOLEM : QUADROS_GROW;
   const { w, h } = tabela[animacao][quadro];
   return { w, h, ...SEM_ANCORAS };
 }
 
 type Recorte = { x: number; y: number; w: number; h: number; ax: number; axAnjo?: number; pedra?: readonly number[] };
-type TabelaDeQuadros = Record<NomeAnimacao, readonly Recorte[]> & { morto?: readonly Recorte[]; retrato?: readonly Recorte[] };
+type TabelaDeQuadros = Record<NomeAnimacao, readonly Recorte[]> & { morto?: readonly Recorte[]; retrato?: readonly Recorte[]; golpe?: readonly Recorte[] };
 
 // `anjo`: usa o eixo do sprite do anjo — de lado a cabeça dele recua, e o eixo recua junto para
 // a cabeça ficar no mesmo ponto do mapa nas duas formas.
 function recortar(folha: HTMLImageElement, tabela: TabelaDeQuadros, anjo: boolean): AnimacoesPersonagem {
   const animacoes = {} as AnimacoesPersonagem;
-  (Object.keys(tabela) as (NomeAnimacao | 'morto' | 'retrato')[]).forEach((nome) => {
+  (Object.keys(tabela) as (NomeAnimacao | 'morto' | 'retrato' | 'golpe')[]).forEach((nome) => {
     animacoes[nome] = (tabela[nome] ?? []).map((q) => {
       const canvas = novoCanvas(q.w, q.h);
       contexto2d(canvas).drawImage(folha, q.x, q.y, q.w, q.h, 0, 0, q.w, q.h);
@@ -129,22 +142,26 @@ function recortar(folha: HTMLImageElement, tabela: TabelaDeQuadros, anjo: boolea
 }
 
 // Os sprites de cada personagem, por forma: todos têm a base; o Anjo, a de anjo; o Grow, a de golem
-// e, de gente, a sem o cajado na mão (no modo arma o cajado vai nas costas: grow/cajado.ts).
+// e, de gente, a sem o cajado na mão (no modo arma o cajado vai nas costas: grow/cajado.ts); a
+// Margo, a sem o rolo na mão (no Bumerangue).
 export type SpritesDosHerois = Record<
   Heroi,
-  { base: AnimacoesPersonagem; semCajado?: AnimacoesPersonagem } & Partial<Record<Forma, AnimacoesPersonagem>>
+  { base: AnimacoesPersonagem; semCajado?: AnimacoesPersonagem; semRolo?: AnimacoesPersonagem } & Partial<Record<Forma, AnimacoesPersonagem>>
 >;
 
 // O Anjo também carrega (a arte é pequena), mesmo guardado: é só ligar para ele voltar.
 export async function carregarHerois(): Promise<SpritesDosHerois> {
-  const [leslie, anjoBase, anjoAnjo, growBase, growGolem, growSemCajado] = await Promise.all([
+  const [leslie, anjoBase, anjoAnjo, growBase, growGolem, growSemCajado, margoBase, margoSemRolo] = await Promise.all([
     carregarImagem(urlLeslie),
     carregarImagem(urlAnjoBase),
     carregarImagem(urlAnjoAnjo),
     carregarImagem(urlGrowBase),
     carregarImagem(urlGrowGolem),
     carregarImagem(urlGrowSemCajado),
+    carregarImagem(urlMargoBase),
+    carregarImagem(urlMargoSemRolo),
     carregarAguias(), // as águias da Revoada do Grow
+    carregarGanso(), // o ganso da Margo (e o Ganso Raivoso)
     carregarFlor(), // a Flor Carnívora da Leslie
   ]);
   return {
@@ -155,6 +172,7 @@ export async function carregarHerois(): Promise<SpritesDosHerois> {
       golem: recortar(growGolem, QUADROS_GOLEM, false),
       semCajado: recortar(growSemCajado, QUADROS_GROW, false),
     },
+    margo: { base: recortar(margoBase, QUADROS_MARGO, false), semRolo: recortar(margoSemRolo, QUADROS_MARGO, false) },
   };
 }
 
@@ -168,6 +186,8 @@ const DURACAO_QUADRO: Record<NomeAnimacao, number> = {
   caindo: 0.2,
   atacando: 1, // um quadro só: não é animação do estado, só a pose de atacar parado
 };
+// A rolada da Margo: a fileira ATTACK inteira no tempo do golpe (ROLO.golpe).
+const QUADROS_DA_ROLADA = 7;
 
 const VELOCIDADE = 90; // pixels por segundo (o golem, MOVIMENTO_GOLEM)
 const FORCA_PULO = 240; // pixels por segundo — segurando o botão, sobe ~45px
@@ -211,13 +231,15 @@ const MAO_DE_FRENTE: Record<Heroi, { lado: number; linha: number }> = {
   anjo: { lado: 5, linha: 23 },
   leslie: { lado: 3, linha: 17 },
   grow: { lado: 5, linha: 19 },
+  margo: { lado: 4, linha: 18 },
 };
 // O braço que segura a arma: a manga do moletom do Anjo, a pele da Leslie e do Grow.
-const BRACO_DA_ARMA: Record<Heroi, CoresBraco> = { anjo: BRACO_BASE, leslie: BRACO_LESLIE, grow: BRACO_GROW };
+const BRACO_DA_ARMA: Record<Heroi, CoresBraco> = { anjo: BRACO_BASE, leslie: BRACO_LESLIE, grow: BRACO_GROW, margo: BRACO_MARGO };
 const BRACO_DO_PODER: Record<Heroi, { cores: CoresBraco; brilho: string }> = {
   anjo: { cores: BRACO_ANJO, brilho: '255, 95, 162' }, // rosa
   leslie: { cores: BRACO_LESLIE, brilho: '143, 212, 90' }, // verde
   grow: { cores: BRACO_GROW, brilho: '214, 236, 170' }, // o verde-claro do vento
+  margo: { cores: BRACO_MARGO, brilho: '255, 246, 224' }, // o branco da farinha
 };
 
 // Os botões de um quadro: segurados ou não.
@@ -259,6 +281,7 @@ export interface Personagem {
   preso: number; // segundos presos pelas Raízes da Leslie: não anda nem pula (0 = livre)
   veneno: number; // segundos envenenado pelo Chicote da Leslie (0 = limpo)
   venenoTique: number;
+  lento: number; // segundos enfarinhado pela Farinha da Margo: anda devagar e sem arranco (0 = livre)
   gesto: { resta: number; angulo: number } | null; // o braço soltando um poder
   poderes: Poderes;
   arma: ArmaNaMao | null; // a espada ou o arco na mão (só a forma base)
@@ -280,6 +303,8 @@ export interface Personagem {
   defesa: number; // parte do dano que absorve (o golem)
   pesado: boolean; // o golem
   rastro: Rastro; // os efeitos do dash e do pulo duplo
+  roloFora: boolean; // a Margo: o rolo está voando (o Bumerangue), a mão vazia
+  ganso: Companheiro; // o ganso da Margo, que anda atrás dela (os outros têm um, parado e invisível)
 }
 
 let ANIMACOES: SpritesDosHerois;
@@ -306,10 +331,12 @@ function pelaPedra(p: Personagem): boolean {
   return p.heroi === 'grow' && formaDo(p) === 'base';
 }
 
-// Os quadros que aparecem agora: os da forma, ou os do Grow sem o cajado na mão.
+// Os quadros que aparecem agora: os da forma, os do Grow sem o cajado na mão ou os da Margo sem o
+// rolo (ele está voando).
 function quadrosDo(p: Personagem): AnimacoesPersonagem {
   const semCajado = cajadoNasCostas(p) ? ANIMACOES.grow.semCajado : undefined;
-  return semCajado ?? spritesDo(p.heroi, formaDo(p));
+  const semRolo = p.heroi === 'margo' && p.roloFora && p.vida > 0 ? ANIMACOES.margo.semRolo : undefined;
+  return semCajado ?? semRolo ?? spritesDo(p.heroi, formaDo(p));
 }
 
 export function criarPersonagem(heroi: Heroi, x: number, direcao: 1 | -1 = 1): Personagem {
@@ -343,6 +370,7 @@ export function criarPersonagem(heroi: Heroi, x: number, direcao: 1 | -1 = 1): P
     preso: 0,
     veneno: 0,
     venenoTique: 0,
+    lento: 0,
     gesto: null,
     poderes: criarPoderes(heroi),
     arma: null,
@@ -362,6 +390,8 @@ export function criarPersonagem(heroi: Heroi, x: number, direcao: 1 | -1 = 1): P
     defesa: 0,
     pesado: false,
     rastro: criarRastro(),
+    roloFora: false,
+    ganso: criarCompanheiro(x, direcao),
   };
 }
 
@@ -375,7 +405,7 @@ export function formaDo(p: Personagem): Forma {
 // virar golem, a barra cheia). O Anjo e o golem não gastam nos poderes.
 export function custoDeEnergia(p: Personagem, poder: IdPoder = poderEscolhido(p.poderes)): number {
   const tabela: Partial<Record<IdPoder, number>> =
-    p.heroi === 'leslie' ? ENERGIA_PIXY.custoLeslie : p.heroi === 'grow' ? ENERGIA_PIXY.custoGrow : {};
+    p.heroi === 'leslie' ? ENERGIA_PIXY.custoLeslie : p.heroi === 'grow' ? ENERGIA_PIXY.custoGrow : p.heroi === 'margo' ? ENERGIA_PIXY.custoMargo : {};
   return tabela[poder] ?? 0;
 }
 
@@ -417,13 +447,15 @@ export function podeUsarPoderes(p: Personagem): boolean {
   return bloqueioDosPoderes(p) === null;
 }
 
-// O mesmo para a arma da mão, na forma base (null = ataca, se a recarga dela deixar).
+// O mesmo para a arma da mão, na forma base (null = ataca, se a recarga dela deixar). Na Margo, o
+// rolo: sem ele na mão (voando, no Bumerangue), nada de rolada.
 export function bloqueioDaArma(p: Personagem): string | null {
   if (p.vida <= 0) return 'CAIU';
   if (p.encanto) return 'ENFEITICADO';
   if (!personagemLivre(p)) return 'TRANSFORMANDO';
   // O golem não pega arma nem soca: as mãos de pedra são dos poderes dele.
   if (formaDo(p) !== 'base') return 'SO PODERES'; // (a fonte do painel não tem acento)
+  if (p.heroi === 'margo' && p.roloFora) return 'O ROLO ESTA VOANDO';
   return null;
 }
 
@@ -432,9 +464,10 @@ export function armaPronta(p: Personagem): boolean {
   return bloqueioDaArma(p) === null && (p.arma ? p.arma.recarga : p.recargaSoco) <= 0;
 }
 
-// Só a forma base pega arma: vivo, com a mão livre e fora da transformação.
+// Só a forma base pega arma: vivo, com a mão livre e fora da transformação. A Margo nunca: idosa, a
+// arma dela é o rolo de massa.
 export function podePegarArma(p: Personagem): boolean {
-  return p.vida > 0 && !p.arma && formaDo(p) === 'base' && personagemLivre(p);
+  return p.heroi !== 'margo' && p.vida > 0 && !p.arma && formaDo(p) === 'base' && personagemLivre(p);
 }
 
 // Começou a virar anjo ou golem (ou já é) com uma arma na mão: ela cai no chão.
@@ -582,7 +615,11 @@ function avancarAnimacao(p: Personagem, dt: number): void {
 // O quadro que aparece: parado, ele olha para a tela (com a arma, se tiver, na mão do sprite);
 // soltando um poder ou atacando com a arma, vira de lado, em pé e com as pernas juntas, para o
 // braço sair para o lado da mira. Correndo ou no ar, o ataque vai por cima do quadro de sempre.
-function quadroMostrado(p: Personagem): { animacao: NomeAnimacao; quadro: number } {
+// A rolada da Margo é a própria folha: o quadro da fileira ATTACK no ponto do golpe.
+function quadroMostrado(p: Personagem): { animacao: NomeAnimacao | 'golpe'; quadro: number } {
+  if (p.ataque?.tipo === 'rolo') {
+    return { animacao: 'golpe', quadro: Math.min(QUADROS_DA_ROLADA - 1, Math.floor((p.ataque.idade / ROLO.golpe) * QUADROS_DA_ROLADA)) };
+  }
   // Agachando para o Salto ou batendo o pé antes da Investida: a pose de golpe do golem.
   if (p.manobra && p.manobra.idade < p.manobra.espera) return { animacao: 'atacando', quadro: 0 };
   if ((p.gesto || p.ataque || p.canalizando) && p.animacao === 'parado') return { animacao: 'atacando', quadro: 0 };
@@ -601,7 +638,7 @@ function spriteAtual(p: Personagem): Sprite {
   const morto = spriteMorto(p);
   if (morto) return morto;
   const { animacao, quadro } = quadroMostrado(p);
-  const quadros = quadrosDo(p)[animacao];
+  const quadros = (animacao === 'golpe' ? spritesDo(p.heroi).golpe : quadrosDo(p)[animacao]) ?? quadrosDo(p).atacando;
   return quadros[Math.min(quadro, quadros.length - 1)];
 }
 
@@ -613,18 +650,19 @@ function pedraDoCajado(p: Personagem): { x: number; y: number } | null {
   return { x: x + direcao * (pedra[0] + 0.5 - eixo), y: topo + pedra[1] + 0.5 };
 }
 
-// A tinta das cópias do dash: a da Leslie, a do Grow (ou do golem), ou a da forma do Anjo.
+// A tinta das cópias do dash: a da Leslie, a do Grow (ou do golem), a da Margo ou a da forma do Anjo.
 const tintaDo = (p: Personagem): TintaRastro =>
-  p.heroi === 'leslie' ? 'leslie' : p.heroi === 'grow' ? (formaDo(p) === 'golem' ? 'golem' : 'grow') : formaDo(p) === 'anjo' ? 'anjo' : 'base';
+  p.heroi === 'leslie' ? 'leslie' : p.heroi === 'margo' ? 'margo' : p.heroi === 'grow' ? (formaDo(p) === 'golem' ? 'golem' : 'grow') : formaDo(p) === 'anjo' ? 'anjo' : 'base';
 
 function poseDe(p: Personagem): Pose {
   const { imagem, eixo } = spriteAtual(p);
   const { animacao, quadro } = quadroMostrado(p);
   const morto = spriteMorto(p) !== null;
   return {
-    quadro: morto
-      ? { w: imagem.width, h: imagem.height, ...SEM_ANCORAS }
-      : quadroPersonagem(p.heroi, animacao, Math.min(quadro, spritesDo(p.heroi, formaDo(p))[animacao].length - 1), formaDo(p)),
+    quadro:
+      morto || animacao === 'golpe'
+        ? { w: imagem.width, h: imagem.height, ...SEM_ANCORAS }
+        : quadroPersonagem(p.heroi, animacao, Math.min(quadro, spritesDo(p.heroi, formaDo(p))[animacao].length - 1), formaDo(p)),
     imagem,
     eixo,
     x: Math.round(p.x),
@@ -665,7 +703,8 @@ function atualizarDash(p: Personagem, toque: -1 | 0 | 1, solto: -1 | 0 | 1, dt: 
 // Também chamado de fora para o outro jogador online, quando o estado dele chega em dash e o
 // toque duplo dele se perdeu no caminho. Não faz nada se ainda está na recarga.
 export function comecarDash(p: Personagem, lado: 1 | -1): void {
-  if (p.recargaDash > 0 || !personagemLivre(p)) return;
+  // Enfarinhado (a Farinha da Margo) não dá o arranco.
+  if (p.recargaDash > 0 || !personagemLivre(p) || p.lento > 0) return;
   p.dash = DURACAO_DASH;
   p.recargaDash = DURACAO_DASH + RECARGA_DASH;
   p.direcao = lado;
@@ -782,7 +821,8 @@ export function podeVirarGolem(p: Personagem): boolean {
 // golem, não).
 export function ganharEnergia(p: Personagem, dano: number): void {
   if (dano <= 0 || formaDo(p) !== 'base' || !personagemLivre(p)) return;
-  const porDano = p.heroi === 'grow' ? ENERGIA_PIXY.porDanoGrow : p.heroi === 'anjo' ? ENERGIA_PIXY.porDanoAnjo : ENERGIA_PIXY.porDano;
+  const porDano =
+    p.heroi === 'grow' ? ENERGIA_PIXY.porDanoGrow : p.heroi === 'anjo' ? ENERGIA_PIXY.porDanoAnjo : p.heroi === 'margo' ? ENERGIA_PIXY.porDanoMargo : ENERGIA_PIXY.porDano;
   p.energia = Math.min(ENERGIA_PIXY.maxima, p.energia + dano * porDano);
 }
 
@@ -820,6 +860,7 @@ function ajustarCorpo(p: Personagem): void {
 export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: number, tempo: number): void {
   if (p.encanto && (p.encanto.resta -= dt) <= 0) p.encanto = null;
   p.preso = Math.max(0, p.preso - dt);
+  p.lento = Math.max(0, p.lento - dt);
   const encanto = p.encanto;
   // Preso pelas Raízes: não anda, não pula e não dá dash (os poderes e a arma continuam). Soprando
   // o Vendaval, também não; carregado pela Revoada ou no meio de um Salto ou de uma Investida,
@@ -828,7 +869,7 @@ export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: num
     // Caiu: nada mais o prende nem o envenena; só a queda até o chão.
     p.morte += dt;
     p.encanto = null;
-    p.preso = p.veneno = p.levado = 0;
+    p.preso = p.veneno = p.levado = p.lento = 0;
     p.canalizando = false;
     p.gesto = null;
   }
@@ -865,7 +906,8 @@ export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: num
     // No dash o lado já está decidido: os botões só voltam a mandar quando ele acaba.
     p.vx = p.direcao * VELOCIDADE_DASH;
   } else {
-    const velocidade = encanto ? RAJADA.andarEncantado : golem ? MOVIMENTO_GOLEM.velocidade : VELOCIDADE;
+    const normal = encanto ? RAJADA.andarEncantado : golem ? MOVIMENTO_GOLEM.velocidade : VELOCIDADE;
+    const velocidade = p.lento > 0 ? normal * FARINHA.lento : normal;
     if (esquerda) {
       p.vx = -velocidade;
       p.direcao = -1;
@@ -951,6 +993,7 @@ export function atualizarPersonagem(p: Personagem, recebidos: Controles, dt: num
   if (p.heroi === 'anjo') atualizarAnjo(p.anjo, dt, tempo, p, pose);
   // Caído de golem, fica golem (a pedra não se desfaz em cima de quem perdeu).
   if (p.heroi === 'grow') atualizarGolem(p.golem, dt, p, p.manobra !== null || p.vida <= 0);
+  if (p.heroi === 'margo') atualizarCompanheiro(p.ganso, p, dt);
   ajustarCorpo(p);
 }
 
@@ -970,6 +1013,8 @@ export function desenharPersonagem(ctx: CanvasRenderingContext2D, p: Personagem,
   desenharRastro(ctx, p.rastro);
   if (p.heroi === 'anjo') desenharAnjoAtras(ctx, p.anjo, tempo, pose);
   if (p.heroi === 'grow') desenharGolemAtras(ctx, p.golem, pose);
+  // O ganso da Margo anda atrás dela: desenhado antes.
+  if (p.heroi === 'margo') desenharCompanheiro(ctx, p.ganso, yChao, AFUNDAR_NA_GRAMA);
 
   // Caído (vida 0): deitado no chão; o Anjo, sem a queda desenhada, fica meio apagado.
   const alfa = p.vida > 0 || spriteMorto(p) ? 1 : 0.45;
@@ -992,7 +1037,8 @@ export function desenharPersonagem(ctx: CanvasRenderingContext2D, p: Personagem,
   // guardada (a mão é dos poderes); o Grow não estica braço: quem brilha é a pedra do cajado.
   const bracos = (): void => {
     if (p.gesto && !golem && !pelaPedra(p)) desenharBraco(ctx, p, p.gesto);
-    if (p.vida > 0 && !(p.heroi !== 'anjo' && p.modo === 'poderes') && !golem) {
+    // A Margo não tem arma nem soco: o rolo é do próprio sprite.
+    if (p.vida > 0 && !(p.heroi !== 'anjo' && p.modo === 'poderes') && !golem && p.heroi !== 'margo') {
       desenharArmaNaMao(ctx, p, tempo, maoDeFrente, BRACO_DA_ARMA[p.heroi]);
       desenharSoco(ctx, p, BRACO_DA_ARMA[p.heroi]); // sem arma na mão
     }
@@ -1013,6 +1059,7 @@ export function desenharPersonagem(ctx: CanvasRenderingContext2D, p: Personagem,
   desenharEncanto(ctx, p, tempo);
   desenharPreso(ctx, p, tempo);
   desenharVeneno(ctx, p, tempo);
+  desenharEnfarinhado(ctx, p, tempo);
 }
 
 // O braço do gesto (entidades/braco.ts): sai do ombro da frente na direção da mira, com a mão

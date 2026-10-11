@@ -3,7 +3,8 @@
 // esperam no chão; a arma na mão, com o braço segurando; o golpe da espada, que varre
 // de cima para a frente, e a flecha do arco; a arma quebrando quando o tempo dela acaba, e a
 // jogada fora (tecla E), que cai e some. E, sem arma na mão, o soco: o braço estica rápido com o
-// punho fechado na ponta e volta.
+// punho fechado na ponta e volta. A Margo, no lugar do soco, dá a rolada com o rolo de massa (a
+// pose é a da folha dela: personagem.ts); aqui fica o acerto e o risco do rolo no ar.
 //
 // Sozinho, o próprio jogo sorteia as quedas; online, elas chegam do servidor, que também decide
 // quem pega. Como nos poderes, cada um confere só o que acerta o próprio personagem.
@@ -14,6 +15,7 @@ import {
   ESPADA,
   MUNDO,
   QUEDA_DE_ARMAS,
+  ROLO,
   SOCO,
   cabeOutraArma,
   danoNaZona,
@@ -60,12 +62,13 @@ export interface Ataque {
 
 // O que as armas precisam de um personagem (o corpo é de entidades/personagem.ts).
 export interface CorpoArmado extends CorpoAlvo {
+  heroi?: string; // a Margo dá a rolada no lugar do soco
   direcao: 1 | -1;
   maoLivreAtras?: boolean; // o Grow: o braço da arma e do soco é o de trás
   dash: number; // no dash o lado já está decidido: o ataque não vira o corpo
   arma: ArmaNaMao | null;
   ataque: Ataque | null;
-  recargaSoco: number; // segundos até o próximo soco
+  recargaSoco: number; // segundos até o próximo soco (na Margo, a próxima rolada)
 }
 
 // As poses, em ângulos do corpo (0 = frente, positivo = para baixo) e pixels. Parado com a arma,
@@ -100,8 +103,8 @@ function ombroDoAcerto(ombro: Ponto, ataque: Ataque): Ponto {
 // Mais longe que isto, o corpo do outro aqui está num lugar bem diferente (pulou direto para a
 // posição nova): o golpe sai do corpo daqui mesmo.
 const DESVIO_MAXIMO = 48;
-const DURACAO_ATAQUE: Record<TipoAtaque, number> = { espada: ESPADA.golpe + 0.08, arco: 0.4, soco: SOCO.golpe + 0.04 };
-const LIMITE_DA_MIRA: Record<TipoAtaque, number> = { espada: POSE.miraEspada, arco: POSE.miraArco, soco: POSE.miraSoco };
+const DURACAO_ATAQUE: Record<TipoAtaque, number> = { espada: ESPADA.golpe + 0.08, arco: 0.4, soco: SOCO.golpe + 0.04, rolo: ROLO.golpe };
+const LIMITE_DA_MIRA: Record<TipoAtaque, number> = { espada: POSE.miraEspada, arco: POSE.miraArco, soco: POSE.miraSoco, rolo: 0.6 };
 const LAMINA = { de: 4, ate: 15 }; // pixels da mão até o começo e a ponta da lâmina (o cabo fica na mão)
 const ACABANDO = 3; // segundos: com menos que isto de durabilidade, a arma pisca
 
@@ -350,6 +353,14 @@ export function gastarArma(a: Arsenal, c: CorpoArmado, dt: number, podeQuebrar: 
 // antes disso não faz nada); sem arma, dá um soco. Volta o ataque, para lançar aqui e mandar pela
 // rede.
 export function tentarAtacar(c: CorpoArmado, alvo: Ponto): AtaqueUsado | null {
+  if (c.heroi === 'margo') {
+    // A rolada: o rolo de massa é a arma dela (ela não soca nem pega arma).
+    if (c.recargaSoco > 0) return null;
+    c.recargaSoco = ROLO.recarga;
+    virarPara(c, alvo);
+    const ombro = ombroDe(c);
+    return { arma: 'rolo', x: Math.max(0, Math.min(MUNDO, ombro.x)), y: ombro.y, alvoX: alvo.x, alvoY: alvo.y };
+  }
   if (!c.arma) {
     if (c.recargaSoco > 0) return null;
     c.recargaSoco = SOCO.recarga;
@@ -461,6 +472,28 @@ function socar(e: Efeitos, a: Arsenal, c: CorpoArmado, ataque: Ataque, alvos: re
   }
 }
 
+// A rolada: no meio do golpe (ROLO.acerta), a linha do ombro até a ponta do rolo, na direção da
+// mira, confere os corpos (cada um uma vez). Dano fixo, sem crítico.
+function rolar(e: Efeitos, a: Arsenal, c: CorpoArmado, ataque: Ataque, alvos: readonly Alvo[]): void {
+  const t = ataque.idade / ROLO.golpe;
+  if (t < ROLO.acerta[0] || t > ROLO.acerta[1]) return;
+  const ombro = ombroDoAcerto(ombroDe(c), ataque);
+  const ang = anguloNoMapa(ataque.mira, c.direcao);
+  for (const alvo of vivos(alvos, c)) {
+    if (ataque.atingidos.includes(alvo.corpo)) continue;
+    for (let k = 4; k <= ROLO.alcance; k += 2) {
+      const x = ombro.x + Math.cos(ang) * k;
+      const y = ombro.y + Math.sin(ang) * k;
+      if (!acertaCorpo(alvo.corpo, x, y, 2)) continue;
+      ataque.atingidos.push(alvo.corpo);
+      ferirAlvo(e, alvo, ROLO.dano);
+      // A pancada: lascas da madeira e um sopro de farinha.
+      for (let n = 0; n < 8; n++) faisca(a, x, y, 55, 0, n % 2 ? '#f8ce98' : '#ffffff');
+      break;
+    }
+  }
+}
+
 function atualizarFlecha(e: Efeitos, a: Arsenal, f: Flecha, dt: number, alvos: readonly Alvo[]): boolean {
   if (f.presa >= 0) return (f.presa += dt) < 0.9;
   // Em passos curtos, para a flecha rápida não atravessar ninguém entre dois quadros.
@@ -552,6 +585,7 @@ export function atualizarArsenal(
     ataque.idade += dt;
     if (ataque.tipo === 'espada') golpear(e, a, c, ataque, alvosDe(c));
     if (ataque.tipo === 'soco') socar(e, a, c, ataque, alvosDe(c));
+    if (ataque.tipo === 'rolo') rolar(e, a, c, ataque, alvosDe(c));
     if (ataque.idade >= DURACAO_ATAQUE[ataque.tipo]) c.ataque = null;
   }
   a.flechas = a.flechas.filter((f) => atualizarFlecha(e, a, f, dt, alvosDe(f.dono)));

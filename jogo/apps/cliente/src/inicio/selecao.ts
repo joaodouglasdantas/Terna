@@ -18,7 +18,7 @@
 //
 // Setas (ou A/D) passam de um cartão para o outro (pulando o do outro), Enter joga e Esc volta.
 
-import { HEROIS, LIBERADO, SOBRE_HEROI, type Heroi, type Lado, type MensagemPartidaDoServidor } from '@terna/compartilhado';
+import { HEROIS, HEROIS_DO_TUTORIAL, LIBERADO, SOBRE_HEROI, type Heroi, type Lado, type MensagemPartidaDoServidor } from '@terna/compartilhado';
 import { spritesDo } from '../entidades/personagem';
 import { contexto2d } from '../motor/imagens';
 import type { ConexaoPartida } from '../rede/partida';
@@ -77,6 +77,7 @@ export interface TextosDaSelecao {
   sub: string;
   voltar: string;
   jogar: string;
+  herois?: readonly Heroi[]; // só estes aparecem (o treino: os dois iniciais)
 }
 
 // A escolha do treino (o atalho Treinamento da tela inicial).
@@ -85,6 +86,7 @@ export const TEXTOS_DO_TREINO: TextosDaSelecao = {
   sub: 'Escolha com quem treinar: o tutorial mostra os controles e os poderes dele',
   voltar: 'Voltar',
   jogar: 'Treinar',
+  herois: HEROIS_DO_TUTORIAL, // o tutorial é sempre só com a Leslie e o Grow
 };
 
 // A primeira vez, logo depois de criar a conta: o personagem do tutorial (ou pular).
@@ -93,6 +95,7 @@ export const TEXTOS_DO_PRIMEIRO_TREINO: TextosDaSelecao = {
   sub: 'Você vai aprender a jogar com ele numa partida de treino',
   voltar: 'Já sei jogar',
   jogar: 'Começar',
+  herois: HEROIS_DO_TUTORIAL,
 };
 
 interface Cartao {
@@ -178,7 +181,7 @@ export function telaSelecao(sala?: SalaNaSelecao, textos?: TextosDaSelecao, todo
     estado.setAttribute('aria-live', 'polite');
     const acoes = elemento('div', 'inicio-acoes');
 
-    const livre = (h: Heroi): boolean => LIBERADO[h] || (todos && !sala);
+    const livre = (h: Heroi): boolean => (LIBERADO[h] || (todos && !sala)) && (!textos?.herois || textos.herois.includes(h));
     const liberados = HEROIS.filter(livre);
     let escolhido: Heroi | null = null; // nenhum até a pessoa clicar num
     let confirmado = false;

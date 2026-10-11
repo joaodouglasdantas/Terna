@@ -11,6 +11,8 @@
 //   Carnívora pronta.
 // - Grow: de gente, como a Leslie (a barra cheia: dá para virar golem); de golem, a barra de pedra
 //   com o tempo que resta, descendo, e os três poderes do golem.
+// - Margo: como a Leslie, mas o primeiro quadrinho é sempre o rolo de massa (ela não soca nem pega
+//   arma; com o rolo voando, no Bumerangue, ele fica apagado). A barra cheia é o Ganso Raivoso.
 // - Anjo: na forma base, a energia pixy (cheia, dá para virar anjo) e o quadrinho da arma; de
 //   anjo, o tempo que resta e os três poderes.
 // O escolhido fica em destaque. Em pixels da tela do jogo, desenhado por último, por cima da luz.
@@ -87,7 +89,13 @@ const ENERGIA_LESLIE: CoresBarra = { fundo: '#1c2a18', cheio: '#8fd45a', brilho:
 const ENERGIA_GROW: CoresBarra = { fundo: '#241a12', cheio: '#b07a45', brilho: '#e6bf8e', sombra: '#7a4f2c' };
 // As marquinhas dos poderes baratos na barra: escuras onde a energia já passou, claras onde falta.
 const MARCA_CRISTAL = { passou: 'rgba(70, 44, 6, 0.55)', falta: 'rgba(255, 241, 176, 0.55)' };
-const MARCA_CHEIA: Record<'leslie' | 'grow', string> = { leslie: 'rgba(20, 40, 16, 0.55)', grow: 'rgba(44, 26, 12, 0.55)' };
+// A da Margo: o azul do avental dela.
+const ENERGIA_MARGO: CoresBarra = { fundo: '#151c2c', cheio: '#6f95d4', brilho: '#c6d8f4', sombra: '#3a5590' };
+const MARCA_CHEIA: Record<'leslie' | 'grow' | 'margo', string> = {
+  leslie: 'rgba(20, 40, 16, 0.55)',
+  grow: 'rgba(44, 26, 12, 0.55)',
+  margo: 'rgba(14, 22, 44, 0.55)',
+};
 const ADAPTAR = 0.6; // segundos da cor do personagem correndo pela barra, quando ela enche
 const GOLEM: CoresBarra = { fundo: '#221c16', cheio: '#a8977a', brilho: '#d2c3a2', sombra: '#75654f' };
 const GOLEM_PISCANDO: CoresBarra = { fundo: '#221c16', cheio: '#d2c3a2', brilho: '#fff4dc', sombra: '#a8977a' };
@@ -272,7 +280,92 @@ const PALETA_GROW: Paleta = {
   l: '#a8977a',
   L: '#d2c3a2',
 };
+// Os da Margo: o rolo de massa girando, o saco de farinha estourando e a cabeça do Ganso Raivoso
+// (olho vermelho, sobrancelha brava e o bico aberto), nas cores da folha dela.
+const PALETA_MARGO: Paleta = {
+  t: '#3c1c0e',
+  m: '#83421b',
+  c: '#c66b37',
+  C: '#e88a43',
+  b: '#f8ce98',
+  w: '#ffffff',
+  f: '#efe7d6',
+  s: '#bfb39e',
+  N: '#5a4428',
+  n: '#d9c39a',
+  k: '#28252a',
+  g: '#fbf7ee',
+  G: '#d8cdb8',
+  r: '#e02222',
+  o: '#f08a2c',
+  O: '#b85a16',
+};
+// O rolo de massa: o quadrinho do clique esquerdo da Margo (no lugar do punho do soco).
+const ROLO = criarSprite(
+  [
+    '...........',
+    '........tt.',
+    '.......tmmt',
+    '......tCbt.',
+    '.....tCct..',
+    '....tCct...',
+    '...tCct....',
+    '..tbct.....',
+    '.tmmt......',
+    '.ttt.......',
+    '...........',
+  ],
+  PALETA_MARGO,
+);
 const ICONES: Record<IdPoder, HTMLCanvasElement> = {
+  bumerangue: criarSprite(
+    [
+      '...........',
+      '...wwwww...',
+      '..w.....w..',
+      '.ttttttttt.',
+      'tmtCbbbCtmt',
+      'tmtcccccmmt',
+      '.ttttttttt.',
+      '..w.....w..',
+      '...wwwww...',
+      '...........',
+      '...........',
+    ],
+    PALETA_MARGO,
+  ),
+  farinha: criarSprite(
+    [
+      '.f.......f.',
+      '..f..N..f..',
+      '....NnN....',
+      '...NnnnN...',
+      '..NnwnnnN..',
+      '..NnnnnnN..',
+      '..NnnnnsN..',
+      '...NNNNN...',
+      '.sfffffffs.',
+      'sfwfffffwfs',
+      '.sssssssss.',
+    ],
+    PALETA_MARGO,
+  ),
+  ganso: criarSprite(
+    [
+      '...kkkk....',
+      '..kggggk...',
+      '.kgkkggk...',
+      '.kggrkgkkk.',
+      '.kgggggkook',
+      '.kGggggkOOk',
+      '..kGgggkkk.',
+      '..kGggk....',
+      '..kGggk....',
+      '.kGgggk....',
+      '.kGggggk...',
+    ],
+    PALETA_MARGO,
+  ),
   aves: criarSprite(
     [
       '...........',
@@ -527,7 +620,8 @@ function desenharEspaco(
 // tempo que ela ainda dura, que se esvazia até quebrar. `ativo`: o clique esquerdo usa a arma agora.
 // `naFileira` (a Leslie e o Grow de gente): o quadrinho é o primeiro da fileira que o botão direito
 // percorre; escolhido, ganha a moldura verde, e não escolhido só perde a moldura (o ícone não apaga).
-function desenharEspacoDaArma(p: Pincel, arma: ArmaNaMao | null, tempo: number, ativo = true, naFileira = false): void {
+// `rolo`: o da Margo — sempre o rolo de massa (apagado com ele voando, no Bumerangue).
+function desenharEspacoDaArma(p: Pincel, arma: ArmaNaMao | null, tempo: number, ativo = true, naFileira = false, rolo?: { voando: boolean }): void {
   const ARMA_X = BARRA_X; // a arma abre a fileira
   const acabando = arma !== null && arma.durabilidade < ACABANDO;
   const apaga = acabando && Math.floor(tempo * 8) % 2 === 0;
@@ -535,6 +629,10 @@ function desenharEspacoDaArma(p: Pincel, arma: ArmaNaMao | null, tempo: number, 
   const apagado = naFileira ? 1 : 0.3; // o ícone apaga quando o clique não usa a arma, menos na fileira
   p.arredondado(ARMA_X, ESPACOS_Y, ESPACO, ESPACO, moldura);
   p.retangulo(ARMA_X + 1, ESPACOS_Y + 1, ESPACO - 2, ESPACO - 2, 'rgba(26, 10, 22, 0.85)');
+  if (rolo) {
+    p.imagem(ROLO, ARMA_X + 1, ESPACOS_Y + 1, rolo.voando ? 0.3 : 1);
+    return;
+  }
   if (!arma) {
     // Sem arma: o soco (apagadinho — é o ataque mais fraco).
     p.imagem(PUNHO, ARMA_X + 1, ESPACOS_Y + 1, ativo || naFileira ? 0.85 : apagado);
@@ -616,6 +714,20 @@ export function desenharPainel(
     }
     if (cheia) desenharBrilho(p, ANJO_Y, 3, tempo, ENERGIA_LESLIE.brilho);
     desenharEspacoDaArma(p, personagem.arma, tempo, personagem.modo === 'arma', true);
+    desenharPoderes(p, personagem, ESPACO + ENTRE_ESPACOS);
+  } else if (personagem.heroi === 'margo') {
+    // Como a Leslie: a energia, que enche para o Ganso Raivoso; o rolo e os poderes lado a lado.
+    const cheia = personagem.energia >= ENERGIA_PIXY.maxima;
+    desenharCaco(p, cheia ? ENERGIA_MARGO : CRISTAL, cheia, tempo);
+    desenharEnergia(p, personagem, personagem.energia / ENERGIA_PIXY.maxima, ENERGIA_MARGO, tempo);
+    for (const poder of ['bumerangue', 'farinha'] as const) {
+      const custo = ENERGIA_PIXY.custoMargo[poder];
+      const x = Math.round((BARRA * custo) / ENERGIA_PIXY.maxima);
+      const cor = cheia ? MARCA_CHEIA.margo : personagem.energia >= custo ? MARCA_CRISTAL.passou : MARCA_CRISTAL.falta;
+      p.retangulo(BARRA_X + 1 + x, ANJO_Y + 1, 1, 3, cor);
+    }
+    if (cheia) desenharBrilho(p, ANJO_Y, 3, tempo, ENERGIA_MARGO.brilho);
+    desenharEspacoDaArma(p, null, tempo, personagem.modo === 'arma', true, { voando: personagem.roloFora });
     desenharPoderes(p, personagem, ESPACO + ENTRE_ESPACOS);
   } else {
     const anjo = barraDoAnjo(personagem.anjo, personagem.energia);

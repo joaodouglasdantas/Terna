@@ -49,6 +49,17 @@ import {
   type PoderGrow,
 } from './grow/poderes';
 import {
+  ameacasDaMargo,
+  atualizarEfeitoMargo,
+  desenharMargoNaFrente,
+  desenharMargoNoChao,
+  desenharPreviaMargo,
+  lancarPoderMargo,
+  roloDoDono,
+  type EfeitoMargo,
+  type PoderMargo,
+} from './margo/poderes';
+import {
   ameacasDaLeslie,
   atualizarEfeitoLeslie,
   desenharLeslieNaFrente,
@@ -61,6 +72,7 @@ import {
 
 export { desenharBordaDoEncanto, desenharEncanto } from './anjo/poderes';
 export { desenharPreso, desenharVeneno } from './leslie/poderes';
+export { desenharEnfarinhado } from './margo/poderes';
 export { absorvidoDoQuePassou, acertaCorpo, CORPO_REAL, deVerdade, ferirAlvo, mostrarCura, mostrarDano } from './efeitos';
 export type { Alvo, Ameacas, CorpoAlvo, Dono, Encanto, Manobra, Medida } from './efeitos';
 
@@ -147,7 +159,7 @@ export function tentarUsar(
 
 // ---- No mapa ----
 
-type Efeito = EfeitoAnjo | EfeitoLeslie | EfeitoGrow;
+type Efeito = EfeitoAnjo | EfeitoLeslie | EfeitoGrow | EfeitoMargo;
 export type Efeitos = Nucleo<Efeito>;
 
 export function criarEfeitos(): Efeitos {
@@ -164,6 +176,10 @@ const PODERES_LESLIE: readonly IdPoder[] = PODERES_DO_HEROI.leslie;
 const daLeslie = (poder: IdPoder): poder is PoderLeslie => PODERES_LESLIE.includes(poder);
 const efeitoDaLeslie = (ef: Efeito): ef is EfeitoLeslie =>
   ef.tipo === 'chicote' || ef.tipo === 'raizes' || ef.tipo === 'flor';
+const PODERES_MARGO: readonly IdPoder[] = PODERES_DO_HEROI.margo;
+const daMargo = (poder: IdPoder): poder is PoderMargo => PODERES_MARGO.includes(poder);
+const efeitoDaMargo = (ef: Efeito): ef is EfeitoMargo =>
+  ef.tipo === 'bumerangue' || ef.tipo === 'saco' || ef.tipo === 'nuvem' || ef.tipo === 'ganso';
 const doGrow = (poder: IdPoder): poder is PoderGrow => (PODERES_DO_GROW as readonly IdPoder[]).includes(poder);
 const efeitoDoGrow = (ef: Efeito): ef is EfeitoGrow =>
   ef.tipo === 'aves' || ef.tipo === 'vento' || ef.tipo === 'salto' || ef.tipo === 'investida' || ef.tipo === 'pedra';
@@ -173,6 +189,7 @@ const efeitoDoGrow = (ef: Efeito): ef is EfeitoGrow =>
 export function lancarPoder(e: Efeitos, dono: Dono, uso: PoderUsado): void {
   const poder = uso.poder;
   if (daLeslie(poder)) lancarPoderLeslie(e as Nucleo<EfeitoLeslie>, dono, { ...uso, poder });
+  else if (daMargo(poder)) lancarPoderMargo(e as Nucleo<EfeitoMargo>, dono, { ...uso, poder });
   else if (doGrow(poder)) lancarPoderGrow(e as Nucleo<EfeitoGrow>, dono, { ...uso, poder });
   else lancarPoderAnjo(e as Nucleo<EfeitoAnjo>, dono, { ...uso, poder: poder as PoderAnjo });
 }
@@ -184,6 +201,11 @@ export function pararVento(e: Efeitos, dono: Dono): void {
 
 export function soprando(e: Efeitos, dono: Dono): boolean {
   return ventoDo(e, dono);
+}
+
+// O rolo da Margo (`dono`) está voando, no Bumerangue: a mão dela está vazia.
+export function roloVoando(e: Efeitos, dono: Dono): boolean {
+  return roloDoDono(e.lista, dono);
 }
 
 // Um quadro dos efeitos no mapa. `alvos`: os corpos de verdade (o veneno corre neles). `alvosDe`:
@@ -198,7 +220,9 @@ export function atualizarEfeitos(
   e.lista = e.lista.filter((ef) =>
     efeitoDaLeslie(ef)
       ? atualizarEfeitoLeslie(e as Nucleo<EfeitoLeslie>, ef, dt, alvosDe(ef.dono))
-      : efeitoDoGrow(ef)
+      : efeitoDaMargo(ef)
+        ? atualizarEfeitoMargo(e as Nucleo<EfeitoMargo>, ef, dt, alvosDe(ef.dono))
+        : efeitoDoGrow(ef)
         ? atualizarEfeitoGrow(e as Nucleo<EfeitoGrow>, ef, dt, alvosDe(ef.dono))
         : atualizarEfeitoAnjo(e as Nucleo<EfeitoAnjo>, ef, dt, alvosDe(ef.dono)),
   );
@@ -213,6 +237,7 @@ export function ameacasPara(e: Efeitos, corpo: Dono): Ameacas {
   for (const ef of e.lista) {
     if (ef.dono === corpo) continue;
     if (efeitoDaLeslie(ef)) ameacasDaLeslie(ef, ameacas);
+    else if (efeitoDaMargo(ef)) ameacasDaMargo(ef, ameacas);
     else if (efeitoDoGrow(ef)) ameacasDoGrow(ef, ameacas);
     else ameacasDoAnjo(ef, ameacas);
   }
@@ -223,6 +248,7 @@ export function ameacasPara(e: Efeitos, corpo: Dono): Ameacas {
 export function desenharEfeitosNoChao(ctx: CanvasRenderingContext2D, e: Efeitos, tempo: number): void {
   for (const ef of e.lista) {
     if (efeitoDaLeslie(ef)) desenharLeslieNoChao(ctx, ef, tempo);
+    else if (efeitoDaMargo(ef)) desenharMargoNoChao(ctx, ef, tempo);
     else if (efeitoDoGrow(ef)) desenharGrowNoChao(ctx, ef, tempo);
     else desenharAnjoNoChao(ctx, ef, tempo);
   }
@@ -232,6 +258,7 @@ export function desenharEfeitosNoChao(ctx: CanvasRenderingContext2D, e: Efeitos,
 export function desenharEfeitosNaFrente(ctx: CanvasRenderingContext2D, e: Efeitos, tempo: number): void {
   for (const ef of e.lista) {
     if (efeitoDaLeslie(ef)) desenharLeslieNaFrente(ctx, ef, tempo);
+    else if (efeitoDaMargo(ef)) desenharMargoNaFrente(ctx, ef, tempo);
     else if (efeitoDoGrow(ef)) desenharGrowNaFrente(ctx, ef, tempo);
     else desenharAnjoNaFrente(ctx, ef, tempo);
   }
@@ -249,10 +276,12 @@ export function desenharPreviaDoPoder(
   origem: { x: number; y: number },
   alvo: { x: number; y: number },
   tempo: number,
+  dono?: Dono,
 ): void {
   ctx.save();
   ctx.globalAlpha = PREVIA.alfa * (0.8 + 0.2 * Math.sin(tempo * 4));
   if (daLeslie(poder)) desenharPreviaLeslie(ctx, poder, origem, alvo, tempo, PREVIA);
+  else if (daMargo(poder)) desenharPreviaMargo(ctx, poder, origem, alvo, tempo, PREVIA, dono);
   else if (doGrow(poder)) desenharPreviaGrow(ctx, poder, origem, alvo, tempo, PREVIA);
   else desenharPreviaAnjo(ctx, poder as PoderAnjo, origem, alvo, tempo);
   ctx.restore();

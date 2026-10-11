@@ -61,8 +61,9 @@ export const SOCO = {
   alcance: 9, // do ombro até o punho esticado
 };
 
-// Tudo o que o clique esquerdo faz na forma base (e vai pela rede como `golpe`): as armas e o soco.
-export const ATAQUES = [...ARMAS, 'soco'] as const;
+// Tudo o que o clique esquerdo faz na forma base (e vai pela rede como `golpe`): as armas, o soco e a
+// rolada da Margo (ela não soca nem pega arma: o rolo de massa é a arma dela, conteudo/margo.ts).
+export const ATAQUES = [...ARMAS, 'soco', 'rolo'] as const;
 export type TipoAtaque = (typeof ATAQUES)[number];
 
 export const DADOS_ARMA: Record<TipoArma, { dano: number; recarga: number; durabilidade: number }> = {

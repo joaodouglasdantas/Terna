@@ -9,6 +9,9 @@
 //   ataca com os três quando você está no alcance (a Flor Carnívora, só com a barra de energia cheia).
 // - Grow: de gente, como a Leslie (os pássaros e o vento — soprando um tempo sorteado); com a
 //   barra cheia, vira golem pelo terceiro quadrinho e aí chega perto e bate com os do golem.
+// - Margo: sem arma do chão nem soco, chega perto e bate com o rolo; com um poder pronto, troca
+//   para ele (o Bumerangue e a Farinha de perto ou de média distância; o Ganso Raivoso com a barra
+//   cheia).
 // - Anjo: quando a energia e a recarga deixam, vira anjo (e aí voa, plana e às vezes solta o
 //   botão no meio) e ataca com os poderes dele. Com uma arma boa na mão, adia virar anjo
 //   (virando, ela cairia no chão).
@@ -26,6 +29,8 @@ import {
   RAIZES,
   RAJADA,
   CHICOTE,
+  BUMERANGUE,
+  FARINHA,
   type IdPoder,
   type Intervalo,
 } from '@terna/compartilhado';
@@ -33,6 +38,7 @@ import { sortear } from '../motor/matematica';
 import { ALCANCE_ANJO } from './anjo/poderes';
 import { ALCANCE_GROW } from './grow/poderes';
 import { ALCANCE_LESLIE } from './leslie/poderes';
+import { ALCANCE_MARGO } from './margo/poderes';
 import {
   armaPronta,
   custoDeEnergia,
@@ -79,6 +85,7 @@ const SOSIA = {
   arco: { longe: 150, de: 40, ate: 250 }, // fica a esta distância e atira neste intervalo
   entreGolpes: [0.05, 0.35] as Intervalo, // segundos de hesitação depois da arma ficar pronta
   soprar: [0.8, 2.2] as Intervalo, // segundos segurando o Vendaval
+  rolo: { perto: 11, golpe: 20 }, // a Margo chega a esta distância e dá a rolada a partir desta
 };
 
 export interface CerebroSosia {
@@ -137,7 +144,7 @@ function escolherDestino(c: CerebroSosia, x: number): number {
 }
 
 // Até onde cada poder pega.
-const ALCANCE: Record<IdPoder, number> = { ...ALCANCE_ANJO, ...ALCANCE_LESLIE, ...ALCANCE_GROW };
+const ALCANCE: Record<IdPoder, number> = { ...ALCANCE_ANJO, ...ALCANCE_LESLIE, ...ALCANCE_GROW, ...ALCANCE_MARGO };
 // O aviso de cada poder de área: a mira adianta o passo do oponente por parte dele.
 const AVISO: Partial<Record<IdPoder, number>> = {
   impacto: IMPACTO.aviso,
@@ -174,6 +181,17 @@ function mirar(corpo: Personagem, oponente: Personagem, poder: number): Mira {
     const voo = (Math.abs(oponente.x - corpo.x) / CHICOTE.alcance) * CHICOTE.estica;
     return { poder, x: oponente.x + oponente.vx * voo * 0.7 + erro(), y: oponente.y - 16 + erro() / 2 };
   }
+  if (id === 'bumerangue') {
+    const voo = Math.abs(oponente.x - corpo.x) / BUMERANGUE.velocidade;
+    return { poder, x: oponente.x + oponente.vx * voo * 0.7 + erro(), y: oponente.y - 16 + erro() / 2 };
+  }
+  if (id === 'farinha') {
+    // O saco cai no caminho: mira acima dele, mais alto quanto mais longe.
+    const d = Math.abs(oponente.x - corpo.x);
+    const voo = d / FARINHA.velocidade;
+    return { poder, x: oponente.x + oponente.vx * voo * 0.6 + erro(), y: oponente.y - 16 - d * 0.35 + erro() };
+  }
+  if (id === 'ganso') return { poder, x: oponente.x, y: oponente.y - 16 };
   if (id === 'aves') {
     const voo = Math.abs(oponente.x - corpo.x) / REVOADA.velocidade;
     return { poder, x: oponente.x + oponente.vx * voo * 0.7 + erro(), y: oponente.y - 16 + erro() / 2 };
@@ -253,6 +271,18 @@ function lutarComArma(c: CerebroSosia, corpo: Personagem, oponente: Personagem, 
   return { x, golpe: { x: oponente.x + oponente.vx * voo * 0.7 + erro(), y: oponente.y - 16 - queda + erro() } };
 }
 
+// A Margo com o rolo: chega perto e dá a rolada quando ele está no alcance (o rolo voando, espera
+// longe dele a volta).
+function lutarComRolo(c: CerebroSosia, corpo: Personagem, oponente: Personagem, dt: number): { x: number; golpe: { x: number; y: number } | null } {
+  const lado = corpo.x >= oponente.x ? 1 : -1;
+  const pronta = armaPronta(corpo) && oponente.vida > 0;
+  if (!pronta) c.ateGolpe = sortear(SOSIA.entreGolpes);
+  else c.ateGolpe -= dt;
+  const x = noMapa(oponente.x + lado * (corpo.roloFora ? SOSIA.distanciaPoderes : SOSIA.rolo.perto));
+  const alcanca = Math.abs(oponente.x - corpo.x) <= SOSIA.rolo.golpe && Math.abs(oponente.y - corpo.y) < 22;
+  return { x, golpe: pronta && c.ateGolpe <= 0 && alcanca ? { x: oponente.x, y: oponente.y - 16 } : null };
+}
+
 export function pensarSosia(
   c: CerebroSosia,
   corpo: Personagem,
@@ -281,7 +311,18 @@ export function pensarSosia(
 
   const guardando = corpo.arma !== null && corpo.arma.durabilidade > SOSIA.guardarArma;
   const podeApertar = corpo.noChao && c.segurando <= 0 && !corpo.transformarSegurado;
-  if (corpo.heroi !== 'anjo') {
+  if (corpo.heroi === 'margo') {
+    // O rolo de perto; com um poder pronto (e o outro no alcance dele), os poderes.
+    const distancia = Math.abs(oponente.x - corpo.x);
+    const algum = corpo.poderes.lista.some(
+      (id, i) => corpo.poderes.recarga[i] <= 0 && corpo.energia >= custoDeEnergia(corpo, id) && distancia <= ALCANCE[id],
+    );
+    const quer: Modo = algum && !corpo.roloFora ? 'poderes' : 'arma';
+    if (corpo.modo !== quer && podeApertar) {
+      corpo.modo = quer;
+      return decisao;
+    }
+  } else if (corpo.heroi !== 'anjo') {
     // Com uma arma boa (ou sem energia nem para o primeiro poder), o modo arma; senão, os
     // poderes. Muda o modo por um quadro só (não há tecla para isso). De golem não muda.
     const semEnergia = corpo.energia < custoDeEnergia(corpo, corpo.poderes.lista[0]);
@@ -305,7 +346,12 @@ export function pensarSosia(
 
   const fuga = fugaDeMarca(corpo, ameacas);
   const buscar = podePegarArma(corpo) ? armaParaBuscar(corpo, armas) : null;
-  const luta = corpo.arma && formaDo(corpo) === 'base' && !usaPoderes(corpo) ? lutarComArma(c, corpo, oponente, dt) : null;
+  const luta =
+    corpo.heroi === 'margo' && !usaPoderes(corpo)
+      ? lutarComRolo(c, corpo, oponente, dt)
+      : corpo.arma && formaDo(corpo) === 'base' && !usaPoderes(corpo)
+        ? lutarComArma(c, corpo, oponente, dt)
+        : null;
   decisao.golpe = luta?.golpe ?? null;
   // Sem arma e sem os poderes na mão, de perto: um soco de vez em quando.
   if (!corpo.arma && formaDo(corpo) === 'base' && !usaPoderes(corpo) && armaPronta(corpo) && oponente.vida > 0) {

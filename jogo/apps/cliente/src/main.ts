@@ -375,7 +375,7 @@ function desenharVista(tempo: number, luz: Luz, camX: number, olharY: number, x0
     if (mostrarMira(partida) && acaoPronta(partida)) {
       const { jogador } = partida;
       if (usaPoderes(jogador)) {
-        desenharPreviaDoPoder(ctx, poderEscolhido(jogador.poderes), peitoDo(jogador), telaParaMapa(cursor), tempo);
+        desenharPreviaDoPoder(ctx, poderEscolhido(jogador.poderes), peitoDo(jogador), telaParaMapa(cursor), tempo, jogador);
       } else if (jogador.arma?.tipo === 'arco') {
         desenharPreviaDoArco(ctx, jogador, telaParaMapa(cursor), tempo);
       }

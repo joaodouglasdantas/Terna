@@ -1,7 +1,8 @@
 // O braço que o personagem estica por cima do sprite: segurando ou usando uma arma, dando um soco
 // (armas.ts) e soltando um poder (personagem.ts). Sai do ombro, de lado, na direção pedida: um
 // braço de verdade, com contorno escuro, luz, cor e sombra, a roupa de cada um (a manga e o punho
-// do casaco do Grow, a pulseira de folhas da Leslie, a manga do moletom do Anjo) e a mão fechada
+// do casaco do Grow, a pulseira de folhas da Leslie, a manga da blusa da Margo, a do moletom do
+// Anjo) e a mão fechada
 // na ponta, segurando o que tiver.
 
 // De lado, o ombro da frente fica 2 px à frente do eixo e 16 px acima dos pés. O da Leslie, que é
@@ -56,6 +57,13 @@ export const BRACO_LESLIE: CoresBraco = {
   faixa: { cima: '#6c7d48', sombra: '#3d492a', noPulso: true },
   braco: { luz: '#f1c299', cima: '#e3a37c', sombra: '#ac7355' },
   mao: { brilho: '#fde2ba', luz: '#f1c299', cima: '#e3a37c', sombra: '#c88968', vinco: '#936147' },
+};
+// A Margo: a manga bufante da blusa branca, o braço e a mão de pele, nas cores da folha dela.
+export const BRACO_MARGO: CoresBraco = {
+  contorno: '#28252a',
+  manga: { luz: '#fcf7ec', cima: '#e6d8d2', sombra: '#bba8a6', ate: 5 },
+  braco: { luz: '#f8ce98', cima: '#ecab76', sombra: '#be8d6f' },
+  mao: { brilho: '#fde8c4', luz: '#f8ce98', cima: '#ecab76', sombra: '#be8d6f', vinco: '#9a6040' },
 };
 // O Anjo, na forma base: a manga do moletom preto até o pulso, com o punho canelado.
 export const BRACO_BASE: CoresBraco = {

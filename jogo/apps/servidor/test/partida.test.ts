@@ -39,6 +39,7 @@ const ESTADO = {
   preso: 0,
   veneno: 0,
   levado: 0,
+  lento: 0,
   empurrao: 0,
   canalizando: false,
   energia: 40,

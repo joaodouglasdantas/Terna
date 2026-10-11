@@ -1,9 +1,10 @@
-// O tutorial, dentro da partida de treino (partida.ts, `treino`): um cartão no alto da tela diz o
-// que fazer — andar, pular, arranco, pegar a arma, atacar, a energia, trocar para os poderes,
-// cada poder do seu personagem e a ult — e a etapa passa sozinha quando a pessoa faz (o tutorial
-// olha o estado da partida a cada quadro). Um contorno piscando aponta a parte do painel de que a
-// etapa fala. "Já sei jogar" (embaixo, à direita) sai a qualquer hora; no fim, "Ir para o jogo"
-// sai e "Continuar treinando" fica no treino, sem o cartão.
+// O tutorial, dentro da partida de treino (partida.ts, `treino`) — sempre com um dos dois iniciais,
+// a Leslie ou o Grow (HEROIS_DO_TUTORIAL; a Margo e quem vier depois não entram), contra o outro: um
+// cartão no alto da tela diz o que fazer — andar, pular, arranco, pegar a arma, atacar, a energia,
+// trocar para os poderes, cada poder do seu personagem e a ult — e a etapa passa sozinha quando a
+// pessoa faz (o tutorial olha o estado da partida a cada quadro). Um contorno piscando aponta a
+// parte do painel de que a etapa fala. "Já sei jogar" (embaixo, à direita) sai a qualquer hora; no
+// fim, "Ir para o jogo" sai e "Continuar treinando" fica no treino, sem o cartão.
 //
 // O treino ajuda nas etapas dos poderes: começa cada uma com o poder carregado e energia
 // suficiente (na da ult, a barra cheia), para ninguém ficar esperando.

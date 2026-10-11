@@ -57,6 +57,14 @@ em desenvolvimento o servidor usa o **PGlite**, um Postgres embutido que grava e
   é pesado e tem **defesa**: 40% do dano que leva é absorvido e aparece em cima do número ("DEF").
   A **R** desfaz o golem antes do tempo. Números em `conteudo/grow.ts`; o código em
   `apps/cliente/src/entidades/grow/`.
+- **Margo**, a vovó do rolo de massa, com o ganso dela: idosa, **não dá soco e não pega as armas
+  do chão** — o primeiro quadrinho é o rolo (a rolada). O 1 arremessa o rolo como um **bumerangue**
+  (vai, volta para a mão e acerta nas duas passadas; até ele voltar, nada de rolada), o 2 joga um
+  **saco de farinha** que estoura numa nuvem (quem está nela fica lento, sem arranco, e perde um
+  pouquinho de vida) e, com a barra cheia, o 3 é o **Ganso Raivoso**: o ganso, que anda atrás dela,
+  fica bravo e sai correndo atrás do outro, bicando sem parar quem está perto do chão; ela continua
+  usando o rolo e os poderes. Números em `conteudo/margo.ts`; o código em
+  `apps/cliente/src/entidades/margo/`.
 - **Anjo**: pronto, mas desligado até a atualização dele. Não aparece na seleção (fica guardado, fora da vista do público).
   Para ligar, `LIBERADO.anjo = true` em `packages/compartilhado/src/conteudo/herois.ts`. O código
   dele mora em `apps/cliente/src/entidades/anjo/` e os números em `conteudo/anjo.ts`.
@@ -65,7 +73,7 @@ Sem arma na mão (no modo arma), o clique esquerdo dá um **soco**: curto, o ata
 jogo, que enche bem pouco a energia. As armas do chão são só a segunda opção: até no crítico na
 cabeça tiram menos que um uso inteiro de qualquer poder (o teste `armas-vs-poderes.test.ts`
 confere). O Grow transformado em golem só tem os poderes: sem soco e sem arma; a Leslie, que
-continua em forma humana ao ultar, pode usar. A vida é 2500, e os danos, as recargas e a energia foram
+continua em forma humana ao ultar, pode usar. A Margo nunca: a arma dela é o rolo de massa. A vida é 2500, e os danos, as recargas e a energia foram
 acertados juntos para a luta quase sempre acabar em até 3 minutos (as partidas rápidas e médias);
 os 3 a 5 do relógio ficam para as difíceis ou peculiares, e passar de 4 é raro. Se o relógio zerar,
 vence quem tiver mais vida. A tabela anotada e o porquê de cada número estão em **[BALANCEAMENTO.md](BALANCEAMENTO.md)**
@@ -75,8 +83,13 @@ A escolha é feita na tela de seleção, depois do Singleplayer (a CPU espera a 
 outro personagem) ou, no Multiplayer, com os dois já na sala: a partida só começa quando os dois
 escolhem. Cada personagem é de um jogador só na partida (não há dois iguais em campo). O cartão de
 cada um mostra só o retrato (o mesmo da tela dos personagens; o escolhido troca para o sprite
-correndo), o nome e o codinome (**Leslie, a Primeira Semente**; **Grow, a Rocha Profunda**): o que
+correndo), o nome e o codinome (**Leslie, a Primeira Semente**; **Grow, a Rocha Profunda**;
+**Margo, a Avó do Ganso**): o que
 cada um faz não aparece na escolha, só no Tab da partida, e só o seu.
+
+O **Treinamento** (o tutorial, também logo depois de criar a conta) é sempre com um dos dois
+personagens iniciais, a **Leslie** ou o **Grow**, contra o outro de boneco: a Margo (e quem vier
+depois) não entra nele (`HEROIS_DO_TUTORIAL`, em `packages/compartilhado/src/conteudo/herois.ts`).
 
 Antes de cada partida vem o carregamento da temporada atual (**Temporada 1 — A Primeira
 Semente**), com a arte num outdoor, os nomes dos personagens e o do mapa (**Floresta da Divisa**);
@@ -105,7 +118,7 @@ No canto de baixo da tela inicial ficam três atalhos: **Personagens**, **Mapa**
   grande e os personagens de cada um estão em `inicio/terras.ts`.
 
 Os retratos saem de `fontes/retratos-leslie-grow.png` (um painel para cada, recortado sem a
-moldura), a arte do mapa de `fontes/mapa-floresta-da-divisa.png` e a nuvem de `fontes/nuvem.png`
+moldura; o da Margo, da cena dela na cozinha, `fontes/margo-cozinha.png`), a arte do mapa de `fontes/mapa-floresta-da-divisa.png` e a nuvem de `fontes/nuvem.png`
 (já com o fundo transparente); as versões do jogo, em webp, ficam em
 `apps/cliente/src/assets/retratos/` e `apps/cliente/src/assets/mapa/`. Os cartões e os
 quadrinhos enquadram os retratos pelo rosto (`ROSTO`, em `inicio/terras.ts`): trocando um

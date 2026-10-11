@@ -7,6 +7,6 @@
   // Pontos de entrada em `files` (o resto entra pelos imports): numa pasta sincronizada pelo
   // OneDrive o tsc 7 não acha nada pelo `include` — ver jogo/README.md, "Cuidados ao mexer". Arquivo
   // novo que ninguém importa (um teste novo, um script) tem de entrar nesta lista.
-  "files": ["src/vite-env.d.ts", "src/main.ts", "src/rede/tempo-real.ts", "test/save.test.ts"],
+  "files": ["src/vite-env.d.ts", "src/main.ts", "src/rede/tempo-real.ts", "test/save.test.ts", "test/golem-sem-arma.test.ts", "test/margo.test.ts"],
   "include": ["src", "test"]
 }

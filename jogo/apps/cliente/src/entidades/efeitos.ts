@@ -30,6 +30,7 @@ export interface CorpoAlvo {
   encanto: Encanto | null; // enfeitiçado pela Rajada de Amor do Anjo
   preso: number; // segundos que ainda faltam presos pelas Raízes da Leslie (0 = livre)
   veneno: number; // segundos que ainda faltam do veneno do Chicote da Leslie (0 = limpo)
+  lento: number; // segundos que ainda faltam enfarinhado pela Farinha da Margo: anda devagar, sem arranco
   venenoTique: number; // segundos desde o último pinguinho de dano do veneno
 }
 
@@ -58,8 +59,8 @@ export interface Manobra {
 }
 
 // Quem lança um poder: o corpo de onde ele sai (`y`: a linha dos pés). `manobra`: o golem, que o
-// Salto e a Investida levam junto.
-export type Dono = { x: number; y: number; direcao: 1 | -1; manobra?: Manobra | null };
+// Salto e a Investida levam junto. `ganso`: o ganso da Margo (o companheiro), que sai na ult dela.
+export type Dono = { x: number; y: number; direcao: 1 | -1; manobra?: Manobra | null; ganso?: { x: number; direcao: 1 | -1; fora: boolean } };
 
 export interface Medida {
   meiaLargura: number;

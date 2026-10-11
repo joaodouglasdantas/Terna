@@ -1,5 +1,5 @@
-// A cena de ult: quando sai o especial de alguém (a Flor Carnívora da Leslie, o golem do Grow, a
-// forma de anjo do Anjo), uma faixa inclinada atravessa o meio da tela com a arte dele, como nos
+// A cena de ult: quando sai o especial de alguém (a Flor Carnívora da Leslie, o golem do Grow, o
+// Ganso Raivoso da Margo, a forma de anjo do Anjo), uma faixa inclinada atravessa o meio da tela com a arte dele, como nos
 // jogos de luta. O jogo é online e não para: a faixa passa POR CIMA da partida, no tempo do
 // aviso que a ult já tem (a terra tremendo antes da flor, a pedra subindo, a luz do anjo), e
 // serve de alerta — a sua entra pela esquerda, na sua cor; a do outro, pela direita, na dele.
@@ -13,11 +13,12 @@
 import { NOME_PODER, SOBRE_HEROI, type Heroi } from '@terna/compartilhado';
 import urlGrow from '../assets/ult/grow.webp';
 import urlLeslie from '../assets/ult/leslie.webp';
+import urlMargo from '../assets/ult/margo.webp';
 import { retrato } from '../entidades/personagem';
 import { textoEmPixels } from '../motor/fonte';
 import { carregarDecodificada } from '../motor/imagens';
 
-export type QualUlt = 'flor' | 'golem' | 'anjo';
+export type QualUlt = 'flor' | 'golem' | 'ganso' | 'anjo';
 
 // Os tempos, em segundos. A Flor fica ~1,1 s avisando antes de ferir: a faixa já saiu quando
 // ela brota.
@@ -55,12 +56,16 @@ interface Estilo {
 const ESTILOS: Record<Heroi, Estilo> = {
   grow: { fundo: '#241a12', risco: '#e6bf8e', url: urlGrow, pedacos: [{ de: 0, y: 50 }] },
   leslie: { fundo: '#1c2a18', risco: '#d4f7a8', url: urlLeslie, pedacos: [{ de: 0, y: 58 }] },
+  // A da Margo (a cena da cozinha, ferramentas/margo-artes.py) tem 256 de altura: o rosto dela e o
+  // do ganso bravo cabem na faixa.
+  margo: { fundo: '#151c2c', risco: '#c6d8f4', url: urlMargo, pedacos: [{ de: 0, y: 14 }] },
   anjo: { fundo: '#2a2442', risco: '#fff4c2', url: null, pedacos: [] },
 };
 
 const NOME_ULT: Record<QualUlt, string> = {
   flor: NOME_PODER.flor,
   golem: NOME_PODER.golem,
+  ganso: NOME_PODER.ganso,
   anjo: 'Forma de Anjo',
 };
 

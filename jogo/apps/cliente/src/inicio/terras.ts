@@ -6,12 +6,14 @@ import type { Heroi } from '@terna/compartilhado';
 import urlFlorestaDaDivisa from '../assets/mapa/floresta-da-divisa.webp';
 import urlRetratoGrow from '../assets/retratos/grow.webp';
 import urlRetratoLeslie from '../assets/retratos/leslie.webp';
+import urlRetratoMargo from '../assets/retratos/margo.webp';
 import { carregarDecodificada, umaVez } from '../motor/imagens';
 import { TEMPORADA } from './temporada';
 
-// O retrato de cada personagem (de fontes/retratos-leslie-grow.png, um painel para cada). O Anjo,
-// guardado até a atualização dele, ainda não tem.
-export const RETRATO: Partial<Record<Heroi, string>> = { leslie: urlRetratoLeslie, grow: urlRetratoGrow };
+// O retrato de cada personagem (de fontes/retratos-leslie-grow.png, um painel para cada; o da Margo,
+// da cena dela na cozinha, por ferramentas/margo-artes.py). O Anjo, guardado até a atualização dele,
+// ainda não tem.
+export const RETRATO: Partial<Record<Heroi, string>> = { leslie: urlRetratoLeslie, grow: urlRetratoGrow, margo: urlRetratoMargo };
 
 // Os retratos baixados e decodificados uma vez, no carregamento do começo do jogo: os cartões da
 // escolha de personagem e da tela dos personagens abrem com eles, sem o quadro vazio antes.
@@ -24,6 +26,7 @@ const LARGURA_DO_RETRATO = 477;
 const ROSTO: Partial<Record<Heroi, { x: number; olhos: number }>> = {
   leslie: { x: 268, olhos: 530 },
   grow: { x: 214, olhos: 600 },
+  margo: { x: 238, olhos: 305 },
 };
 
 // Põe o retrato de `heroi` em `img`, que fica dentro de uma moldura (position relative, overflow
@@ -59,7 +62,7 @@ export const BIOMAS: readonly Bioma[] = [
     arte: urlFlorestaDaDivisa,
     lado: 1254,
     centro: { x: MAPA_GRANDE.largura / 2, y: MAPA_GRANDE.altura / 2 },
-    herois: ['leslie', 'grow'],
+    herois: ['leslie', 'grow', 'margo'],
   },
 ];
 

@@ -9,7 +9,9 @@ import {
   DEFESA_GOLEM,
   DURACAO_ANJO,
   DURACAO_GOLEM,
+  FARINHA,
   FLOR,
+  GANSO,
   NOME_PODER,
   PODERES_DO_HEROI,
   PODERES_GOLEM,
@@ -36,6 +38,9 @@ export const SOBRE_PODER: Record<IdPoder, string> = {
   salto: 'pula alto e esmaga quem está embaixo',
   investida: 'corre em linha reta atropelando quem estiver na frente',
   pedra: 'arremessa um pedregulho que estoura em lascas',
+  bumerangue: 'arremessa o rolo girando: ele vai e volta para a mão, e acerta na ida e na volta',
+  farinha: 'um saco de farinha estoura numa nuvem que deixa quem está nela lento',
+  ganso: 'com a energia cheia: o ganso fica raivoso e sai correndo atrás do outro, bicando sem parar',
 };
 
 // Uma linha: as teclas (cada item vira uma tecla desenhada; '/' vira "ou") e o que fazem.
@@ -118,6 +123,16 @@ function dicasDo(heroi: Heroi): { dicas: string[]; outra?: { titulo: string; pod
         `De golem: os poderes não gastam energia, a pele de pedra segura ${Math.round(DEFESA_GOLEM * 100)}% do dano (DEF), e ele não pega arma, não dá soco nem pulo duplo.`,
       ],
       outra: { titulo: 'De golem', poderes: PODERES_GOLEM },
+    };
+  }
+  if (heroi === 'margo') {
+    return {
+      dicas: [
+        'A Margo não dá soco nem pega as armas do chão: o primeiro quadrinho é o rolo de massa, a arma dela (Clique esq.: a rolada).',
+        'No Bumerangue o rolo sai da mão: até ele voltar, nada de rolada.',
+        `Na nuvem da Farinha, o outro anda devagar, não dá o arranco e perde vida de pouquinho (fica enfarinhado ${String(FARINHA.depois).replace('.', ',')} s depois de sair).`,
+        `O Ganso Raivoso só sai com a barra cheia: por ${GANSO.duracao} s ele persegue o outro, rápido, e bica quem está no chão — pular por cima escapa. Você continua usando o rolo e os poderes.`,
+      ],
     };
   }
   return {
